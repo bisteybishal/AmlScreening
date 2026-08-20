@@ -1,19 +1,20 @@
 ﻿
-using AmlScreening.Application.Interface.Services;
-using AmlScreening.Portal.Models;
+using AmlScreening.Portal.ViewModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
-using SecurityClaim = System.Security.Claims.Claim;
-using SecurityClaimTypes = System.Security.Claims.ClaimTypes;
+using System.Security.Claims;
+using AppAuthenticationService =
+    AmlScreening.Application.Interface.Services.IAuthenticationService;
+
 
 namespace AmlScreening.Portal.Controllers
 {
     public class AccountController : Controller
     {
-        private readonly IAuthenticationService _authenticationService;
+        private readonly AppAuthenticationService _authenticationService;
 
-        public AccountController(IAuthenticationService authenticationService)
+        public AccountController(AppAuthenticationService authenticationService)
         {
             _authenticationService = authenticationService;
         }
@@ -23,12 +24,12 @@ namespace AmlScreening.Portal.Controllers
         public IActionResult Login()
         {
 
-            return View();
+            return View(new LoginViewModel());
         }
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(
-            UserModel model)
+            LoginViewModel model)
         {
 
             if (!ModelState.IsValid)
@@ -44,32 +45,33 @@ namespace AmlScreening.Portal.Controllers
 
                 return View(model);
             }
+            var claims = new List<Claim>
+            {
+                new Claim(
+                    ClaimTypes.NameIdentifier,
+                    result.UserId.ToString()),
 
-            var claims = new List<SecurityClaim>
-{
-    new SecurityClaim(
-        SecurityClaimTypes.NameIdentifier,
-        result.UserId.ToString()),
+                new Claim(
+                    ClaimTypes.Name,
+                    result.Username ?? string.Empty),
 
-    new SecurityClaim(
-        SecurityClaimTypes.Name,
-        result.Username ?? string.Empty),
+                new Claim(
+                    "FullName",
+                    result.FullName ?? string.Empty),
 
-    new SecurityClaim(
-        "FullName",
-        result.FullName ?? string.Empty),
+                new Claim(
+                    ClaimTypes.Role,
+                    result.Role ?? string.Empty)
+            };
+            var identity = new ClaimsIdentity(
+                claims,
+                CookieAuthenticationDefaults.AuthenticationScheme);
 
-    new SecurityClaim(
-        SecurityClaimTypes.Role,
-        result.Role ?? string.Empty)
-};
-            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             var principal = new ClaimsPrincipal(identity);
 
             await HttpContext.SignInAsync(
-                 CookieAuthenticationDefaults
-                     .AuthenticationScheme,
-                 principal);
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                principal);
 
             return RedirectToAction(
                 "Index",

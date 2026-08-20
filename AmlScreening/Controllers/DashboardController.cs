@@ -14,6 +14,11 @@ namespace AmlScreening.Portal.Controllers
                 ?? User.Identity?.Name
                 ?? "User";
 
+            ViewBag.Username =
+                User.FindFirst("Username")?.Value
+                ?? User.Identity?.Name
+                ?? "User";
+
             ViewBag.RoleName =
                 User.FindFirst(ClaimTypes.Role)?.Value
                 ?? "User";

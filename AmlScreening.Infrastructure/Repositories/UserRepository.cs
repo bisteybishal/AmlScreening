@@ -19,7 +19,7 @@ namespace AmlScreening.Infrastructure.Repositories
             using var connection = _dbConnectionFactory.CreateConnection();
             var user =
                     await connection.QueryFirstOrDefaultAsync<User>(
-                        "usp_User_GetByUsername",
+                        "usp_User_GetForLogin",
                         new
                         {
                             Username = username
