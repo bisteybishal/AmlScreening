@@ -1,0 +1,584 @@
+﻿/* =====================================================
+   GLOBAL
+   ===================================================== */
+
+body {
+    margin: 0;
+    padding: 0;
+    background: #f5f6f8;
+    color: #252525;
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+
+
+/* =====================================================
+   TOP BAR
+   ===================================================== */
+
+.topbar {
+    height: 70px;
+    background: linear-gradient( 135deg, #720000, #a90000, #850000 );
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 22px;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.18);
+    position: relative;
+    z-index: 1000;
+}
+
+
+/* =====================================================
+   TOP LEFT
+   ===================================================== */
+
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+
+/* =====================================================
+   THREE LINE BUTTON
+   ===================================================== */
+
+.sidebar-toggle {
+    width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.12);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 25px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+
+    .sidebar-toggle:hover {
+        background: rgba(255,255,255,0.22);
+    }
+
+
+/* =====================================================
+   LOGO
+   ===================================================== */
+
+.brand-logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 9px;
+    background: rgba(255,255,255,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+}
+
+
+.brand-title {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+
+.brand-subtitle {
+    font-size: 10px;
+    opacity: 0.7;
+}
+
+
+/* =====================================================
+   PROFILE
+   ===================================================== */
+
+.profile-dropdown {
+    position: relative;
+}
+
+
+.profile-button {
+    border: none;
+    background: transparent;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+
+    .profile-button:hover {
+        background: rgba(255,255,255,0.12);
+    }
+
+
+.profile-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: white;
+    color: #950000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.profile-info {
+    text-align: left;
+}
+
+
+.profile-name {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+
+.profile-role {
+    font-size: 10px;
+    opacity: 0.7;
+}
+
+
+.profile-arrow {
+    font-size: 10px;
+}
+
+
+/* =====================================================
+   PROFILE DROPDOWN
+   ===================================================== */
+
+.profile-menu {
+    width: 245px;
+    padding: 8px;
+    margin-top: 8px !important;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 10px 35px rgba(0,0,0,0.18);
+}
+
+
+.profile-menu-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+}
+
+
+.profile-menu-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #f9e4e4;
+    color: #950000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.profile-menu-name {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+
+.profile-menu-role {
+    font-size: 10px;
+    color: #777;
+    text-transform: uppercase;
+}
+
+
+.profile-menu .dropdown-item {
+    border-radius: 7px;
+    padding: 10px 12px;
+    font-size: 13px;
+}
+
+
+.logout-item {
+    color: #a00000;
+}
+
+
+    .logout-item:hover {
+        background: #fbe8e8;
+        color: #800000;
+    }
+
+
+/* =====================================================
+   APP CONTAINER
+   ===================================================== */
+
+.app-container {
+    display: flex;
+    min-height: calc(100vh - 70px);
+}
+
+
+/* =====================================================
+   SIDEBAR
+   ===================================================== */
+
+.sidebar {
+    width: 245px;
+    min-width: 245px;
+    background: linear-gradient( 180deg, #a40000, #820000 );
+    color: white;
+    display: flex;
+    flex-direction: column;
+    transition: width 0.25s ease, min-width 0.25s ease;
+    box-shadow: 3px 0 12px rgba(0,0,0,0.08);
+}
+
+
+    /* =====================================================
+   SIDEBAR COLLAPSED
+   ===================================================== */
+
+    .sidebar.collapsed {
+        width: 72px;
+        min-width: 72px;
+    }
+
+
+/* =====================================================
+   SIDEBAR MENU TITLE
+   ===================================================== */
+
+.sidebar-menu-title {
+    font-size: 10px;
+    letter-spacing: 1px;
+    font-weight: 600;
+    opacity: 0.55;
+    padding: 25px 20px 10px;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+
+.sidebar.collapsed
+.sidebar-menu-title {
+    opacity: 0;
+    height: 25px;
+}
+
+
+/* =====================================================
+   NAVIGATION
+   ===================================================== */
+
+.sidebar .nav {
+    padding: 0 9px;
+}
+
+
+.sidebar .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: rgba(255,255,255,0.88);
+    padding: 12px 13px;
+    margin: 3px 0;
+    border-radius: 8px;
+    font-size: 13px;
+    text-decoration: none;
+    transition: 0.2s;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+
+    .sidebar .nav-link:hover {
+        background: rgba(255,255,255,0.13);
+        color: white;
+    }
+
+
+    .sidebar .nav-link.active {
+        background: white;
+        color: #950000;
+        font-weight: 600;
+    }
+
+
+/* =====================================================
+   MENU ICON
+   ===================================================== */
+
+.menu-icon {
+    min-width: 32px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+}
+
+
+.sidebar .nav-link:hover
+.menu-icon {
+    background: rgba(255,255,255,0.10);
+}
+
+
+/* =====================================================
+   COLLAPSED MENU
+   ===================================================== */
+
+.sidebar.collapsed .nav-link {
+    justify-content: center;
+    padding: 12px 0;
+}
+
+
+.sidebar.collapsed
+.menu-text {
+    display: none;
+}
+
+
+.sidebar.collapsed
+.menu-icon {
+    margin: 0;
+}
+
+
+/* =====================================================
+   SECURITY CARD
+   ===================================================== */
+
+.sidebar-bottom {
+    margin-top: auto;
+    padding: 15px;
+}
+
+
+.security-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.09);
+}
+
+
+.security-icon {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #82ff82;
+}
+
+
+.security-title {
+    font-size: 11px;
+    font-weight: 600;
+}
+
+
+.security-text {
+    font-size: 9px;
+    opacity: 0.6;
+}
+
+
+/* Hide security text when collapsed */
+
+.sidebar.collapsed
+.security-content {
+    display: none;
+}
+
+
+.sidebar.collapsed
+.security-card {
+    justify-content: center;
+}
+
+
+/* =====================================================
+   MAIN CONTENT
+   ===================================================== */
+
+.main-content {
+    flex: 1;
+    min-width: 0;
+    padding: 30px;
+    overflow-x: auto;
+}
+
+
+/* =====================================================
+   DASHBOARD
+   ===================================================== */
+
+.dashboard-header {
+    margin-bottom: 25px;
+}
+
+
+.dashboard-title {
+    font-size: 26px;
+    font-weight: 600;
+    margin: 0;
+}
+
+
+.dashboard-subtitle {
+    font-size: 13px;
+    color: #777;
+    margin-top: 5px;
+}
+
+
+/* =====================================================
+   WELCOME
+   ===================================================== */
+
+.welcome-card {
+    background: white;
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    padding: 22px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+
+.welcome-title {
+    font-size: 17px;
+    font-weight: 600;
+}
+
+
+.welcome-text {
+    font-size: 13px;
+    color: #777;
+    margin: 5px 0 0;
+}
+
+
+/* =====================================================
+   STAT CARDS
+   ===================================================== */
+
+.stat-card {
+    background: white;
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    padding: 20px;
+    height: 100%;
+    transition: 0.2s;
+}
+
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.07);
+    }
+
+
+.stat-card-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+
+.stat-title {
+    font-size: 11px;
+    color: #888;
+    font-weight: 600;
+}
+
+
+.stat-number {
+    font-size: 28px;
+    margin: 5px 0 0;
+}
+
+
+.stat-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f9e4e4;
+    color: #980000;
+    font-size: 20px;
+}
+
+
+/* =====================================================
+   MOBILE
+   ===================================================== */
+
+@media (max-width: 768px) {
+
+    .brand-content {
+        display: none;
+    }
+
+
+    .profile-info {
+        display: none;
+    }
+
+
+    .sidebar {
+        width: 72px;
+        min-width: 72px;
+    }
+
+
+    .sidebar-menu-title {
+        display: none;
+    }
+
+
+    .sidebar .nav-link {
+        justify-content: center;
+    }
+
+
+    .menu-text {
+        display: none;
+    }
+
+
+    .security-content {
+        display: none;
+    }
+
+
+    .security-card {
+        justify-content: center;
+    }
+
+
+    .main-content {
+        padding: 20px;
+    }
+}

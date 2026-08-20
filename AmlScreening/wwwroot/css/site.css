@@ -1,0 +1,65 @@
+/* =========================
+   COLLAPSED SIDEBAR
+========================= */
+
+body.sidebar-collapsed .sidebar {
+    width: var(--sidebar-collapsed-width);
+}
+
+body.sidebar-collapsed .main-content {
+    margin-left: var(--sidebar-collapsed-width);
+}
+
+body.sidebar-collapsed .brand-text,
+body.sidebar-collapsed .menu-section,
+body.sidebar-collapsed .menu-item span,
+body.sidebar-collapsed .profile-info,
+body.sidebar-collapsed .profile-mini > i,
+body.sidebar-collapsed .logout-button span {
+    display: none;
+}
+
+body.sidebar-collapsed .sidebar-brand {
+    justify-content: center;
+    padding: 0;
+}
+
+body.sidebar-collapsed .brand-icon {
+    margin: 0;
+}
+
+body.sidebar-collapsed .menu-item {
+    justify-content: center;
+    padding: 0;
+}
+
+    body.sidebar-collapsed .menu-item i {
+        margin: 0;
+    }
+
+body.sidebar-collapsed .sidebar-footer {
+    padding: 10px;
+}
+
+body.sidebar-collapsed .profile-mini {
+    justify-content: center;
+}
+
+body.sidebar-collapsed .logout-button {
+    justify-content: center;
+}
+
+    body.sidebar-collapsed .logout-button i {
+        margin: 0;
+    }
+
+@media (max-width: 991px) {
+
+    body.sidebar-collapsed .sidebar {
+        width: var(--sidebar-width);
+    }
+
+    body.sidebar-collapsed .main-content {
+        margin-left: 0;
+    }
+}

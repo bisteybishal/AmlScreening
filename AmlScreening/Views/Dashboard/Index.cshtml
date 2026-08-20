@@ -1,0 +1,150 @@
+﻿@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="dashboard-header">
+
+    <h1 class="dashboard-title">
+        Dashboard
+    </h1>
+
+    <p class="dashboard-subtitle">
+        AML Screening & Compliance Overview
+    </p>
+
+</div>
+
+
+<div class="welcome-card">
+
+    <div class="welcome-title">
+        Welcome back, @ViewBag.FullName
+    </div>
+
+    <p class="welcome-text">
+        You are logged in as
+        <strong>@ViewBag.RoleName</strong>.
+        Here's your AML screening overview.
+    </p>
+
+</div>
+
+
+<div class="row g-4">
+
+    <div class="col-xl-3 col-md-6">
+
+        <div class="stat-card">
+
+            <div class="stat-card-content">
+
+                <div>
+
+                    <div class="stat-title">
+                        TOTAL AML RECORDS
+                    </div>
+
+                    <h2 class="stat-number">
+                        1,245
+                    </h2>
+
+                </div>
+
+                <div class="stat-icon">
+                    <i class="bi bi-shield-check"></i>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="col-xl-3 col-md-6">
+
+        <div class="stat-card">
+
+            <div class="stat-card-content">
+
+                <div>
+
+                    <div class="stat-title">
+                        PENDING REVIEW
+                    </div>
+
+                    <h2 class="stat-number">
+                        35
+                    </h2>
+
+                </div>
+
+                <div class="stat-icon">
+                    <i class="bi bi-hourglass-split"></i>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="col-xl-3 col-md-6">
+
+        <div class="stat-card">
+
+            <div class="stat-card-content">
+
+                <div>
+
+                    <div class="stat-title">
+                        MATCHED
+                    </div>
+
+                    <h2 class="stat-number">
+                        12
+                    </h2>
+
+                </div>
+
+                <div class="stat-icon">
+                    <i class="bi bi-exclamation-triangle"></i>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="col-xl-3 col-md-6">
+
+        <div class="stat-card">
+
+            <div class="stat-card-content">
+
+                <div>
+
+                    <div class="stat-title">
+                        CLEARED
+                    </div>
+
+                    <h2 class="stat-number">
+                        1,198
+                    </h2>
+
+                </div>
+
+                <div class="stat-icon">
+                    <i class="bi bi-check-circle"></i>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
