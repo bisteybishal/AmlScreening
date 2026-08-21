@@ -13,6 +13,7 @@ namespace AmlScreening.Infrastructure
             // Register your infrastructure services here
             services.AddScoped<IDBConnectionFactory, DBConnectionFactory>();
             services.AddScoped<IUserRepository,UserRepository>();
+            services.AddScoped<IAmlRecordRepository, AmlRecordRepository>();
 
             services.AddScoped<IPasswordService,PasswordService>();
 

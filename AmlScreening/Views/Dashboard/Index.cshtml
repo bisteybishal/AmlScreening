@@ -1,150 +1,62 @@
-﻿@{
+@{
     ViewData["Title"] = "Dashboard";
+    var displayName = ViewBag.FullName as string ?? ViewBag.Username as string ?? "Admin User";
 }
+<section class="dashboard-heading">
+    <div><h1>Welcome back, @displayName! <span>👋</span></h1><p>Here’s what’s happening with your AML screening system today.</p></div>
+    <div class="date-chip"><i class="bi bi-calendar3"></i><span id="currentDate">20 Aug 2026, Thursday</span></div>
+</section>
 
-<div class="dashboard-header">
+<section class="metric-grid" aria-label="AML record summary">
+    <article class="metric-card teal">
+        <div class="metric-top"><span class="metric-icon"><i class="bi bi-file-earmark-text-fill"></i></span><div><span class="metric-label">Total Records</span><strong>12,540</strong></div></div>
+        <p class="metric-change positive"><i class="bi bi-arrow-up"></i> 8.4% <span>from last month</span></p>
+        <svg class="sparkline" viewBox="0 0 260 46" preserveAspectRatio="none"><path class="fill" d="M0 38 L12 28 24 35 36 29 48 36 61 24 74 35 88 29 100 36 114 31 126 19 138 24 150 8 162 3 175 12 186 7 199 17 211 11 224 18 237 12 248 18 260 14 L260 46 L0 46Z"/><path d="M0 38 L12 28 24 35 36 29 48 36 61 24 74 35 88 29 100 36 114 31 126 19 138 24 150 8 162 3 175 12 186 7 199 17 211 11 224 18 237 12 248 18 260 14"/></svg>
+    </article>
+    <article class="metric-card green">
+        <div class="metric-top"><span class="metric-icon"><i class="bi bi-shield-fill-check"></i></span><div><span class="metric-label">Active Records</span><strong>11,980</strong></div></div>
+        <p class="metric-change positive"><i class="bi bi-arrow-up"></i> 6.7% <span>from last month</span></p>
+        <svg class="sparkline" viewBox="0 0 260 46" preserveAspectRatio="none"><path class="fill" d="M0 38 L12 28 24 34 36 25 48 32 61 29 74 35 88 34 100 39 114 32 126 36 138 27 150 29 162 20 175 22 186 12 199 4 211 9 224 7 237 12 248 9 260 1 L260 46 L0 46Z"/><path d="M0 38 L12 28 24 34 36 25 48 32 61 29 74 35 88 34 100 39 114 32 126 36 138 27 150 29 162 20 175 22 186 12 199 4 211 9 224 7 237 12 248 9 260 1"/></svg>
+    </article>
+    <article class="metric-card amber">
+        <div class="metric-top"><span class="metric-icon"><i class="bi bi-hourglass-split"></i></span><div><span class="metric-label">Under Review</span><strong>425</strong></div></div>
+        <p class="metric-change negative"><i class="bi bi-arrow-down"></i> 3.1% <span>from last month</span></p>
+        <svg class="sparkline" viewBox="0 0 260 46" preserveAspectRatio="none"><path class="fill" d="M0 37 L12 27 24 34 36 25 48 33 61 12 74 2 88 15 100 19 114 31 126 34 138 18 150 9 162 12 175 4 186 10 199 29 211 35 224 27 237 31 248 40 260 32 L260 46 L0 46Z"/><path d="M0 37 L12 27 24 34 36 25 48 33 61 12 74 2 88 15 100 19 114 31 126 34 138 18 150 9 162 12 175 4 186 10 199 29 211 35 224 27 237 31 248 40 260 32"/></svg>
+    </article>
+    <article class="metric-card red">
+        <div class="metric-top"><span class="metric-icon"><i class="bi bi-exclamation-triangle-fill"></i></span><div><span class="metric-label">High Risk</span><strong>135</strong></div></div>
+        <p class="metric-change negative"><i class="bi bi-arrow-up"></i> 12.5% <span>from last month</span></p>
+        <svg class="sparkline" viewBox="0 0 260 46" preserveAspectRatio="none"><path class="fill" d="M0 38 L12 25 24 31 36 23 48 29 61 34 74 20 88 25 100 9 114 2 126 10 138 16 150 11 162 18 175 13 186 5 199 10 211 20 224 18 237 26 248 24 260 34 L260 46 L0 46Z"/><path d="M0 38 L12 25 24 31 36 23 48 29 61 34 74 20 88 25 100 9 114 2 126 10 138 16 150 11 162 18 175 13 186 5 199 10 211 20 224 18 237 26 248 24 260 34"/></svg>
+    </article>
+</section>
 
-    <h1 class="dashboard-title">
-        Dashboard
-    </h1>
-
-    <p class="dashboard-subtitle">
-        AML Screening & Compliance Overview
-    </p>
-
-</div>
-
-
-<div class="welcome-card">
-
-    <div class="welcome-title">
-        Welcome back, @ViewBag.Username
-    </div>
-
-    <p class="welcome-text">
-        You are logged in as
-        <strong>@ViewBag.RoleName</strong>.
-        Here's your AML screening overview.
-    </p>
-
-</div>
-
-
-<div class="row g-4">
-
-    <div class="col-xl-3 col-md-6">
-
-        <div class="stat-card">
-
-            <div class="stat-card-content">
-
-                <div>
-
-                    <div class="stat-title">
-                        TOTAL AML RECORDS
-                    </div>
-
-                    <h2 class="stat-number">
-                        1,245
-                    </h2>
-
-                </div>
-
-                <div class="stat-icon">
-                    <i class="bi bi-shield-check"></i>
-                </div>
-
-            </div>
-
+<section class="dashboard-grid">
+    <article class="panel activity-panel">
+        <div class="panel-header"><h2>Recent AML Screening Activity</h2><button class="outline-button" type="button">View All</button></div>
+        <div class="table-responsive"><table class="activity-table">
+            <thead><tr><th>AML ID</th><th>Name</th><th>Watchlist</th><th>Risk Level</th><th>Status</th><th>Screened On</th><th></th></tr></thead>
+            <tbody>
+                <tr><td>AML-10254</td><td>Ram Bahadur Shrestha</td><td>Sanctions</td><td><span class="badge-risk high">High</span></td><td><span class="badge-status review">Review</span></td><td>19 Aug 2026 10:30 AM</td><td><i class="bi bi-three-dots-vertical"></i></td></tr>
+                <tr><td>AML-10253</td><td>John Doe</td><td>PEP</td><td><span class="badge-risk medium">Medium</span></td><td><span class="badge-status active">Active</span></td><td>19 Aug 2026 09:15 AM</td><td><i class="bi bi-three-dots-vertical"></i></td></tr>
+                <tr><td>AML-10252</td><td>ABC Trading Pvt Ltd</td><td>Watchlist</td><td><span class="badge-risk high">High</span></td><td><span class="badge-status active">Active</span></td><td>18 Aug 2026 04:45 PM</td><td><i class="bi bi-three-dots-vertical"></i></td></tr>
+                <tr><td>AML-10251</td><td>Sunita Maharjan</td><td>PEP</td><td><span class="badge-risk low">Low</span></td><td><span class="badge-status active">Active</span></td><td>18 Aug 2026 02:20 PM</td><td><i class="bi bi-three-dots-vertical"></i></td></tr>
+                <tr><td>AML-10250</td><td>XYZ Import Export</td><td>Sanctions</td><td><span class="badge-risk medium">Medium</span></td><td><span class="badge-status review">Review</span></td><td>18 Aug 2026 11:05 AM</td><td><i class="bi bi-three-dots-vertical"></i></td></tr>
+            </tbody>
+        </table></div>
+        <p class="table-caption">Showing 1 to 5 of 5 entries</p>
+    </article>
+    <article class="panel risk-panel">
+        <div class="panel-header"><h2>Risk Summary</h2></div>
+        <div class="risk-content">
+            <div class="donut" role="img" aria-label="72 percent low, 20 percent medium, 8 percent high risk"><div><strong>12,540</strong><span>Total</span></div></div>
+            <ul class="risk-legend"><li><i class="low-dot"></i><span><strong>Low Risk</strong><small>72% (9,029)</small></span></li><li><i class="medium-dot"></i><span><strong>Medium Risk</strong><small>20% (2,508)</small></span></li><li><i class="high-dot"></i><span><strong>High Risk</strong><small>8% (1,003)</small></span></li></ul>
         </div>
+        <button class="outline-button report-button" type="button"><i class="bi bi-bar-chart-fill"></i> View Full Report</button>
+    </article>
+</section>
 
-    </div>
-
-
-    <div class="col-xl-3 col-md-6">
-
-        <div class="stat-card">
-
-            <div class="stat-card-content">
-
-                <div>
-
-                    <div class="stat-title">
-                        PENDING REVIEW
-                    </div>
-
-                    <h2 class="stat-number">
-                        35
-                    </h2>
-
-                </div>
-
-                <div class="stat-icon">
-                    <i class="bi bi-hourglass-split"></i>
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <div class="col-xl-3 col-md-6">
-
-        <div class="stat-card">
-
-            <div class="stat-card-content">
-
-                <div>
-
-                    <div class="stat-title">
-                        MATCHED
-                    </div>
-
-                    <h2 class="stat-number">
-                        12
-                    </h2>
-
-                </div>
-
-                <div class="stat-icon">
-                    <i class="bi bi-exclamation-triangle"></i>
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <div class="col-xl-3 col-md-6">
-
-        <div class="stat-card">
-
-            <div class="stat-card-content">
-
-                <div>
-
-                    <div class="stat-title">
-                        CLEARED
-                    </div>
-
-                    <h2 class="stat-number">
-                        1,198
-                    </h2>
-
-                </div>
-
-                <div class="stat-icon">
-                    <i class="bi bi-check-circle"></i>
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-</div>
+<section class="bottom-grid">
+    <article class="summary-card danger-card"><span class="summary-icon"><i class="bi bi-clipboard2-fill"></i></span><div><span>Watchlist Matches</span><strong>186</strong><small>Potential matches<br />Requires investigation</small></div><i class="bi bi-search summary-watermark"></i></article>
+    <article class="summary-card screening-card"><span class="summary-icon"><i class="bi bi-fingerprint"></i></span><div><span>Screening This Month</span><strong>2,847</strong><small>Total screenings</small><em><i class="bi bi-arrow-up"></i> 15.3% from last month</em></div><i class="bi bi-bar-chart-line-fill summary-watermark"></i></article>
+    <article class="summary-card status-card"><span class="summary-icon"><i class="bi bi-shield-fill-check"></i></span><div><span>System Status</span><strong>All Systems Operational</strong><small>Last updated: 19 Aug 2026 10:45 AM</small></div><i class="bi bi-check-lg status-check"></i></article>
+</section>

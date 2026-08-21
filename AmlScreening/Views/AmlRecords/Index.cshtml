@@ -1,0 +1,141 @@
+@model AmlScreening.Portal.ViewModels.AmlRecordsPageViewModel
+@{
+    ViewData["Title"] = "AML Records";
+    var openEditor = !ViewData.ModelState.IsValid;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/aml-records.css" asp-append-version="true" />
+}
+
+<section class="records-heading">
+    <div><h1>AML Records</h1><p>Add, review, update, report, and manage watchlist records.</p></div>
+    <div class="records-heading-actions">
+        <button class="records-secondary-button" type="button" onclick="window.print()"><i class="bi bi-printer"></i> Print Report</button>
+        <button class="records-primary-button" type="button" data-bs-toggle="modal" data-bs-target="#recordModal" data-mode="create"><i class="bi bi-plus-lg"></i> Add AML Record</button>
+    </div>
+</section>
+
+@if (TempData["SuccessMessage"] is string message)
+{
+    <div class="records-alert"><i class="bi bi-check-circle-fill"></i><span>@message</span><button type="button" aria-label="Dismiss"><i class="bi bi-x"></i></button></div>
+}
+
+<section id="recordsReport" class="records-report-grid" aria-label="AML report summary">
+    <article><span class="report-icon teal"><i class="bi bi-database"></i></span><div><small>Total Records</small><strong>@Model.TotalRecords</strong><em>All AML entries</em></div></article>
+    <article><span class="report-icon green"><i class="bi bi-shield-check"></i></span><div><small>Active Records</small><strong>@Model.ActiveRecords</strong><em>Currently monitored</em></div></article>
+    <article><span class="report-icon blue"><i class="bi bi-person"></i></span><div><small>Individuals</small><strong>@Model.IndividualRecords</strong><em>Person records</em></div></article>
+    <article><span class="report-icon amber"><i class="bi bi-building"></i></span><div><small>Entities</small><strong>@Model.EntityRecords</strong><em>Organization records</em></div></article>
+    <article><span class="report-icon violet"><i class="bi bi-globe2"></i></span><div><small>Countries</small><strong>@Model.CountriesCovered</strong><em>Geographic coverage</em></div></article>
+</section>
+
+<section class="records-panel">
+    <div class="records-toolbar">
+        <form method="get" asp-action="Index" class="records-filter-form">
+            <div class="records-search"><i class="bi bi-search"></i><input name="search" value="@Model.Search" placeholder="Search name, reference, or source..." /></div>
+            <select name="recordType" aria-label="Filter by record type"><option value="">All record types</option><option value="Individual" selected="@(Model.RecordType == "Individual")">Individual</option><option value="Entity" selected="@(Model.RecordType == "Entity")">Entity</option><option value="Vessel" selected="@(Model.RecordType == "Vessel")">Vessel</option></select>
+            <select name="status" aria-label="Filter by status"><option value="">All statuses</option><option value="active" selected="@(Model.Status == "active")">Active</option><option value="inactive" selected="@(Model.Status == "inactive")">Inactive</option></select>
+            <button class="filter-button" type="submit">Filter</button>
+            @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.RecordType) || !string.IsNullOrEmpty(Model.Status))
+            { <a class="clear-filter" asp-action="Index">Clear</a> }
+        </form>
+        <span class="record-count">@Model.Records.Count record@(Model.Records.Count == 1 ? "" : "s")</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="records-table">
+            <thead><tr><th>Reference</th><th>Name</th><th>Type</th><th>Country / Nationality</th><th>Source</th><th>Status</th><th>Created</th><th class="actions-column">Actions</th></tr></thead>
+            <tbody>
+                @if (Model.Records.Count == 0)
+                {
+                    <tr><td colspan="8"><div class="records-empty"><i class="bi bi-inbox"></i><strong>No AML records found</strong><span>Add a new record or change your filters.</span></div></td></tr>
+                }
+                else
+                {
+                    @foreach (var record in Model.Records)
+                    {
+                        <tr>
+                            <td><strong class="record-reference">@record.ReferenceNo</strong></td>
+                            <td><div class="record-name"><span class="record-avatar">@(record.FullName.Length > 0 ? record.FullName[0].ToString().ToUpperInvariant() : "?")</span><span><strong>@record.FullName</strong><small>@(record.DateOfBirth?.ToString("dd MMM yyyy") ?? "Date not provided")</small></span></div></td>
+                            <td><span class="record-type">@record.RecordType</span></td>
+                            <td><strong>@record.Country</strong><small class="table-subtext">@record.Nationality</small></td>
+                            <td>@record.SourceName</td>
+                            <td><span class="record-status @(record.IsActive ? "active" : "inactive")"><i></i>@(record.IsActive ? "Active" : "Inactive")</span></td>
+                            <td>@record.CreatedDate.ToString("dd MMM yyyy")</td>
+                            <td>
+                                <div class="record-actions">
+                                    <button type="button" class="action-button edit" title="Edit record" data-bs-toggle="modal" data-bs-target="#recordModal" data-mode="edit"
+                                            data-id="@record.Id" data-type="@record.RecordType" data-name="@record.FullName" data-date="@record.DateOfBirth?.ToString("yyyy-MM-dd")"
+                                            data-country="@record.Country" data-nationality="@record.Nationality" data-reference="@record.ReferenceNo"
+                                            data-source="@record.SourceName" data-remarks="@record.Remarks" data-active="@record.IsActive.ToString().ToLowerInvariant()"><i class="bi bi-pencil-square"></i></button>
+                                    <button type="button" class="action-button delete" title="Delete record" data-bs-toggle="modal" data-bs-target="#deleteModal" data-id="@record.Id" data-name="@record.FullName"><i class="bi bi-trash3"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="modal fade" id="recordModal" tabindex="-1" aria-labelledby="recordModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content records-modal">
+        <form asp-action="Save" method="post">
+            @Html.AntiForgeryToken()
+            <input asp-for="Input.Id" type="hidden" />
+            <input asp-for="Search" type="hidden" /><input asp-for="RecordType" type="hidden" /><input asp-for="Status" type="hidden" />
+            <div class="modal-header"><div><span class="modal-icon"><i class="bi bi-shield-plus"></i></span><span><h2 id="recordModalTitle">Add AML Record</h2><p>Enter the watchlist record details below.</p></span></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <div asp-validation-summary="ModelOnly" class="records-validation-summary"></div>
+                <div class="record-form-grid">
+                    <div class="field"><label asp-for="Input.RecordType"></label><select asp-for="Input.RecordType"><option>Individual</option><option>Entity</option><option>Vessel</option></select><span asp-validation-for="Input.RecordType"></span></div>
+                    <div class="field wide"><label asp-for="Input.FullName"></label><input asp-for="Input.FullName" placeholder="Enter the complete name" /><span asp-validation-for="Input.FullName"></span></div>
+                    <div class="field"><label asp-for="Input.DateOfBirth"></label><input asp-for="Input.DateOfBirth" type="date" /><span asp-validation-for="Input.DateOfBirth"></span></div>
+                    <div class="field"><label asp-for="Input.Country"></label><input asp-for="Input.Country" placeholder="e.g. Nepal" /><span asp-validation-for="Input.Country"></span></div>
+                    <div class="field"><label asp-for="Input.Nationality"></label><input asp-for="Input.Nationality" placeholder="e.g. Nepali" /><span asp-validation-for="Input.Nationality"></span></div>
+                    <div class="field"><label asp-for="Input.ReferenceNo"></label><input asp-for="Input.ReferenceNo" placeholder="e.g. AML-10255" /><span asp-validation-for="Input.ReferenceNo"></span></div>
+                    <div class="field"><label asp-for="Input.SourceName"></label><input asp-for="Input.SourceName" placeholder="e.g. UN Sanctions" /><span asp-validation-for="Input.SourceName"></span></div>
+                    <div class="field full"><label asp-for="Input.Remarks"></label><textarea asp-for="Input.Remarks" rows="3" placeholder="Add relevant notes or screening details"></textarea><span asp-validation-for="Input.Remarks"></span></div>
+                    <label class="active-switch full"><input asp-for="Input.IsActive" /><span></span><strong>Active record</strong><small>Include this record in active screening.</small></label>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="records-secondary-button" data-bs-dismiss="modal">Cancel</button><button type="submit" class="records-primary-button"><i class="bi bi-check2"></i> Save Record</button></div>
+        </form>
+    </div></div>
+</div>
+
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content delete-modal-content">
+        <form asp-action="Delete" method="post">@Html.AntiForgeryToken()<input id="deleteRecordId" name="id" type="hidden" />
+            <div class="delete-modal-icon"><i class="bi bi-trash3"></i></div><h2 id="deleteModalTitle">Delete AML record?</h2><p>You are about to permanently delete <strong id="deleteRecordName"></strong>. This action cannot be undone.</p>
+            <div class="delete-actions"><button type="button" class="records-secondary-button" data-bs-dismiss="modal">Cancel</button><button type="submit" class="delete-confirm-button">Delete</button></div>
+        </form>
+    </div></div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const recordModal = document.getElementById("recordModal");
+            const form = recordModal.querySelector("form");
+            recordModal.addEventListener("show.bs.modal", function (event) {
+                const button = event.relatedTarget;
+                if (!button) return;
+                const editing = button.dataset.mode === "edit";
+                recordModal.querySelector("h2").textContent = editing ? "Edit AML Record" : "Add AML Record";
+                if (!editing) { form.reset(); form.querySelector('[name="Input.Id"]').value = "0"; form.querySelector('[name="Input.IsActive"]').checked = true; return; }
+                const values = {"Input.Id":"id","Input.RecordType":"type","Input.FullName":"name","Input.DateOfBirth":"date","Input.Country":"country","Input.Nationality":"nationality","Input.ReferenceNo":"reference","Input.SourceName":"source","Input.Remarks":"remarks"};
+                Object.entries(values).forEach(([name, key]) => form.querySelector(`[name="${name}"]`).value = button.dataset[key] || "");
+                form.querySelector('[name="Input.IsActive"]').checked = button.dataset.active === "true";
+            });
+            document.getElementById("deleteModal").addEventListener("show.bs.modal", function (event) {
+                document.getElementById("deleteRecordId").value = event.relatedTarget.dataset.id;
+                document.getElementById("deleteRecordName").textContent = event.relatedTarget.dataset.name;
+            });
+            document.querySelector(".records-alert button")?.addEventListener("click", e => e.currentTarget.closest(".records-alert").remove());
+            @if (openEditor) { <text>bootstrap.Modal.getOrCreateInstance(recordModal).show();</text> }
+        });
+    </script>
+}
