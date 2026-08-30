@@ -1,5 +1,6 @@
 using AmlScreening.Application;
 using AmlScreening.Infrastructure;
+using AmlScreening.Application.Security;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using System.Threading.RateLimiting;
@@ -8,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure();
+builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -18,7 +19,14 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
         options.SlidingExpiration = true;
     });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    foreach (var permission in AppPermissions.All)
+    {
+        options.AddPolicy(permission, policy =>
+            policy.RequireClaim(AppPermissions.ClaimType, permission));
+    }
+});
 
 builder.Services.AddRateLimiter(options =>
 {

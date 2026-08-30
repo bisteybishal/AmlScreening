@@ -4,10 +4,11 @@ using AmlScreening.Portal.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using AmlScreening.Application.Security;
 
 namespace AmlScreening.Portal.Controllers;
 
-[Authorize]
+[Authorize(Policy = AppPermissions.AmlRecordsView)]
 public sealed class AmlRecordsController : Controller
 {
     private readonly IAmlRecordRepository _repository;
@@ -18,69 +19,26 @@ public sealed class AmlRecordsController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index(string? search, string? recordType, string? status)
+    public async Task<IActionResult> Index(
+        string? search,
+        string? recordType,
+        string? status,
+        int page = 1)
     {
-        return View(await BuildPageAsync(new AmlRecordInputModel(), search, recordType, status));
+        return View(await BuildPageAsync(
+            new AmlRecordInputModel(), search, recordType, status, page));
     }
 
     [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Save(AmlRecordsPageViewModel model)
-    {
-        if (model.Input.DateOfBirth > DateTime.Today)
-        {
-            ModelState.AddModelError("Input.DateOfBirth", "The date cannot be in the future.");
-        }
-
-        var allRecords = await _repository.GetAllAsync();
-        if (allRecords.Any(x => x.Id != model.Input.Id &&
-            x.ReferenceNo.Equals(model.Input.ReferenceNo?.Trim(), StringComparison.OrdinalIgnoreCase)))
-        {
-            ModelState.AddModelError("Input.ReferenceNo", "This reference number already exists.");
-        }
-
-        if (!ModelState.IsValid)
-        {
-            return View("Index", await BuildPageAsync(model.Input, model.Search, model.RecordType, model.Status, allRecords));
-        }
-
-        var userId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : (int?)null;
-        if (model.Input.Id == 0)
-        {
-            var record = Map(model.Input);
-            record.CreatedDate = DateTime.UtcNow;
-            record.CreatedBy = userId;
-            await _repository.CreateAsync(record);
-            TempData["SuccessMessage"] = "AML record added successfully.";
-        }
-        else
-        {
-            var existing = await _repository.GetByIdAsync(model.Input.Id);
-            if (existing is null) return NotFound();
-
-            existing.RecordType = model.Input.RecordType.Trim();
-            existing.FullName = model.Input.FullName.Trim();
-            existing.DateOfBirth = model.Input.DateOfBirth;
-            existing.Country = model.Input.Country.Trim();
-            existing.Nationality = model.Input.Nationality.Trim();
-            existing.ReferenceNo = model.Input.ReferenceNo.Trim();
-            existing.SourceName = model.Input.SourceName.Trim();
-            existing.Remarks = model.Input.Remarks.Trim();
-            existing.IsActive = model.Input.IsActive;
-            existing.UpdatedDate = DateTime.UtcNow;
-            existing.UpdatedBy = userId;
-            await _repository.UpdateAsync(existing);
-            TempData["SuccessMessage"] = "AML record updated successfully.";
-        }
-
-        return RedirectToAction(nameof(Index));
-    }
-
-    [HttpPost]
+    [Authorize(Policy = AppPermissions.AmlRecordsDelete)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (id <= 0 || !await _repository.DeleteAsync(id)) return NotFound();
+        var deletedBy = User.FindFirstValue(ClaimTypes.Name)
+            ?? User.Identity?.Name
+            ?? "Unknown";
+
+        if (id <= 0 || !await _repository.DeleteAsync(id, deletedBy)) return NotFound();
         TempData["SuccessMessage"] = "AML record deleted successfully.";
         return RedirectToAction(nameof(Index));
     }
@@ -90,6 +48,7 @@ public sealed class AmlRecordsController : Controller
         string? search,
         string? recordType,
         string? status,
+        int page = 1,
         IReadOnlyList<AmlRecord>? loadedRecords = null)
     {
         var all = loadedRecords ?? await _repository.GetAllAsync();
@@ -107,10 +66,20 @@ public sealed class AmlRecordsController : Controller
         if (status == "active") filtered = filtered.Where(x => x.IsActive);
         if (status == "inactive") filtered = filtered.Where(x => !x.IsActive);
 
+        const int pageSize = 5;
+
+        var filteredRecords = filtered.ToList();
+        var totalPages = Math.Max(1, (int)Math.Ceiling(filteredRecords.Count / (double)pageSize));
+        page = Math.Clamp(page, 1, totalPages);
+        var pagedRecords = filteredRecords
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
         return new AmlRecordsPageViewModel
         {
             Input = input,
-            Records = filtered.ToList(),
+            Records = pagedRecords,
             Search = search?.Trim() ?? string.Empty,
             RecordType = recordType ?? string.Empty,
             Status = status ?? string.Empty,
@@ -118,20 +87,11 @@ public sealed class AmlRecordsController : Controller
             ActiveRecords = all.Count(x => x.IsActive),
             IndividualRecords = all.Count(x => x.RecordType.Equals("Individual", StringComparison.OrdinalIgnoreCase)),
             EntityRecords = all.Count(x => x.RecordType.Equals("Entity", StringComparison.OrdinalIgnoreCase)),
-            CountriesCovered = all.Where(x => !string.IsNullOrWhiteSpace(x.Country)).Select(x => x.Country).Distinct(StringComparer.OrdinalIgnoreCase).Count()
+            CountriesCovered = all.Where(x => !string.IsNullOrWhiteSpace(x.Country)).Select(x => x.Country).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            Page = page,
+            PageSize = pageSize,
+            FilteredRecords = filteredRecords.Count,
+            TotalPages = totalPages
         };
     }
-
-    private static AmlRecord Map(AmlRecordInputModel input) => new()
-    {
-        RecordType = input.RecordType.Trim(),
-        FullName = input.FullName.Trim(),
-        DateOfBirth = input.DateOfBirth,
-        Country = input.Country.Trim(),
-        Nationality = input.Nationality.Trim(),
-        ReferenceNo = input.ReferenceNo.Trim(),
-        SourceName = input.SourceName.Trim(),
-        Remarks = input.Remarks.Trim(),
-        IsActive = input.IsActive
-    };
 }

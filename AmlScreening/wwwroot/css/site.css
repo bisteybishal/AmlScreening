@@ -1,3 +1,8 @@
 /* Shared site styles are intentionally minimal; dashboard.css owns the portal shell. */
 a,button{transition:background-color .18s ease,color .18s ease,transform .18s ease}
 button:focus-visible,a:focus-visible{outline:3px solid rgba(11,167,156,.35);outline-offset:2px}
+
+.workspace-tabs{display:flex;align-items:flex-end;min-height:58px;padding:12px 26px 0;overflow-x:auto;overflow-y:hidden;background:#edf3f7;border-bottom:1px solid #d7e1e8;scrollbar-width:thin}.dynamic-workspace-tabs{display:flex;align-items:flex-end}.workspace-tab{display:flex;align-items:center;flex:0 0 auto;min-height:46px;margin-right:5px;border:1px solid #dbe4ea;border-bottom:3px solid transparent;border-radius:8px 8px 0 0;background:#fff;color:#18364f;white-space:nowrap}.workspace-tab:hover{background:#f8fbfc}.workspace-tab.active{border-bottom-color:#079e94;color:#087f78;background:#fff}.dashboard-tab{gap:8px;padding:0 20px;color:inherit;font-size:13px;font-weight:700;text-decoration:none}.dashboard-tab:hover{color:#087f78}.workspace-tab-link{display:flex;align-items:center;min-height:43px;max-width:210px;padding:0 10px 0 18px;overflow:hidden;color:inherit;font-size:13px;font-weight:650;text-decoration:none;text-overflow:ellipsis}.workspace-tab-link:hover{color:#087f78}.workspace-tab-close{width:32px;height:32px;flex:0 0 32px;margin-right:6px;border:0;border-radius:6px;background:transparent;color:#536c7f;font-size:21px;line-height:1}.workspace-tab-close:hover{background:#fdeaea;color:#d73333}
+
+@media(max-width:700px){.workspace-tabs{min-height:54px;padding-left:14px;padding-right:14px}.dashboard-tab{padding:0 14px}.workspace-tab-link{max-width:150px}}
+

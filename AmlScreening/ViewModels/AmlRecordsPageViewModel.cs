@@ -15,6 +15,14 @@ public sealed class AmlRecordsPageViewModel
     public int IndividualRecords { get; set; }
     public int EntityRecords { get; set; }
     public int CountriesCovered { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
+    public int FilteredRecords { get; set; }
+    public int TotalPages { get; set; } = 1;
+    public int FirstRecordNumber => FilteredRecords == 0 ? 0 : ((Page - 1) * PageSize) + 1;
+    public int LastRecordNumber => Math.Min(Page * PageSize, FilteredRecords);
+    public bool HasPreviousPage => Page > 1;
+    public bool HasNextPage => Page < TotalPages;
 }
 
 public sealed class AmlRecordInputModel

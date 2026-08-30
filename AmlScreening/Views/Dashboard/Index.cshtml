@@ -1,24 +1,22 @@
+
+@model IReadOnlyList<AmlScreening.Domain.Entities.AmlRecord>
 @{
     ViewData["Title"] = "Dashboard";
-    var displayName = ViewBag.FullName as string ?? ViewBag.Username as string ?? "Admin User";
+    var displayName = ViewBag.Username as string ?? ViewBag.Username as string ?? "Admin User";
 }
 <section class="dashboard-heading">
-    <div><h1>Welcome back, @displayName! <span>👋</span></h1><p>Here’s what’s happening with your AML screening system today.</p></div>
+    <div><h1>Welcome Back, @displayName! <span>👋</span></h1><p>Here’s what’s happening with your AML screening system today.</p></div>
     <div class="date-chip"><i class="bi bi-calendar3"></i><span id="currentDate">20 Aug 2026, Thursday</span></div>
 </section>
 
 <section class="metric-grid" aria-label="AML record summary">
     <article class="metric-card teal">
-        <div class="metric-top"><span class="metric-icon"><i class="bi bi-file-earmark-text-fill"></i></span><div><span class="metric-label">Total Records</span><strong>12,540</strong></div></div>
-        <p class="metric-change positive"><i class="bi bi-arrow-up"></i> 8.4% <span>from last month</span></p>
-        <svg class="sparkline" viewBox="0 0 260 46" preserveAspectRatio="none"><path class="fill" d="M0 38 L12 28 24 35 36 29 48 36 61 24 74 35 88 29 100 36 114 31 126 19 138 24 150 8 162 3 175 12 186 7 199 17 211 11 224 18 237 12 248 18 260 14 L260 46 L0 46Z"/><path d="M0 38 L12 28 24 35 36 29 48 36 61 24 74 35 88 29 100 36 114 31 126 19 138 24 150 8 162 3 175 12 186 7 199 17 211 11 224 18 237 12 248 18 260 14"/></svg>
+        <div class="metric-top"><span class="metric-icon"><i class="bi bi-file-earmark-text-fill"></i></span><div><span class="metric-label">Total Records</span><strong>@ViewBag.totalrecords</strong></div></div>
     </article>
     <article class="metric-card green">
-        <div class="metric-top"><span class="metric-icon"><i class="bi bi-shield-fill-check"></i></span><div><span class="metric-label">Active Records</span><strong>11,980</strong></div></div>
-        <p class="metric-change positive"><i class="bi bi-arrow-up"></i> 6.7% <span>from last month</span></p>
-        <svg class="sparkline" viewBox="0 0 260 46" preserveAspectRatio="none"><path class="fill" d="M0 38 L12 28 24 34 36 25 48 32 61 29 74 35 88 34 100 39 114 32 126 36 138 27 150 29 162 20 175 22 186 12 199 4 211 9 224 7 237 12 248 9 260 1 L260 46 L0 46Z"/><path d="M0 38 L12 28 24 34 36 25 48 32 61 29 74 35 88 34 100 39 114 32 126 36 138 27 150 29 162 20 175 22 186 12 199 4 211 9 224 7 237 12 248 9 260 1"/></svg>
+        <div class="metric-top"><span class="metric-icon"><i class="bi bi-shield-fill-check"></i></span><div><span class="metric-label">Active Records</span><strong>@ViewBag.activerecord</strong></div></div>
     </article>
-    <article class="metric-card amber">
+   @* <article class="metric-card amber">
         <div class="metric-top"><span class="metric-icon"><i class="bi bi-hourglass-split"></i></span><div><span class="metric-label">Under Review</span><strong>425</strong></div></div>
         <p class="metric-change negative"><i class="bi bi-arrow-down"></i> 3.1% <span>from last month</span></p>
         <svg class="sparkline" viewBox="0 0 260 46" preserveAspectRatio="none"><path class="fill" d="M0 37 L12 27 24 34 36 25 48 33 61 12 74 2 88 15 100 19 114 31 126 34 138 18 150 9 162 12 175 4 186 10 199 29 211 35 224 27 237 31 248 40 260 32 L260 46 L0 46Z"/><path d="M0 37 L12 27 24 34 36 25 48 33 61 12 74 2 88 15 100 19 114 31 126 34 138 18 150 9 162 12 175 4 186 10 199 29 211 35 224 27 237 31 248 40 260 32"/></svg>
@@ -27,20 +25,33 @@
         <div class="metric-top"><span class="metric-icon"><i class="bi bi-exclamation-triangle-fill"></i></span><div><span class="metric-label">High Risk</span><strong>135</strong></div></div>
         <p class="metric-change negative"><i class="bi bi-arrow-up"></i> 12.5% <span>from last month</span></p>
         <svg class="sparkline" viewBox="0 0 260 46" preserveAspectRatio="none"><path class="fill" d="M0 38 L12 25 24 31 36 23 48 29 61 34 74 20 88 25 100 9 114 2 126 10 138 16 150 11 162 18 175 13 186 5 199 10 211 20 224 18 237 26 248 24 260 34 L260 46 L0 46Z"/><path d="M0 38 L12 25 24 31 36 23 48 29 61 34 74 20 88 25 100 9 114 2 126 10 138 16 150 11 162 18 175 13 186 5 199 10 211 20 224 18 237 26 248 24 260 34"/></svg>
-    </article>
+    </article>*@
 </section>
 
 <section class="dashboard-grid">
     <article class="panel activity-panel">
-        <div class="panel-header"><h2>Recent AML Screening Activity</h2><button class="outline-button" type="button">View All</button></div>
+        <div class="panel-header"><h2>Recent AML Screening Activity</h2>
+        @*<button class="outline-button" type="button">View All</button>*@</div>
         <div class="table-responsive"><table class="activity-table">
-            <thead><tr><th>AML ID</th><th>Name</th><th>Watchlist</th><th>Risk Level</th><th>Status</th><th>Screened On</th><th></th></tr></thead>
+            <thead><tr><th>Reference No</th><th>Name</th><th>Country</th><th>Date of Birth</th><th>Source</th><th>Created On</th><th></th></tr></thead>
             <tbody>
-                <tr><td>AML-10254</td><td>Ram Bahadur Shrestha</td><td>Sanctions</td><td><span class="badge-risk high">High</span></td><td><span class="badge-status review">Review</span></td><td>19 Aug 2026 10:30 AM</td><td><i class="bi bi-three-dots-vertical"></i></td></tr>
-                <tr><td>AML-10253</td><td>John Doe</td><td>PEP</td><td><span class="badge-risk medium">Medium</span></td><td><span class="badge-status active">Active</span></td><td>19 Aug 2026 09:15 AM</td><td><i class="bi bi-three-dots-vertical"></i></td></tr>
-                <tr><td>AML-10252</td><td>ABC Trading Pvt Ltd</td><td>Watchlist</td><td><span class="badge-risk high">High</span></td><td><span class="badge-status active">Active</span></td><td>18 Aug 2026 04:45 PM</td><td><i class="bi bi-three-dots-vertical"></i></td></tr>
-                <tr><td>AML-10251</td><td>Sunita Maharjan</td><td>PEP</td><td><span class="badge-risk low">Low</span></td><td><span class="badge-status active">Active</span></td><td>18 Aug 2026 02:20 PM</td><td><i class="bi bi-three-dots-vertical"></i></td></tr>
-                <tr><td>AML-10250</td><td>XYZ Import Export</td><td>Sanctions</td><td><span class="badge-risk medium">Medium</span></td><td><span class="badge-status review">Review</span></td><td>18 Aug 2026 11:05 AM</td><td><i class="bi bi-three-dots-vertical"></i></td></tr>
+                    @if(Model!=null && Model.Any())
+                    {
+                        @foreach(var r in Model.Take(5))
+                        {
+                            <tr>
+                            <td>@r.ReferenceNo</td>
+                            <td>@r.FullName</td>
+                            <td>@r.Country</td>
+                            <td>@r.DateOfBirth</td>
+                            <td>@r.SourceName</td>
+                            <td>@r.CreatedDate</td>
+                            </tr>
+
+                            
+                        }
+                    }
+               
             </tbody>
         </table></div>
         <p class="table-caption">Showing 1 to 5 of 5 entries</p>

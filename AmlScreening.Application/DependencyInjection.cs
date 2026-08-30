@@ -1,4 +1,5 @@
-using AmlScreening.Application.Interface.Services;
+using AmlScreening.Application.Interface;
+using AmlScreening.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AmlScreening.Application;

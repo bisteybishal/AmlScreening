@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace AmlScreening.Application.Interface.Services
+namespace AmlScreening.Application.Interface
 {
     public  interface IAuthenticationService
     {

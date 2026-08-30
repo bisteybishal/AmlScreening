@@ -1,13 +1,21 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AmlScreening.Application.Interface.Repositories;
+using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
 namespace AmlScreening.Portal.Controllers
 {
     public class DashboardController : Controller
     {
+        private readonly IAmlRecordRepository _amlRecordRepository;
+
+        public DashboardController(IAmlRecordRepository amlRecordRepository)
+        {
+            _amlRecordRepository = amlRecordRepository;
+        }
+
         [HttpGet]
         
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
             ViewBag.FullName =
                 User.FindFirst("FullName")?.Value
@@ -23,7 +31,11 @@ namespace AmlScreening.Portal.Controllers
                 User.FindFirst(ClaimTypes.Role)?.Value
                 ?? "User";
 
-            return View();
+            var record = await _amlRecordRepository.GetAllAsync();
+            ViewBag.totalrecords = record.Count;
+            ViewBag.activerecord = record.Count(r => r.IsActive);
+
+            return View(record);
         }
     }
 }

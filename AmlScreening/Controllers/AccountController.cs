@@ -3,14 +3,17 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Runtime.InteropServices;
 using System.Security.Claims;
-using AppAuthenticationService = AmlScreening.Application.Interface.Services.IAuthenticationService;
+using AppAuthenticationService = AmlScreening.Application.Interface.IAuthenticationService;
+using AmlScreening.Application.Security;
 
 namespace AmlScreening.Portal.Controllers;
 
 public class AccountController : Controller
 {
     private readonly AppAuthenticationService _authenticationService;
+    
 
     public AccountController(AppAuthenticationService authenticationService)
     {
@@ -42,6 +45,8 @@ public class AccountController : Controller
             new("FullName", result.FullName ?? string.Empty),
             new(ClaimTypes.Role, result.Role ?? string.Empty)
         };
+        claims.AddRange(result.Permissions.Select(permission =>
+            new Claim(AppPermissions.ClaimType, permission)));
         var identity = new ClaimsIdentity(
             claims,
             CookieAuthenticationDefaults.AuthenticationScheme);

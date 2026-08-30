@@ -1,9 +1,17 @@
 @using System.Security.Claims
+@using AmlScreening.Application.Security
 @{
     var fullName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Admin User";
     var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "Administrator";
+    var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
     var initials = string.Join("", fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant();
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var showManagementSection =
+        User.HasClaim(AppPermissions.ClaimType, AppPermissions.UsersView) ||
+        User.HasClaim(AppPermissions.ClaimType, AppPermissions.RolesManage) ||
+        User.HasClaim(AppPermissions.ClaimType, AppPermissions.ReportsView) ||
+        User.HasClaim(AppPermissions.ClaimType, AppPermissions.AuditLogsView) ||
+        User.HasClaim(AppPermissions.ClaimType, AppPermissions.SettingsView);
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -26,17 +34,41 @@
             </a>
             <nav class="sidebar-nav">
                 <div class="nav-section-label">MAIN</div>
-                <a class="nav-link @(currentController == "Dashboard" ? "active" : "")" asp-controller="Dashboard" asp-action="Index"><i class="bi bi-house-door-fill"></i><span>Dashboard</span></a>
-                <a class="nav-link @(currentController == "AmlRecords" ? "active" : "")" asp-controller="AmlRecords" asp-action="Index"><i class="bi bi-shield-check"></i><span>AML Records</span></a>
-                <a class="nav-link" href="#"><i class="bi bi-search"></i><span>Search Screening</span></a>
-                <a class="nav-link" href="#"><i class="bi bi-list-check"></i><span>Watchlists</span></a>
-                <div class="nav-divider"></div>
-                <div class="nav-section-label">MANAGEMENT</div>
-                <a class="nav-link" href="#"><i class="bi bi-people"></i><span>Users</span></a>
-                <a class="nav-link" href="#"><i class="bi bi-lock"></i><span>Roles &amp; Permissions</span></a>
-                <a class="nav-link" asp-controller="AmlRecords" asp-action="Index" asp-fragment="recordsReport"><i class="bi bi-bar-chart"></i><span>Reports</span></a>
-                <a class="nav-link" href="#"><i class="bi bi-file-earmark-text"></i><span>Audit Logs</span></a>
-                <a class="nav-link" href="#"><i class="bi bi-gear"></i><span>Settings</span></a>
+                @* <a class="nav-link @(currentController == "Dashboard" ? "active" : "")" asp-controller="Dashboard" asp-action="Index"><i class="bi bi-house-door-fill"></i><span>Dashboard</span></a> *@
+                @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlRecordsView))
+                {
+                    <a class="nav-link @(currentController is "AmlRecords" or "AmlRecordAdd" or "AmlRecordEdit" ? "active" : "")" asp-controller="AmlRecords" asp-action="Index"><i class="bi bi-shield-check"></i><span>AML Records</span></a>
+                }
+                @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.SearchScreeningView))
+                {
+                    <a class="nav-link" href="#"><i class="bi bi-search"></i><span>Search Screening</span></a>
+                }
+                @if (showManagementSection)
+                {
+                    <div class="nav-divider"></div>
+                    <div class="nav-section-label">MANAGEMENT</div>
+                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.UsersView))
+                    {
+                        <a class="nav-link @(currentController == "Users" ? "active" : "")" asp-controller="Users" asp-action="Index"><i class="bi bi-people"></i><span>Users</span></a>
+                    }
+                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.RolesManage))
+                    {
+                        <a class="nav-link @(currentController == "Subscription" ? "active" : "")" asp-controller="Subscription" asp-action="Index"><i class="bi bi-credit-card"></i><span>Subscription</span></a>
+                    }
+
+                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.ReportsView))
+                    {
+                        <a class="nav-link" asp-controller="AmlRecords" asp-action="Index" asp-fragment="recordsReport"><i class="bi bi-bar-chart"></i><span>Reports</span></a>
+                    }
+                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.AuditLogsView))
+                    {
+                        <a class="nav-link" href="#"><i class="bi bi-file-earmark-text"></i><span>Audit Logs</span></a>
+                    }
+                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.SettingsView))
+                    {
+                        <a class="nav-link" href="#"><i class="bi bi-gear"></i><span>Settings</span></a>
+                    }
+                }
             </nav>
             <div class="sidebar-footer">
                 <div class="sidebar-user">
@@ -67,10 +99,27 @@
                     </div>
                 </div>
             </header>
+            <nav id="workspaceTabs"
+                 class="workspace-tabs"
+                 aria-label="Open pages"
+                 data-dashboard-url="@Url.Action("Index", "Dashboard")"
+                 data-current-url="@($"{Context.Request.Path}{Context.Request.QueryString}")"
+                 data-current-title="@ViewData["Title"]"
+                 data-user-key="@userId"
+                 data-is-dashboard="@((currentController == "Dashboard").ToString().ToLowerInvariant())">
+                <a class="workspace-tab dashboard-tab @(currentController == "Dashboard" ? "active" : "")"
+                   asp-controller="Dashboard"
+                   asp-action="Index">
+                    <i class="bi bi-house-door"></i>
+                    <span>Dashboard</span>
+                </a>
+                <div id="dynamicWorkspaceTabs" class="dynamic-workspace-tabs"></div>
+            </nav>
             <main class="main-content">@RenderBody()</main>
             <footer class="portal-footer"><span>&copy; 2026 AML Screening System. All rights reserved.</span><span>Version 1.0.0</span></footer>
         </div>
     </div>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)

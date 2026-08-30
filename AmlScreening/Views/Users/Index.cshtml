@@ -1,0 +1,86 @@
+@model AmlScreening.Portal.ViewModels.UsersPageViewModel
+@{
+    ViewData["Title"] = "Users";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/users.css" asp-append-version="true" />
+}
+
+<section class="users-heading">
+    <div><h1>User Management</h1><p>Create accounts and review access to the AML screening portal.</p></div>
+    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.UsersCreate))
+    {
+        <a class="users-primary-button" asp-action="Create"><i class="bi bi-person-plus"></i> Add User</a>
+    }
+</section>
+
+@if (TempData["SuccessMessage"] is string message)
+{
+    <div class="users-alert"><i class="bi bi-check-circle-fill"></i>@message</div>
+}
+
+<section class="users-summary" aria-label="User summary">
+    <article><span class="teal"><i class="bi bi-people"></i></span><div><small>Total Users</small><strong>@Model.TotalUsers</strong></div></article>
+    <article><span class="green"><i class="bi bi-person-check"></i></span><div><small>Active Users</small><strong>@Model.ActiveUsers</strong></div></article>
+    <article><span class="gray"><i class="bi bi-person-dash"></i></span><div><small>Inactive Users</small><strong>@Model.InactiveUsers</strong></div></article>
+    <a asp-controller="User" asp-action="Index" asp-route-role="Admin" class="summary-card-link">
+
+        <article>
+            <span class="blue">
+                <i class="bi bi-shield-lock"></i>
+            </span>
+
+            <div>
+                <small>Administrators</small>
+                <strong>@Model.Administrators</strong>
+            </div>
+        </article>
+
+    </a>
+</section>
+
+<section class="users-panel">
+    <div class="users-panel-title"><div><h2>Portal users</h2><p>Accounts currently registered in the system.</p></div><span>@Model.TotalUsers user@(Model.TotalUsers == 1 ? "" : "s")</span></div>
+    <div class="table-responsive">
+        <table class="users-table">
+            <thead><tr><th>Sno</th></th><th>User</th><th>Username</th><th>Role</th><th>Status</th><th>Last Login</th><th>Created</th></tr></thead>
+            <tbody>
+                @if (Model.Users.Count == 0)
+                {
+                    <tr><td colspan="6"><div class="users-empty"><i class="bi bi-people"></i><strong>No users found</strong><span>Create the first portal user.</span></div></td></tr>
+                }
+                else
+                {
+                    @for (int i = 0; i < Model.Users.Count; i++)
+                    {
+                        var user = Model.Users[i];
+                        @* var initials = string.Join("", user.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant(); *@
+                        <tr>
+                            <td>@(i + 1)</td>
+                            <td>
+                                <div class="users-person">
+                                    @* <span>@initials</span> *@
+                                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.RolesManage) &&
+                                         !user.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <a class="user-permission-link" asp-action="Access" asp-route-id="@user.UserId">@user.FullName</a>
+                                    }
+                                    else
+                                    {
+                                        <strong>@user.FullName</strong>
+                                    }
+                                </div>
+                            </td>
+                            <td>@user.Username</td>
+                            <td><span class="users-role">@user.RoleName</span></td>
+                            <td><span class="users-status @(user.IsActive ? "active" : "inactive")"><i></i>@(user.IsActive ? "Active" : "Inactive")</span></td>
+                            <td>@(user.LastLoginDate?.ToString("dd MMM yyyy, hh:mm tt") ?? "Never")</td>
+                            <td>@user.CreatedDate.ToString("dd MMM yyyy")</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>

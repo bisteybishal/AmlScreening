@@ -1,0 +1,112 @@
+﻿@model IEnumerable<AmlScreening.Domain.Entities.SubscriptionPlan>
+@{
+	ViewData["Title"] = "Subscription Details";
+	var plans = Model?.ToList() ?? new List<AmlScreening.Domain.Entities.SubscriptionPlan>();
+	@section Styles {
+		<link rel="stylesheet" href="~/css/aml-records.css" asp-append-version="true" />
+		<link rel="stylesheet" href="~/css/Subscription.css" asp-append-version="true" />
+	}
+	<section class="subscription-heading">
+		<div>
+			<h1>Subscription Plans</h1>
+			
+		</div>
+
+		<a class="records-primary-button" asp-controller="Subscription" asp-action="Add"><i class="bi bi-plus-lg"></i> Add Subscription</a>
+	</section>
+	@if (TempData["SuccessMessage"] is string message)
+	{
+		<div class="records-alert"><i class="bi bi-check-circle-fill"></i>@message</div>
+	}
+	@if (plans.Count == 0)
+	{
+		<section class="subscription-empty">
+			<i class="bi bi-credit-card"></i>
+			<strong>No subscription plans found</strong>
+			<p>No subscription information is currently available.</p>
+		</section>
+	}
+	else
+	{
+		<section class="subscription-grid">
+			@foreach (var plan in plans)
+			{
+				<article class="subscription-card">
+					<header class="subscription-card-header">
+						<div>
+							<h2>@plan.SourceName</h2>
+
+							<span class="source-code">
+								@plan.SourceCode
+							</span>
+						</div>
+
+						<span class="subscription-status
+			                          @(plan.IsActive ? "active" : "inactive")">
+
+							@(plan.IsActive ? "Active" : "Inactive")
+						</span>
+					</header>
+
+					<div class="subscription-details">
+						<div class="subscription-detail">
+							<i class="bi bi-calendar3"></i>
+
+							<div>
+								<small>Duration</small>
+								<strong>
+									@plan.DurationMonths month@(plan.DurationMonths == 1 ? "" : "s")
+								</strong>
+							</div>
+						</div>
+
+						<div class="subscription-detail">
+							<i class="bi bi-cash-stack"></i>
+
+							<div>
+								<small>Subscription Rate</small>
+								<strong>@plan.Rate.ToString("N2")</strong>
+							</div>
+						</div>
+					</div>
+
+					<div class="subscription-id">
+						Plan ID: @plan.PlanId
+					</div>
+					<div class="record-actions">
+
+						<a class="action-button edit" title="Edit record" asp-controller="Subscription" asp-action="Index" asp-route-id="@plan.PlanId"><i class="bi bi-pencil-square"></i><span>Edit</span></a>
+
+						<form asp-action="Delete"
+							  method="post"
+							  style="display:inline;"
+							  onsubmit="return confirm('Are you sure you want to delete @plan.PlanId?');">
+
+							@Html.AntiForgeryToken()
+
+							<input type="hidden"
+								   name="id"
+								   value="@plan.PlanId" />
+
+							<button type="submit"
+									class="action-button delete"
+									title="Delete record">
+
+								<i class="bi bi-trash3"></i>
+								<span>Delete</span>
+
+							</button>
+
+						</form>
+						
+					</div>
+				</article>
+
+			}
+		</section>
+		
+	}
+
+}
+
+
