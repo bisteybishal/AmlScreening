@@ -1,12 +1,18 @@
 @model AmlScreening.Portal.ViewModels.AmlRecordInputModel
 
 <input asp-for="Id" type="hidden" />
+<input asp-for="RowVersion" type="hidden" />
 <div asp-validation-summary="ModelOnly" class="records-validation-summary"></div>
 
 <div class="record-form-grid">
     <div class="field">
         <label asp-for="RecordType"></label>
-        <select asp-for="RecordType"><option>PEP</option><option>UN</option><option>EU</option></select>
+        <select asp-for="RecordType">
+            @foreach (var item in Model.RecordTypes)
+            {
+                <option value="@item">@item</option>
+            }
+        </select>
         <span asp-validation-for="RecordType"></span>
     </div>
     <div class="field">
@@ -21,12 +27,24 @@
     </div>
     <div class="field">
         <label asp-for="Country"></label>
-        <input asp-for="Country" placeholder="e.g. Nepal" />
+        <select asp-for="Country">
+            <option value="">Select a country</option>
+            @foreach (var item in Model.Countries)
+            {
+                <option value="@item">@item</option>
+            }
+        </select>
         <span asp-validation-for="Country"></span>
     </div>
     <div class="field">
         <label asp-for="Nationality"></label>
-        <input asp-for="Nationality" placeholder="e.g. Nepali" />
+        <select asp-for="Nationality">
+            <option value="">Select a nationality</option>
+            @foreach (var item in Model.Nationalities)
+            {
+                <option value="@item">@item</option>
+            }
+        </select>
         <span asp-validation-for="Nationality"></span>
     </div>
     <div class="field">
@@ -36,7 +54,13 @@
     </div>
     <div class="field full">
         <label asp-for="SourceName"></label>
-        <input asp-for="SourceName" placeholder="e.g. UN Sanctions" />
+        <select asp-for="SourceName">
+            <option value="">Select a source</option>
+            @foreach (var item in Model.Sources)
+            {
+                <option value="@item">@item</option>
+            }
+        </select>
         <span asp-validation-for="SourceName"></span>
     </div>
     <div class="field full">

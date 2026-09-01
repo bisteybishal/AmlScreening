@@ -6,10 +6,16 @@ namespace AmlScreening.Portal.ViewModels;
 public sealed class UsersPageViewModel
 {
     public IReadOnlyList<UserListItem> Users { get; set; } = Array.Empty<UserListItem>();
-    public int TotalUsers => Users.Count;
-    public int ActiveUsers => Users.Count(x => x.IsActive);
-    public int InactiveUsers => Users.Count(x => !x.IsActive);
-    public int Administrators => Users.Count(x => x.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase));
+    public string? ErrorMessage { get; set; }
+    public int TotalUsers { get; set; }
+    public int ActiveUsers { get; set; }
+    public int InactiveUsers { get; set; }
+    public int Administrators { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
+    public int TotalPages { get; set; } = 1;
+    public bool HasPreviousPage => Page > 1;
+    public bool HasNextPage => Page < TotalPages;
 }
 
 public sealed class CreateUserViewModel

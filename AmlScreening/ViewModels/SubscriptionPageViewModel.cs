@@ -5,6 +5,7 @@ namespace AmlScreening.Portal.ViewModels
     public sealed class SubscriptionAddModel
     {
         public int PlanId { get; set; }
+        public byte[] RowVersion { get; set; } = Array.Empty<byte>();
        
         [Required, StringLength(50)]
         [Display(Name = "Source Code")]
@@ -24,6 +25,19 @@ namespace AmlScreening.Portal.ViewModels
 
         [Display(Name = "Active subscription")]
         public bool IsActive { get; set; } = true;
+    }
+
+    public sealed class SubscriptionPageViewModel
+    {
+        public IReadOnlyList<AmlScreening.Domain.Entities.SubscriptionPlan> Plans { get; set; } =
+            Array.Empty<AmlScreening.Domain.Entities.SubscriptionPlan>();
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 6;
+        public int TotalRecords { get; set; }
+        public int TotalPages { get; set; } = 1;
+        public bool HasPreviousPage => Page > 1;
+        public bool HasNextPage => Page < TotalPages;
+        public string? ErrorMessage { get; set; }
     }
 
 }

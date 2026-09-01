@@ -1,5 +1,7 @@
 using AmlScreening.Application.Interface.Repositories;
+using AmlScreening.Application.Interface;
 using AmlScreening.Application.Models;
+using AmlScreening.Application.Security;
 using AmlScreening.Domain.Entities;
 using AmlScreening.Infrastructure.Persistence;
 using Dapper;
@@ -9,17 +11,22 @@ namespace AmlScreening.Infrastructure.Repositories;
 public sealed class UserRepository : IUserRepository
 {
     private readonly IDBConnectionFactory _dbConnectionFactory;
+    private readonly ICurrentUserContext _currentUser;
 
-    public UserRepository(IDBConnectionFactory dbConnectionFactory)
+    public UserRepository(
+        IDBConnectionFactory dbConnectionFactory,
+        ICurrentUserContext currentUser)
     {
         _dbConnectionFactory = dbConnectionFactory;
+        _currentUser = currentUser;
     }
 
     public async Task<User?> GetUserAsync(string username)
     {
         using var connection = _dbConnectionFactory.CreateConnection();
         const string sql = """
-            SELECT CAST(u.UserId AS INT) AS Id,
+            SELECT u.UserId AS Id,
+                   u.ClientId,
                    u.Username,
                    u.FullName,
                    u.PasswordHash,
@@ -29,18 +36,27 @@ public sealed class UserRepository : IUserRepository
             INNER JOIN dbo.UserRoles ur ON ur.UserId = u.UserId
             INNER JOIN dbo.Roles r ON r.RoleId = ur.RoleId
             WHERE u.Username = @Username
-              AND u.IsActive = 1
               AND r.IsActive = 1;
             """;
 
         return await connection.QueryFirstOrDefaultAsync<User>(sql, new { Username = username });
     }
 
-    public async Task<IReadOnlyList<UserListItem>> GetAllAsync()
+    public async Task<UserPageResult> GetPageAsync(int pageNumber, int pageSize)
     {
         using var connection = _dbConnectionFactory.CreateConnection();
         const string sql = """
+            SELECT COUNT(1) AS TotalUsers,
+                   COALESCE(SUM(CASE WHEN u.IsActive = 1 THEN 1 ELSE 0 END), 0) AS ActiveUsers,
+                   COALESCE(SUM(CASE WHEN u.IsActive = 0 THEN 1 ELSE 0 END), 0) AS InactiveUsers,
+                   COALESCE(SUM(CASE WHEN r.RoleName = 'Admin' THEN 1 ELSE 0 END), 0) AS Administrators
+            FROM dbo.Users u
+            LEFT JOIN dbo.UserRoles ur ON ur.UserId = u.UserId
+            LEFT JOIN dbo.Roles r ON r.RoleId = ur.RoleId
+            WHERE (@CanViewAll = 1 OR u.ClientId = @ClientId);
+
             SELECT u.UserId,
+                   u.ClientId,
                    u.Username,
                    u.FullName,
                    r.RoleId,
@@ -51,11 +67,31 @@ public sealed class UserRepository : IUserRepository
             FROM dbo.Users u
             LEFT JOIN dbo.UserRoles ur ON ur.UserId = u.UserId
             LEFT JOIN dbo.Roles r ON r.RoleId = ur.RoleId
-            ORDER BY u.CreatedDate DESC, u.UserId DESC;
+            WHERE (@CanViewAll = 1 OR u.ClientId = @ClientId)
+            ORDER BY u.CreatedDate DESC, u.UserId DESC
+            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
             """;
 
-        var users = await connection.QueryAsync<UserListItem>(sql);
-        return users.AsList();
+        pageNumber = Math.Max(1, pageNumber);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        using var result = await connection.QueryMultipleAsync(sql, new
+        {
+            ClientId = _currentUser.ClientId,
+            CanViewAll = CanViewAllClients(),
+            Offset = (pageNumber - 1) * pageSize,
+            PageSize = pageSize
+        });
+        var summary = await result.ReadSingleAsync<UserSummaryRow>();
+        return new UserPageResult
+        {
+            Items = (await result.ReadAsync<UserListItem>()).AsList(),
+            TotalUsers = summary.TotalUsers,
+            ActiveUsers = summary.ActiveUsers,
+            InactiveUsers = summary.InactiveUsers,
+            Administrators = summary.Administrators,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
     }
 
     public async Task<UserListItem?> GetByIdAsync(long userId)
@@ -63,6 +99,7 @@ public sealed class UserRepository : IUserRepository
         using var connection = _dbConnectionFactory.CreateConnection();
         const string sql = """
             SELECT u.UserId,
+                   u.ClientId,
                    u.Username,
                    u.FullName,
                    r.RoleId,
@@ -73,10 +110,16 @@ public sealed class UserRepository : IUserRepository
             FROM dbo.Users u
             LEFT JOIN dbo.UserRoles ur ON ur.UserId = u.UserId
             LEFT JOIN dbo.Roles r ON r.RoleId = ur.RoleId
-            WHERE u.UserId = @UserId;
+            WHERE u.UserId = @UserId
+              AND (@CanViewAll = 1 OR u.ClientId = @ClientId);
             """;
 
-        return await connection.QuerySingleOrDefaultAsync<UserListItem>(sql, new { UserId = userId });
+        return await connection.QuerySingleOrDefaultAsync<UserListItem>(sql, new
+        {
+            UserId = userId,
+            ClientId = _currentUser.ClientId,
+            CanViewAll = CanViewAllClients()
+        });
     }
 
     public async Task<IReadOnlyList<RoleOption>> GetActiveRolesAsync()
@@ -86,27 +129,52 @@ public sealed class UserRepository : IUserRepository
             SELECT RoleId, RoleName
             FROM dbo.Roles
             WHERE IsActive = 1
+              AND (@CanAssignPlatformRole = 1 OR RoleName <> 'Admin')
             ORDER BY RoleName;
             """;
 
-        var roles = await connection.QueryAsync<RoleOption>(sql);
+        var roles = await connection.QueryAsync<RoleOption>(sql, new
+        {
+            CanAssignPlatformRole = CanViewAllClients()
+        });
         return roles.AsList();
     }
 
-    public async Task<IReadOnlyList<string>> GetPermissionsAsync(int userId)
+    public async Task<IReadOnlyList<string>> GetPermissionsAsync(long userId)
     {
         using var connection = _dbConnectionFactory.CreateConnection();
         const string sql = """
-            SELECT DISTINCT p.PermissionName
-            FROM dbo.UserPermissions up
-            INNER JOIN dbo.Permissions p ON p.PermissionId = up.PermissionId
-            WHERE up.UserId = @UserId
-              AND p.IsActive = 1
+            SELECT p.PermissionName
+            FROM dbo.Permissions p
+            LEFT JOIN dbo.UserPermissions userOverride
+                ON userOverride.UserId = @UserId
+               AND userOverride.PermissionId = p.PermissionId
+            WHERE p.IsActive = 1
+              AND COALESCE(
+                    userOverride.IsGranted,
+                    CASE WHEN EXISTS
+                    (
+                        SELECT 1
+                        FROM dbo.UserRoles userRole
+                        INNER JOIN dbo.RolePermissions rolePermission
+                            ON rolePermission.RoleId = userRole.RoleId
+                        WHERE userRole.UserId = @UserId
+                          AND rolePermission.PermissionId = p.PermissionId
+                    ) THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END
+                  ) = 1
             ORDER BY p.PermissionName;
             """;
 
         var permissions = await connection.QueryAsync<string>(sql, new { UserId = userId });
         return permissions.AsList();
+    }
+
+    public async Task UpdateLastLoginAsync(long userId)
+    {
+        using var connection = _dbConnectionFactory.CreateConnection();
+        await connection.ExecuteAsync(
+            "UPDATE dbo.Users SET LastLoginDate = SYSUTCDATETIME() WHERE UserId = @UserId;",
+            new { UserId = userId });
     }
 
     public async Task<IReadOnlyList<PermissionListItem>> GetPermissionOptionsAsync(long userId)
@@ -116,15 +184,43 @@ public sealed class UserRepository : IUserRepository
             SELECT p.PermissionId,
                    p.PermissionName,
                    p.Description,
-                   CAST(CASE WHEN up.PermissionId IS NULL THEN 0 ELSE 1 END AS BIT) AS IsSelected
+                   CAST(CASE WHEN EXISTS
+                   (
+                       SELECT 1
+                       FROM dbo.UserRoles userRole
+                       INNER JOIN dbo.RolePermissions rolePermission
+                           ON rolePermission.RoleId = userRole.RoleId
+                       WHERE userRole.UserId = @UserId
+                         AND rolePermission.PermissionId = p.PermissionId
+                   ) THEN 1 ELSE 0 END AS BIT) AS IsRoleGranted,
+                   CAST(CASE WHEN userOverride.PermissionId IS NULL THEN 0 ELSE 1 END AS BIT) AS HasOverride,
+                   COALESCE(
+                       userOverride.IsGranted,
+                       CAST(CASE WHEN EXISTS
+                       (
+                           SELECT 1
+                           FROM dbo.UserRoles userRole
+                           INNER JOIN dbo.RolePermissions rolePermission
+                               ON rolePermission.RoleId = userRole.RoleId
+                           WHERE userRole.UserId = @UserId
+                             AND rolePermission.PermissionId = p.PermissionId
+                       ) THEN 1 ELSE 0 END AS BIT)
+                   ) AS IsSelected
             FROM dbo.Permissions p
-            LEFT JOIN dbo.UserPermissions up
-                ON up.PermissionId = p.PermissionId AND up.UserId = @UserId
+            LEFT JOIN dbo.UserPermissions userOverride
+                ON userOverride.PermissionId = p.PermissionId
+               AND userOverride.UserId = @UserId
             WHERE p.IsActive = 1
+              AND (@CanGrantPlatformPermission = 1 OR p.PermissionName <> @ViewAllPermission)
             ORDER BY p.PermissionName;
             """;
 
-        var permissions = await connection.QueryAsync<PermissionListItem>(sql, new { UserId = userId });
+        var permissions = await connection.QueryAsync<PermissionListItem>(sql, new
+        {
+            UserId = userId,
+            CanGrantPlatformPermission = CanViewAllClients(),
+            ViewAllPermission = AppPermissions.AmlRecordsViewAll
+        });
         return permissions.AsList();
     }
 
@@ -137,8 +233,8 @@ public sealed class UserRepository : IUserRepository
         try
         {
             var userExists = await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(1) FROM dbo.Users WHERE UserId = @UserId;",
-                new { UserId = userId }, transaction) > 0;
+                "SELECT COUNT(1) FROM dbo.Users WHERE UserId = @UserId AND (@CanViewAll = 1 OR ClientId = @ClientId);",
+                new { UserId = userId, ClientId = _currentUser.ClientId, CanViewAll = CanViewAllClients() }, transaction) > 0;
 
             if (!userExists)
             {
@@ -150,21 +246,58 @@ public sealed class UserRepository : IUserRepository
                 "DELETE FROM dbo.UserPermissions WHERE UserId = @UserId;",
                 new { UserId = userId }, transaction);
 
-            if (permissionIds.Count > 0)
+            const string permissionsSql = """
+                SELECT p.PermissionId,
+                       CAST(CASE WHEN rolePermission.PermissionId IS NULL THEN 0 ELSE 1 END AS BIT) AS IsRoleGranted
+                FROM dbo.Permissions p
+                LEFT JOIN
+                (
+                    SELECT DISTINCT rp.PermissionId
+                    FROM dbo.UserRoles ur
+                    INNER JOIN dbo.RolePermissions rp ON rp.RoleId = ur.RoleId
+                    WHERE ur.UserId = @UserId
+                ) rolePermission ON rolePermission.PermissionId = p.PermissionId
+                WHERE p.IsActive = 1
+                  AND (@CanGrantPlatformPermission = 1 OR p.PermissionName <> @ViewAllPermission);
+                """;
+
+            var availablePermissions = (await connection.QueryAsync<PermissionGrantState>(
+                permissionsSql,
+                new
+                {
+                    UserId = userId,
+                    CanGrantPlatformPermission = CanViewAllClients(),
+                    ViewAllPermission = AppPermissions.AmlRecordsViewAll
+                },
+                transaction)).AsList();
+            var selectedIds = permissionIds.Distinct().ToHashSet();
+            var overrides = availablePermissions
+                .Where(permission => selectedIds.Contains(permission.PermissionId) != permission.IsRoleGranted)
+                .Select(permission => new
+                {
+                    UserId = userId,
+                    permission.PermissionId,
+                    IsGranted = selectedIds.Contains(permission.PermissionId)
+                })
+                .ToList();
+
+            if (overrides.Count > 0)
             {
                 const string insert = """
-                    INSERT INTO dbo.UserPermissions (UserId, PermissionId)
-                    SELECT @UserId, p.PermissionId
-                    FROM dbo.Permissions p
-                    WHERE p.PermissionId = @PermissionId
-                      AND p.IsActive = 1;
+                    INSERT INTO dbo.UserPermissions (UserId, PermissionId, IsGranted)
+                    VALUES (@UserId, @PermissionId, @IsGranted);
                     """;
 
-                await connection.ExecuteAsync(
-                    insert,
-                    permissionIds.Distinct().Select(id => new { UserId = userId, PermissionId = id }),
-                    transaction);
+                await connection.ExecuteAsync(insert, overrides, transaction);
             }
+
+            await InsertAuditAsync(
+                connection,
+                transaction,
+                "UpdatePermissions",
+                "User",
+                userId.ToString(),
+                $"Stored {overrides.Count} permission override(s).");
 
             transaction.Commit();
             return true;
@@ -193,10 +326,10 @@ public sealed class UserRepository : IUserRepository
         {
             const string insertUser = """
                 INSERT INTO dbo.Users
-                    (Username, FullName, PasswordHash, IsActive, CreatedDate)
+                    (ClientId, Username, FullName, PasswordHash, IsActive, CreatedDate)
                 OUTPUT INSERTED.UserId
                 VALUES
-                    (@Username, @FullName, @PasswordHash, @IsActive, @CreatedDate);
+                    (@ClientId, @Username, @FullName, @PasswordHash, @IsActive, @CreatedDate);
                 """;
 
             var userId = await connection.ExecuteScalarAsync<long>(insertUser, user, transaction);
@@ -208,17 +341,13 @@ public sealed class UserRepository : IUserRepository
 
             await connection.ExecuteAsync(insertRole, new { UserId = userId, RoleId = roleId }, transaction);
 
-            const string copyRolePermissions = """
-                INSERT INTO dbo.UserPermissions (UserId, PermissionId)
-                SELECT @UserId, rp.PermissionId
-                FROM dbo.RolePermissions rp
-                WHERE rp.RoleId = @RoleId;
-                """;
-
-            await connection.ExecuteAsync(
-                copyRolePermissions,
-                new { UserId = userId, RoleId = roleId },
-                transaction);
+            await InsertAuditAsync(
+                connection,
+                transaction,
+                "Create",
+                "User",
+                userId.ToString(),
+                $"Created user {user.Username}.");
 
             transaction.Commit();
             return userId;
@@ -239,8 +368,8 @@ public sealed class UserRepository : IUserRepository
         try
         {
             var userExists = await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(1) FROM dbo.Users WHERE UserId = @UserId;",
-                new { UserId = userId }, transaction) > 0;
+                "SELECT COUNT(1) FROM dbo.Users WHERE UserId = @UserId AND (@CanViewAll = 1 OR ClientId = @ClientId);",
+                new { UserId = userId, ClientId = _currentUser.ClientId, CanViewAll = CanViewAllClients() }, transaction) > 0;
 
             var roleExists = await connection.ExecuteScalarAsync<int>(
                 "SELECT COUNT(1) FROM dbo.Roles WHERE RoleId = @RoleId AND IsActive = 1;",
@@ -260,6 +389,14 @@ public sealed class UserRepository : IUserRepository
                 "INSERT INTO dbo.UserRoles (UserId, RoleId) VALUES (@UserId, @RoleId);",
                 new { UserId = userId, RoleId = roleId }, transaction);
 
+            await InsertAuditAsync(
+                connection,
+                transaction,
+                "UpdateRole",
+                "User",
+                userId.ToString(),
+                $"Assigned role {roleId}.");
+
             transaction.Commit();
             return true;
         }
@@ -268,5 +405,49 @@ public sealed class UserRepository : IUserRepository
             transaction.Rollback();
             throw;
         }
+    }
+
+    private bool CanViewAllClients() =>
+        _currentUser.HasPermission(AppPermissions.AmlRecordsViewAll);
+
+    private async Task InsertAuditAsync(
+        System.Data.IDbConnection connection,
+        System.Data.IDbTransaction transaction,
+        string action,
+        string entityType,
+        string? entityId,
+        string? details)
+    {
+        const string sql = """
+            INSERT INTO dbo.AuditLogs
+                (ClientId, UserId, Username, Action, EntityType, EntityId, Details, CreatedDate)
+            VALUES
+                (@ClientId, @CurrentUserId, @Username, @Action, @EntityType, @EntityId, @Details, SYSUTCDATETIME());
+            """;
+
+        await connection.ExecuteAsync(sql, new
+        {
+            ClientId = _currentUser.ClientId,
+            CurrentUserId = _currentUser.UserId,
+            Username = _currentUser.Username,
+            Action = action,
+            EntityType = entityType,
+            EntityId = entityId,
+            Details = details
+        }, transaction);
+    }
+
+    private sealed class PermissionGrantState
+    {
+        public int PermissionId { get; init; }
+        public bool IsRoleGranted { get; init; }
+    }
+
+    private sealed class UserSummaryRow
+    {
+        public int TotalUsers { get; init; }
+        public int ActiveUsers { get; init; }
+        public int InactiveUsers { get; init; }
+        public int Administrators { get; init; }
     }
 }

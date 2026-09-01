@@ -6,3 +6,4 @@ button:focus-visible,a:focus-visible{outline:3px solid rgba(11,167,156,.35);outl
 
 @media(max-width:700px){.workspace-tabs{min-height:54px;padding-left:14px;padding-right:14px}.dashboard-tab{padding:0 14px}.workspace-tab-link{max-width:150px}}
 
+.submenu-toggle{width:100%;border:0;text-align:left}.submenu-toggle .submenu-arrow{margin-left:auto;font-size:.75rem;transition:transform .2s ease}.submenu-toggle[aria-expanded="true"] .submenu-arrow{transform:rotate(180deg)}.submenu-link{padding-left:48px!important;font-size:.9rem}.submenu-link i{font-size:.9rem}

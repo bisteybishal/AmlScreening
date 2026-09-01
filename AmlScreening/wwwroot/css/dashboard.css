@@ -434,6 +434,10 @@ button, a {
     margin-bottom: 18px
 }
 
+.dashboard-grid-single {
+    grid-template-columns: minmax(0,1fr)
+}
+
 .panel {
     background: #fff;
     border: 1px solid var(--line);

@@ -1,5 +1,8 @@
 @model AmlScreening.Portal.ViewModels.SubscriptionAddModel
 
+<input asp-for="PlanId" type="hidden" />
+<input asp-for="RowVersion" type="hidden" />
+
 <div asp-validation-summary="ModelOnly" class="records-validation-summary"></div>
 
 <div class="record-form-grid">

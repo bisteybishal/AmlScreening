@@ -44,11 +44,13 @@ namespace AmlScreening.Application.Services
             }
 
             var permissions = await _userRepository.GetPermissionsAsync(user.Id);
+            await _userRepository.UpdateLastLoginAsync(user.Id);
 
             return new LoginResult
             {
                 Success = true,
                 UserId = user.Id,
+                ClientId = user.ClientId,
                 Username = user.Username,
                 FullName = user.FullName,
                 Role = user.Role,

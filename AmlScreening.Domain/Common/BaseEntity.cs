@@ -19,4 +19,6 @@ public abstract class BaseEntity
     public DateTime? DeleteDate { get; set; }
 
     public string? DeleteBy { get; set; }
+
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 }

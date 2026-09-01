@@ -14,6 +14,14 @@
 {
     <div class="roles-alert"><i class="bi bi-check-circle-fill"></i>@message</div>
 }
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
 
 <section class="roles-guide">
     <div><span>1</span><p><strong>Create a role</strong><small>For example AML User or Viewer.</small></p></div><i class="bi bi-chevron-right"></i>

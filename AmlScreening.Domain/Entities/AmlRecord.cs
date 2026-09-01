@@ -5,8 +5,12 @@ using System.Text;
 
 namespace AmlScreening.Domain.Entities
 {
-    public class AmlRecord:BaseEntity
+    public class AmlRecord : BaseEntity, IUserOwnedEntity
     {
+        public int ClientId { get; set; }
+
+        public long OwnerUserId { get; set; }
+
         public string RecordType { get; set; } = string.Empty;
 
         public string FullName { get; set; } = string.Empty;

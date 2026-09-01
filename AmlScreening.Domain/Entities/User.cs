@@ -5,8 +5,12 @@ using System.Text;
 
 namespace AmlScreening.Domain.Entities
 {
-    public class User:BaseEntity
+    public class User
     {
+        public long Id { get; set; }
+
+        public int ClientId { get; set; }
+
         public string Username { get; set; } = string.Empty;
 
         public string FullName { get; set; } = string.Empty;
@@ -14,6 +18,10 @@ namespace AmlScreening.Domain.Entities
         public string PasswordHash { get; set; } = string.Empty;
 
         public string Role { get; set; } = string.Empty;
+
+        public bool IsActive { get; set; } = true;
+
+        public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 
         public void Activate()
         {

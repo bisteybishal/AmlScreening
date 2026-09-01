@@ -4,9 +4,10 @@ namespace AmlScreening.Application.Interface.Repositories
 {
     public interface ISubscriptionRepository
     {
-       Task<IEnumerable<SubscriptionPlan>> GetAllAsync();
-        Task<SubscriptionPlan> GetByIdAsync(int id);
+        Task<PagedResult<SubscriptionPlan>> GetPageAsync(int pageNumber, int pageSize);
+        Task<SubscriptionPlan?> GetByIdAsync(int id);
         Task<int> CreateSubscriptionAsync(SubscriptionPlan plan);
-        Task<bool> DeleteAsync(int id);
+        Task<bool> UpdateAsync(SubscriptionPlan plan);
+        Task<bool> DeleteAsync(int id, byte[] rowVersion);
     }
 }

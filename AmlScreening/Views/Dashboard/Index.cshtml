@@ -1,73 +1,99 @@
-
-@model IReadOnlyList<AmlScreening.Domain.Entities.AmlRecord>
+@model AmlScreening.Portal.ViewModels.DashboardViewModel
 @{
     ViewData["Title"] = "Dashboard";
-    var displayName = ViewBag.Username as string ?? ViewBag.Username as string ?? "Admin User";
 }
+
 <section class="dashboard-heading">
-    <div><h1>Welcome Back, @displayName! <span>👋</span></h1><p>Here’s what’s happening with your AML screening system today.</p></div>
-    <div class="date-chip"><i class="bi bi-calendar3"></i><span id="currentDate">20 Aug 2026, Thursday</span></div>
+    <div>
+        <h1>Welcome Back, @Model.FullName! <span>👋</span></h1>
+        <p>Here’s what’s happening with your AML screening system today.</p>
+    </div>
+    <div class="date-chip"><i class="bi bi-calendar3"></i><span id="currentDate"></span></div>
 </section>
+
+@if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.TransactionsView))
+{
+    <section class="metric-grid" aria-label="AML decision workflow summary">
+        <article class="metric-card teal"><div class="metric-top"><span class="metric-icon"><i class="bi bi-arrow-left-right"></i></span><div><span class="metric-label">Transactions</span><strong>@Model.TransactionCount</strong></div></div></article>
+        <article class="metric-card amber"><div class="metric-top"><span class="metric-icon"><i class="bi bi-hourglass-split"></i></span><div><span class="metric-label">Under Review</span><strong>@Model.ReviewCount</strong></div></div></article>
+        <article class="metric-card red"><div class="metric-top"><span class="metric-icon"><i class="bi bi-slash-octagon"></i></span><div><span class="metric-label">Blocked</span><strong>@Model.BlockCount</strong></div></div></article>
+        <article class="metric-card amber"><div class="metric-top"><span class="metric-icon"><i class="bi bi-exclamation-triangle"></i></span><div><span class="metric-label">Open Alerts</span><strong>@Model.OpenAlertCount</strong></div></div></article>
+        <article class="metric-card teal"><div class="metric-top"><span class="metric-icon"><i class="bi bi-folder2-open"></i></span><div><span class="metric-label">Open Cases</span><strong>@Model.OpenCaseCount</strong></div></div></article>
+    </section>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>@Model.ErrorMessage
+    </div>
+}
 
 <section class="metric-grid" aria-label="AML record summary">
     <article class="metric-card teal">
-        <div class="metric-top"><span class="metric-icon"><i class="bi bi-file-earmark-text-fill"></i></span><div><span class="metric-label">Total Records</span><strong>@ViewBag.totalrecords</strong></div></div>
+        <div class="metric-top"><span class="metric-icon"><i class="bi bi-file-earmark-text-fill"></i></span><div><span class="metric-label">Total Records</span><strong>@Model.Summary.TotalRecords.ToString("N0")</strong></div></div>
     </article>
     <article class="metric-card green">
-        <div class="metric-top"><span class="metric-icon"><i class="bi bi-shield-fill-check"></i></span><div><span class="metric-label">Active Records</span><strong>@ViewBag.activerecord</strong></div></div>
+        <div class="metric-top"><span class="metric-icon"><i class="bi bi-shield-fill-check"></i></span><div><span class="metric-label">Active Records</span><strong>@Model.Summary.ActiveRecords.ToString("N0")</strong></div></div>
     </article>
-   @* <article class="metric-card amber">
-        <div class="metric-top"><span class="metric-icon"><i class="bi bi-hourglass-split"></i></span><div><span class="metric-label">Under Review</span><strong>425</strong></div></div>
-        <p class="metric-change negative"><i class="bi bi-arrow-down"></i> 3.1% <span>from last month</span></p>
-        <svg class="sparkline" viewBox="0 0 260 46" preserveAspectRatio="none"><path class="fill" d="M0 37 L12 27 24 34 36 25 48 33 61 12 74 2 88 15 100 19 114 31 126 34 138 18 150 9 162 12 175 4 186 10 199 29 211 35 224 27 237 31 248 40 260 32 L260 46 L0 46Z"/><path d="M0 37 L12 27 24 34 36 25 48 33 61 12 74 2 88 15 100 19 114 31 126 34 138 18 150 9 162 12 175 4 186 10 199 29 211 35 224 27 237 31 248 40 260 32"/></svg>
+    <article class="metric-card amber">
+        <div class="metric-top"><span class="metric-icon"><i class="bi bi-person-fill"></i></span><div><span class="metric-label">Individuals</span><strong>@Model.Summary.IndividualRecords.ToString("N0")</strong></div></div>
     </article>
     <article class="metric-card red">
-        <div class="metric-top"><span class="metric-icon"><i class="bi bi-exclamation-triangle-fill"></i></span><div><span class="metric-label">High Risk</span><strong>135</strong></div></div>
-        <p class="metric-change negative"><i class="bi bi-arrow-up"></i> 12.5% <span>from last month</span></p>
-        <svg class="sparkline" viewBox="0 0 260 46" preserveAspectRatio="none"><path class="fill" d="M0 38 L12 25 24 31 36 23 48 29 61 34 74 20 88 25 100 9 114 2 126 10 138 16 150 11 162 18 175 13 186 5 199 10 211 20 224 18 237 26 248 24 260 34 L260 46 L0 46Z"/><path d="M0 38 L12 25 24 31 36 23 48 29 61 34 74 20 88 25 100 9 114 2 126 10 138 16 150 11 162 18 175 13 186 5 199 10 211 20 224 18 237 26 248 24 260 34"/></svg>
-    </article>*@
+        <div class="metric-top"><span class="metric-icon"><i class="bi bi-buildings-fill"></i></span><div><span class="metric-label">Entities</span><strong>@Model.Summary.EntityRecords.ToString("N0")</strong></div></div>
+    </article>
+    <article class="metric-card teal">
+        <div class="metric-top"><span class="metric-icon"><i class="bi bi-globe2"></i></span><div><span class="metric-label">Countries Covered</span><strong>@Model.Summary.CountriesCovered.ToString("N0")</strong></div></div>
+    </article>
 </section>
 
-<section class="dashboard-grid">
+<section class="dashboard-grid dashboard-grid-single">
     <article class="panel activity-panel">
-        <div class="panel-header"><h2>Recent AML Screening Activity</h2>
-        @*<button class="outline-button" type="button">View All</button>*@</div>
-        <div class="table-responsive"><table class="activity-table">
-            <thead><tr><th>Reference No</th><th>Name</th><th>Country</th><th>Date of Birth</th><th>Source</th><th>Created On</th><th></th></tr></thead>
-            <tbody>
-                    @if(Model!=null && Model.Any())
+        <div class="panel-header">
+            <h2>Recent AML Records</h2>
+            @if (User.HasClaim(AmlScreening.Application.Security.AppPermissions.ClaimType, AmlScreening.Application.Security.AppPermissions.AmlRecordsView))
+            {
+                <a class="outline-button text-decoration-none" asp-controller="AmlRecords" asp-action="Index">View All</a>
+            }
+        </div>
+        <div class="table-responsive">
+            <table class="activity-table">
+                <thead>
+                    <tr><th>Reference No</th><th>Name</th><th>Type</th><th>Country</th><th>Source</th><th>Created On</th></tr>
+                </thead>
+                <tbody>
+                    @if (Model.RecentRecords.Count == 0)
                     {
-                        @foreach(var r in Model.Take(5))
+                        <tr><td colspan="6" class="text-center text-muted py-4">No AML records are available.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var record in Model.RecentRecords)
                         {
                             <tr>
-                            <td>@r.ReferenceNo</td>
-                            <td>@r.FullName</td>
-                            <td>@r.Country</td>
-                            <td>@r.DateOfBirth</td>
-                            <td>@r.SourceName</td>
-                            <td>@r.CreatedDate</td>
+                                <td>@record.ReferenceNo</td>
+                                <td>@record.FullName</td>
+                                <td>@record.RecordType</td>
+                                <td>@record.Country</td>
+                                <td>@record.SourceName</td>
+                                <td>@record.CreatedDate.ToString("dd MMM yyyy, hh:mm tt")</td>
                             </tr>
-
-                            
                         }
                     }
-               
-            </tbody>
-        </table></div>
-        <p class="table-caption">Showing 1 to 5 of 5 entries</p>
-    </article>
-    <article class="panel risk-panel">
-        <div class="panel-header"><h2>Risk Summary</h2></div>
-        <div class="risk-content">
-            <div class="donut" role="img" aria-label="72 percent low, 20 percent medium, 8 percent high risk"><div><strong>12,540</strong><span>Total</span></div></div>
-            <ul class="risk-legend"><li><i class="low-dot"></i><span><strong>Low Risk</strong><small>72% (9,029)</small></span></li><li><i class="medium-dot"></i><span><strong>Medium Risk</strong><small>20% (2,508)</small></span></li><li><i class="high-dot"></i><span><strong>High Risk</strong><small>8% (1,003)</small></span></li></ul>
+                </tbody>
+            </table>
         </div>
-        <button class="outline-button report-button" type="button"><i class="bi bi-bar-chart-fill"></i> View Full Report</button>
+        <p class="table-caption">Showing @Model.RecentRecords.Count recent record@(Model.RecentRecords.Count == 1 ? "" : "s")</p>
     </article>
 </section>
 
-<section class="bottom-grid">
-    <article class="summary-card danger-card"><span class="summary-icon"><i class="bi bi-clipboard2-fill"></i></span><div><span>Watchlist Matches</span><strong>186</strong><small>Potential matches<br />Requires investigation</small></div><i class="bi bi-search summary-watermark"></i></article>
-    <article class="summary-card screening-card"><span class="summary-icon"><i class="bi bi-fingerprint"></i></span><div><span>Screening This Month</span><strong>2,847</strong><small>Total screenings</small><em><i class="bi bi-arrow-up"></i> 15.3% from last month</em></div><i class="bi bi-bar-chart-line-fill summary-watermark"></i></article>
-    <article class="summary-card status-card"><span class="summary-icon"><i class="bi bi-shield-fill-check"></i></span><div><span>System Status</span><strong>All Systems Operational</strong><small>Last updated: 19 Aug 2026 10:45 AM</small></div><i class="bi bi-check-lg status-check"></i></article>
-</section>
+@section Scripts {
+    <script>
+        document.getElementById("currentDate").textContent = new Intl.DateTimeFormat("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            weekday: "long"
+        }).format(new Date());
+    </script>
+}

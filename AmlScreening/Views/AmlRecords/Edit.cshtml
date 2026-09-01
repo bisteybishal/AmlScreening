@@ -1,0 +1,28 @@
+@model AmlScreening.Portal.ViewModels.AmlRecordInputModel
+@{
+    ViewData["Title"] = "Edit AML Record";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/aml-records.css" asp-append-version="true" />
+}
+
+<section class="record-editor-heading">
+    <a asp-controller="AmlRecords" asp-action="Index"><i class="bi bi-arrow-left"></i> Back to AML Records</a>
+    <h1>Edit AML Record</h1>
+    <p>Update <strong>@Model.FullName</strong>. Ownership cannot be changed from this form.</p>
+</section>
+
+<section class="record-editor-card">
+    <div class="record-editor-card-title"><span><i class="bi bi-pencil-square"></i></span><div><h2>Record details</h2><p>Review the values below and save your changes.</p></div></div>
+    <form asp-controller="AmlRecords" asp-action="Edit" method="post">
+        @Html.AntiForgeryToken()
+        <partial name="_AmlRecordForm" model="Model" />
+        <div class="record-editor-actions">
+            <a class="records-secondary-button" asp-controller="AmlRecords" asp-action="Index">Cancel</a>
+            <button class="records-primary-button" type="submit"><i class="bi bi-check2"></i> Save Changes</button>
+        </div>
+    </form>
+</section>
+
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

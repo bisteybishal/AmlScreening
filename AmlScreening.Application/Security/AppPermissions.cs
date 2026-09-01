@@ -8,6 +8,8 @@ public static class AppPermissions
     public const string AmlRecordsCreate = "AMLRecords.Create";
     public const string AmlRecordsEdit = "AMLRecords.Edit";
     public const string AmlRecordsDelete = "AMLRecords.Delete";
+    public const string AmlRecordsViewClient = "AMLRecords.ViewClient";
+    public const string AmlRecordsViewAll = "AMLRecords.ViewAll";
     public const string SearchScreeningView = "SearchScreening.View";
     public const string ReportsView = "Reports.View";
     public const string AuditLogsView = "AuditLogs.View";
@@ -19,35 +21,33 @@ public static class AppPermissions
     public const string SubscriptionCreate = "Subscription.Create";
     public const string SubscriptionEdit = "Subscription.Edit";
     public const string SubscriptionDelete = "Subscription.Delete";
-    public const string ComplianceRulesView =
-    "ComplianceRules.View";
+    public const string ComplianceRulesView = "ComplianceRules.View";
 
-    public const string ComplianceRulesCreate =
-        "ComplianceRules.Create";
+    public const string ComplianceRulesCreate = "ComplianceRules.Create";
 
-    public const string ComplianceRulesEdit =
-        "ComplianceRules.Edit";
+    public const string ComplianceRulesEdit = "ComplianceRules.Edit";
 
-    public const string ComplianceRulesDelete =
-        "ComplianceRules.Delete";
+    public const string ComplianceRulesDelete = "ComplianceRules.Delete";
 
-    public const string TransactionsView =
-        "Transactions.View";
+    public const string CustomersView = "Customers.View";
+    public const string CustomersCreate = "Customers.Create";
+    public const string CustomersEdit = "Customers.Edit";
+    public const string CustomersDelete = "Customers.Delete";
 
-    public const string TransactionsCreate =
-        "Transactions.Create";
+    public const string TransactionsView = "Transactions.View";
 
-    public const string AlertsView =
-        "Alerts.View";
+    public const string TransactionsCreate = "Transactions.Create";
 
-    public const string AlertsManage =
-        "Alerts.Manage";
+    public const string TransactionsEvaluate = "Transactions.Evaluate";
 
-    public const string CasesView =
-        "Cases.View";
+    public const string AlertsView = "Alerts.View";
 
-    public const string CasesManage =
-        "Cases.Manage";
+    public const string AlertsManage = "Alerts.Manage";
+
+    public const string CasesView = "Cases.View";
+
+    public const string CasesManage = "Cases.Manage";
+    public const string AmlSourceView = "AmlSource.View";
 
     public static readonly string[] All =
     {
@@ -55,6 +55,8 @@ public static class AppPermissions
         AmlRecordsCreate,
         AmlRecordsEdit,
         AmlRecordsDelete,
+        AmlRecordsViewClient,
+        AmlRecordsViewAll,
         SearchScreeningView,
         ReportsView,
         AuditLogsView,
@@ -65,6 +67,22 @@ public static class AppPermissions
         SubscriptionView,
         SubscriptionCreate,
         SubscriptionEdit,
-        SubscriptionDelete
+        SubscriptionDelete,
+        ComplianceRulesView,
+        ComplianceRulesCreate,
+        ComplianceRulesEdit,
+        ComplianceRulesDelete,
+        CustomersView,
+        CustomersCreate,
+        CustomersEdit,
+        CustomersDelete,
+        TransactionsView,
+        TransactionsCreate,
+        TransactionsEvaluate,
+        AlertsView,
+        AlertsManage,
+        CasesView,
+        CasesManage,
+        AmlSourceView
     };
 }

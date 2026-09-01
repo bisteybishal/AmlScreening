@@ -12,7 +12,7 @@
     <input asp-for="UserId" type="hidden" />
     <div asp-validation-summary="ModelOnly" class="users-validation"></div>
     <section class="access-user-summary"><span>@string.Join("", Model.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant()</span><div><h2>@Model.FullName</h2><p>@@@Model.Username · @Model.RoleName</p></div></section>
-    <div class="access-help"><i class="bi bi-info-circle"></i><span>These permissions apply only to <strong>@Model.FullName</strong>. Menu changes appear after this user signs in again.</span></div>
+    <div class="access-help"><i class="bi bi-info-circle"></i><span>The role supplies the default access. Changing a checkbox stores only an override for <strong>@Model.FullName</strong>. The user must sign in again.</span></div>
     <section class="user-permission-groups">
         @foreach (var group in Model.Permissions.GroupBy(x => x.PermissionName.Split('.')[0]))
         {
@@ -27,10 +27,6 @@
                         var actionName = permission.PermissionName.Split('.').Last();
                         var label = group.Key switch
                         {
-                            @* "AMLRecords" when actionName == "View" => "View AML Records",
-                            "AMLRecords" when actionName == "Create" => "Add AML Record",
-                            "AMLRecords" when actionName == "Edit" => "Edit AML Record",
-                            "AMLRecords" when actionName == "Delete" => "Delete AML Record", *@
                             "SearchScreening" => "View Search Screening",
                             "Settings" => "View Settings",
                             _ => $"{actionName} {group.Key}"
@@ -38,7 +34,13 @@
                         <label class="user-permission-option">
                             <input type="checkbox" name="SelectedPermissionIds" value="@permission.PermissionId" checked="@permission.IsSelected" />
                             <span><i class="bi bi-check"></i></span>
-                            <p><strong>@label</strong><small>@permission.Description</small></p>
+                            <p>
+                                <strong>@label</strong>
+                                <small>@permission.Description</small>
+                                <small class="permission-source @(permission.HasOverride ? "override" : "inherited")">
+                                    @(permission.HasOverride ? "User override" : permission.IsRoleGranted ? "Inherited from role" : "Not granted by role")
+                                </small>
+                            </p>
                         </label>
                     }
                 </div>

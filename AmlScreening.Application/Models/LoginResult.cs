@@ -10,7 +10,9 @@ namespace AmlScreening.Application.Models
 
         public string Message { get; set; } = string.Empty;
 
-        public int UserId { get; set; }
+        public long UserId { get; set; }
+
+        public int ClientId { get; set; }
 
         public string Username { get; set; } = string.Empty;
 

@@ -42,6 +42,7 @@ BEGIN
         (
             UserId ' + @UserIdSqlType + N' NOT NULL,
             PermissionId INT NOT NULL,
+            IsGranted BIT NOT NULL CONSTRAINT DF_UserPermissions_IsGranted DEFAULT 1,
             CONSTRAINT PK_UserPermissions PRIMARY KEY (UserId, PermissionId),
             CONSTRAINT FK_UserPermissions_Users FOREIGN KEY (UserId) REFERENCES dbo.Users(UserId),
             CONSTRAINT FK_UserPermissions_Permissions FOREIGN KEY (PermissionId) REFERENCES dbo.Permissions(PermissionId)
@@ -55,13 +56,34 @@ FROM (VALUES
     ('AMLRecords.Create', 'Create new AML records'),
     ('AMLRecords.Edit',   'Edit existing AML records'),
     ('AMLRecords.Delete', 'Soft delete AML records'),
+    ('AMLRecords.ViewClient', 'View all AML records for the current client'),
+    ('AMLRecords.ViewAll', 'Platform access to AML records across all clients'),
     ('SearchScreening.View', 'View the Search Screening menu'),
     ('Reports.View',        'View the Reports menu'),
     ('AuditLogs.View',      'View the Audit Logs menu'),
     ('Settings.View',       'View the Settings menu'),
     ('Users.View',        'View portal users'),
     ('Users.Create',      'Create portal users'),
-    ('Roles.Manage',      'Create roles and assign permissions')
+    ('Roles.Manage',      'Create roles and assign permissions'),
+    ('Subscription.View',   'View subscription plans'),
+    ('Subscription.Create', 'Create subscription plans'),
+    ('Subscription.Edit',   'Edit subscription plans'),
+    ('Subscription.Delete', 'Delete subscription plans'),
+    ('ComplianceRules.View',   'View compliance rules'),
+    ('ComplianceRules.Create', 'Create compliance rules'),
+    ('ComplianceRules.Edit',   'Edit compliance rules'),
+    ('ComplianceRules.Delete', 'Delete compliance rules'),
+    ('Customers.View',       'View customer/KYC profiles'),
+    ('Customers.Create',     'Create customer/KYC profiles'),
+    ('Customers.Edit',       'Edit customer/KYC profiles'),
+    ('Customers.Delete',     'Soft delete customer/KYC profiles'),
+    ('Transactions.View',   'View compliance transactions'),
+    ('Transactions.Create', 'Create compliance transactions'),
+    ('Transactions.Evaluate', 'Run AML transaction evaluation'),
+    ('Alerts.View',         'View compliance alerts'),
+    ('Alerts.Manage',       'Assign and resolve compliance alerts'),
+    ('Cases.View',          'View compliance cases'),
+    ('Cases.Manage',        'Investigate and manage compliance cases')
 ) v (PermissionName, Description)
 WHERE NOT EXISTS
 (
@@ -100,7 +122,7 @@ WHERE r.RoleName = 'AML User'
   (
       SELECT 1 FROM dbo.RolePermissions rp
       WHERE rp.RoleId = r.RoleId AND rp.PermissionId = p.PermissionId
-  );
+);
 
 -- Viewer can only view AML records.
 INSERT INTO dbo.RolePermissions (RoleId, PermissionId)
@@ -113,19 +135,6 @@ WHERE r.RoleName = 'Viewer'
       SELECT 1 FROM dbo.RolePermissions rp
       WHERE rp.RoleId = r.RoleId AND rp.PermissionId = p.PermissionId
   );
-
--- Copy the role defaults to every existing user once. After this, permissions
--- can be changed independently for each user from the Users page.
-INSERT INTO dbo.UserPermissions (UserId, PermissionId)
-SELECT ur.UserId, rp.PermissionId
-FROM dbo.UserRoles ur
-INNER JOIN dbo.RolePermissions rp ON rp.RoleId = ur.RoleId
-WHERE NOT EXISTS
-(
-    SELECT 1
-    FROM dbo.UserPermissions up
-    WHERE up.UserId = ur.UserId
-);
 
 SELECT r.RoleName, p.PermissionName
 FROM dbo.RolePermissions rp

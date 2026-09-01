@@ -6,6 +6,7 @@ namespace AmlScreening.Portal.ViewModels;
 public sealed class RolesPageViewModel
 {
     public IReadOnlyList<RoleListItem> Roles { get; set; } = Array.Empty<RoleListItem>();
+    public string? ErrorMessage { get; set; }
 }
 
 public sealed class CreateRoleViewModel

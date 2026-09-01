@@ -23,11 +23,13 @@ public sealed class AmlRecordsPageViewModel
     public int LastRecordNumber => Math.Min(Page * PageSize, FilteredRecords);
     public bool HasPreviousPage => Page > 1;
     public bool HasNextPage => Page < TotalPages;
+    public IReadOnlyList<string> RecordTypes { get; set; } = AmlRecordOptions.RecordTypes;
 }
 
 public sealed class AmlRecordInputModel
 {
     public int Id { get; set; }
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
     [Required, StringLength(50)]
     [Display(Name = "Record type")]
@@ -60,4 +62,26 @@ public sealed class AmlRecordInputModel
 
     [Display(Name = "Active record")]
     public bool IsActive { get; set; } = true;
+    public IReadOnlyList<string> RecordTypes { get; set; } = AmlRecordOptions.RecordTypes;
+    public IReadOnlyList<string> Countries { get; set; } = AmlRecordOptions.Countries;
+    public IReadOnlyList<string> Nationalities { get; set; } = AmlRecordOptions.Nationalities;
+    public IReadOnlyList<string> Sources { get; set; } = AmlRecordOptions.Sources;
+}
+
+public static class AmlRecordOptions
+{
+    public static readonly IReadOnlyList<string> RecordTypes =
+        new[] { "Individual", "Entity", "Vessel" };
+
+    public static readonly IReadOnlyList<string> Countries =
+        new[] { "Nepal", "India", "China", "United States", "United Kingdom",
+            "United Arab Emirates", "Jordan", "Panama" };
+
+    public static readonly IReadOnlyList<string> Nationalities =
+        new[] { "Nepali", "Indian", "Chinese", "American", "British",
+            "Jordanian", "Panamanian" };
+
+    public static readonly IReadOnlyList<string> Sources =
+        new[] { "PEP Local", "PEP International", "EU Sanctions", "UN Sanctions",
+            "CIB", "Other List" };
 }

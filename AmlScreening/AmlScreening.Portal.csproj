@@ -7,11 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Dapper" Version="2.1.79" />
-    <PackageReference Include="System.Data.SqlClient" Version="4.9.1" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\AmlScreening.Infrastructure\AmlScreening.Infrastructure.csproj" />
   </ItemGroup>
 

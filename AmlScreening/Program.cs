@@ -1,19 +1,52 @@
 using AmlScreening.Application;
-using AmlScreening.Infrastructure;
+using AmlScreening.Application.Interface;
+using AmlScreening.Application.Interface.Provider;
 using AmlScreening.Application.Security;
+using AmlScreening.Application.Services;
+using AmlScreening.Infrastructure;
+using AmlScreening.Infrastructure.Provider;
+using AmlScreening.Portal.Security;
+using AmlScreening.Portal.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (!builder.Environment.IsDevelopment())
+{
+    ValidateHostedConfiguration(builder.Configuration, builder.Environment);
+    builder.Logging.AddJsonConsole();
+}
+
+var dataProtectionBuilder = builder.Services.AddDataProtection()
+    .SetApplicationName(builder.Configuration["DataProtection:ApplicationName"] ?? "AmlScreening.Portal");
+var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+{
+    dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+    if (OperatingSystem.IsWindows() && !builder.Environment.IsDevelopment())
+        dataProtectionBuilder.ProtectKeysWithDpapi();
+}
+
 builder.Services.AddControllersWithViews();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient<IAmlDataProvider, UnDataProvider>();
+builder.Services.AddScoped<UnSyncService>();
+builder.Services.AddScoped<ICurrentUserContext, CurrentUserContext>();
+builder.Services.AddScoped<IAuthorizationHandler, AmlRecordAuthorizationHandler>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+
     .AddCookie(options =>
     {
         options.Cookie.Name = "AMLScreening.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Lax;
         options.LoginPath = "/Account/Login";
         options.AccessDeniedPath = "/Account/AccessDenied";
         options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
@@ -21,6 +54,9 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 builder.Services.AddAuthorization(options =>
 {
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
     foreach (var permission in AppPermissions.All)
     {
         options.AddPolicy(permission, policy =>
@@ -50,7 +86,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey,
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 1,
+                PermitLimit = 5,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 AutoReplenishment = true
@@ -67,6 +103,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseRouting();
 
 // Read the submitted username before the rate limiter creates its partition.
@@ -99,3 +136,42 @@ app.MapControllerRoute(
     .WithStaticAssets();
 
 app.Run();
+
+static void ValidateHostedConfiguration(
+    IConfiguration configuration,
+    IHostEnvironment environment)
+{
+    var connectionString = configuration.GetConnectionString("AMLDatabase");
+    if (string.IsNullOrWhiteSpace(connectionString))
+        throw new InvalidOperationException(
+            "ConnectionStrings__AMLDatabase must be supplied by the host secret store.");
+
+    var allowedHosts = configuration["AllowedHosts"];
+    if (string.IsNullOrWhiteSpace(allowedHosts) ||
+        allowedHosts.Contains("__SET_", StringComparison.OrdinalIgnoreCase) ||
+        allowedHosts == "*")
+    {
+        throw new InvalidOperationException(
+            $"A real AllowedHosts value is required for {environment.EnvironmentName}.");
+    }
+
+    var keysPath = configuration["DataProtection:KeysPath"];
+    if (string.IsNullOrWhiteSpace(keysPath) ||
+        keysPath.Contains("__SET_", StringComparison.OrdinalIgnoreCase) ||
+        !Path.IsPathFullyQualified(keysPath))
+    {
+        throw new InvalidOperationException(
+            $"A fully-qualified DataProtection__KeysPath is required for {environment.EnvironmentName}.");
+    }
+
+    try
+    {
+        Directory.CreateDirectory(keysPath);
+    }
+    catch (Exception exception)
+    {
+        throw new InvalidOperationException(
+            $"The data-protection directory '{keysPath}' could not be prepared.",
+            exception);
+    }
+}

@@ -62,6 +62,12 @@
     font-size: 13px;
 }
 
+.users-alert.error {
+    border-color: #f1c2c2;
+    background: #fff0f0;
+    color: #b42318;
+}
+
 .users-summary {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -656,6 +662,25 @@
         margin-top: 2px;
         color: var(--muted);
         font-size: 10px;
+    }
+
+    .user-permission-option .permission-source {
+        width: max-content;
+        margin-top: 5px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        background: #eef3f6;
+        color: #5e7182;
+    }
+
+    .user-permission-option .permission-source.override {
+        background: #fff1d6;
+        color: #9a6200;
+    }
+
+    .user-permission-option .permission-source.inherited {
+        background: #e4f5ec;
+        color: #167148;
     }
 
 .user-access-form > .users-validation {

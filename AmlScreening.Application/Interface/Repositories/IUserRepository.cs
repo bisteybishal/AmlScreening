@@ -6,10 +6,11 @@ namespace AmlScreening.Application.Interface.Repositories;
 public interface IUserRepository
 {
     Task<User?> GetUserAsync(string username);
-    Task<IReadOnlyList<UserListItem>> GetAllAsync();
+    Task<UserPageResult> GetPageAsync(int pageNumber, int pageSize);
     Task<UserListItem?> GetByIdAsync(long userId);
     Task<IReadOnlyList<RoleOption>> GetActiveRolesAsync();
-    Task<IReadOnlyList<string>> GetPermissionsAsync(int userId);
+    Task<IReadOnlyList<string>> GetPermissionsAsync(long userId);
+    Task UpdateLastLoginAsync(long userId);
     Task<IReadOnlyList<PermissionListItem>> GetPermissionOptionsAsync(long userId);
     Task<bool> UpdatePermissionsAsync(long userId, IReadOnlyCollection<int> permissionIds);
     Task<bool> UsernameExistsAsync(string username);

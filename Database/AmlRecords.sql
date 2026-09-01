@@ -3,6 +3,8 @@ BEGIN
     CREATE TABLE dbo.AmlRecords
     (
         Id            INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_AmlRecords PRIMARY KEY,
+        ClientId      INT NOT NULL,
+        OwnerUserId   INT NOT NULL,
         RecordType    NVARCHAR(50)  NOT NULL,
         FullName      NVARCHAR(200) NOT NULL,
         DateOfBirth   DATE          NULL,
@@ -13,10 +15,10 @@ BEGIN
         Remarks       NVARCHAR(1000) NOT NULL CONSTRAINT DF_AmlRecords_Remarks DEFAULT N'',
         IsActive      BIT           NOT NULL CONSTRAINT DF_AmlRecords_IsActive DEFAULT 1,
         CreatedDate   DATETIME2(0)  NOT NULL CONSTRAINT DF_AmlRecords_CreatedDate DEFAULT SYSUTCDATETIME(),
-        CreatedBy     INT           NULL,
+        CreatedBy     NVARCHAR(100) NULL,
         UpdatedDate   DATETIME2(0)  NULL,
-        UpdatedBy     INT           NULL,
-        CONSTRAINT UQ_AmlRecords_ReferenceNo UNIQUE (ReferenceNo)
+        UpdatedBy     NVARCHAR(100) NULL,
+        CONSTRAINT UQ_AmlRecords_Client_Reference UNIQUE (ClientId, ReferenceNo)
     );
 
     CREATE INDEX IX_AmlRecords_FullName ON dbo.AmlRecords (FullName);

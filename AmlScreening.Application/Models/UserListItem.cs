@@ -3,6 +3,7 @@ namespace AmlScreening.Application.Models;
 public sealed class UserListItem
 {
     public long UserId { get; set; }
+    public int ClientId { get; set; }
     public string Username { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
     public int RoleId { get; set; }

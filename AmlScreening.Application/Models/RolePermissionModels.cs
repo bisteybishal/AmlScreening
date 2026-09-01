@@ -16,4 +16,6 @@ public sealed class PermissionListItem
     public string PermissionName { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public bool IsSelected { get; set; }
+    public bool IsRoleGranted { get; set; }
+    public bool HasOverride { get; set; }
 }

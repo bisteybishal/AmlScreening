@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using System.Data;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace AmlScreening.Infrastructure.Persistence
 {
@@ -12,7 +12,7 @@ namespace AmlScreening.Infrastructure.Persistence
             _connectionString =
                 configuration.GetConnectionString("AMLDatabase")
                 ?? throw new InvalidOperationException(
-                    "DefaultConnection was not found.");
+                    "The AMLDatabase connection string was not found.");
         }
         public IDbConnection CreateConnection()
         {

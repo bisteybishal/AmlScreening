@@ -2,16 +2,21 @@ using AmlScreening.Application.Interface.Repositories;
 using AmlScreening.Application.Models;
 using AmlScreening.Infrastructure.Persistence;
 using Dapper;
+using AmlScreening.Application.Interface;
 
 namespace AmlScreening.Infrastructure.Repositories;
 
 public sealed class RoleRepository : IRoleRepository
 {
     private readonly IDBConnectionFactory _connectionFactory;
+    private readonly ICurrentUserContext _currentUser;
 
-    public RoleRepository(IDBConnectionFactory connectionFactory)
+    public RoleRepository(
+        IDBConnectionFactory connectionFactory,
+        ICurrentUserContext currentUser)
     {
         _connectionFactory = connectionFactory;
+        _currentUser = currentUser;
     }
 
     public async Task<IReadOnlyList<RoleListItem>> GetAllAsync()
@@ -84,7 +89,22 @@ public sealed class RoleRepository : IRoleRepository
             VALUES (@RoleName, @IsActive, SYSUTCDATETIME());
             """;
 
-        return await connection.ExecuteScalarAsync<int>(sql, new { RoleName = roleName, IsActive = isActive });
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+        try
+        {
+            var roleId = await connection.ExecuteScalarAsync<int>(
+                sql, new { RoleName = roleName, IsActive = isActive }, transaction);
+            await InsertAuditAsync(connection, transaction, "Create", roleId,
+                $"Created role {roleName}.");
+            transaction.Commit();
+            return roleId;
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
     }
 
     public async Task<bool> UpdatePermissionsAsync(int roleId, IReadOnlyCollection<int> permissionIds)
@@ -112,6 +132,9 @@ public sealed class RoleRepository : IRoleRepository
                     permissionIds.Select(id => new { RoleId = roleId, PermissionId = id }), transaction);
             }
 
+            await InsertAuditAsync(connection, transaction, "UpdatePermissions", roleId,
+                $"Assigned {permissionIds.Count} role permission(s).");
+
             transaction.Commit();
             return true;
         }
@@ -120,5 +143,29 @@ public sealed class RoleRepository : IRoleRepository
             transaction.Rollback();
             throw;
         }
+    }
+
+    private async Task InsertAuditAsync(
+        System.Data.IDbConnection connection,
+        System.Data.IDbTransaction transaction,
+        string action,
+        int roleId,
+        string details)
+    {
+        const string sql = """
+            INSERT INTO dbo.AuditLogs
+                (ClientId, UserId, Username, Action, EntityType, EntityId, Details, CreatedDate)
+            VALUES
+                (@ClientId, @UserId, @Username, @Action, 'Role', @EntityId, @Details, SYSUTCDATETIME());
+            """;
+        await connection.ExecuteAsync(sql, new
+        {
+            ClientId = _currentUser.ClientId,
+            UserId = _currentUser.UserId,
+            Username = _currentUser.Username,
+            Action = action,
+            EntityId = roleId.ToString(),
+            Details = details
+        }, transaction);
     }
 }

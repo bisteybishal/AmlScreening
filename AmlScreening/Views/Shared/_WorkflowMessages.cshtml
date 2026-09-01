@@ -1,0 +1,6 @@
+@if (TempData["SuccessMessage"] is string success)
+{ <div class="workflow-message success"><i class="bi bi-check-circle"></i>@success</div> }
+@if (TempData["ErrorMessage"] is string error)
+{ <div class="workflow-message error"><i class="bi bi-exclamation-triangle"></i>@error</div> }
+@if (ViewBag.ErrorMessage is string viewError)
+{ <div class="workflow-message error"><i class="bi bi-exclamation-triangle"></i>@viewError</div> }

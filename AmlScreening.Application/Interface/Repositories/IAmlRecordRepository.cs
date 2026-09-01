@@ -1,10 +1,18 @@
 using AmlScreening.Domain.Entities;
+using AmlScreening.Application.Models;
 
 namespace AmlScreening.Application.Interface.Repositories;
 
 public interface IAmlRecordRepository
 {
-    Task<PagedResult<AmlRecord>> GetAllAsync(int pagenmber,int pagesize);
+    Task<PagedResult<AmlRecord>> GetPageAsync(
+        string? search,
+        string? recordType,
+        bool? isActive,
+        int pageNumber,
+        int pageSize);
+    Task<AmlRecordSummary> GetSummaryAsync();
+    Task<bool> ReferenceExistsAsync(string referenceNo, int? excludedId = null);
     Task<IReadOnlyList<AmlRecord>> GetAllAsync();
     Task<AmlRecord?> GetByIdAsync(int id);
     Task<int> CreateAsync(AmlRecord record);

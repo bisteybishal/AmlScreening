@@ -1,17 +1,17 @@
 @using System.Security.Claims
 @using AmlScreening.Application.Security
+@using AmlScreening.Application.Models
+@inject AmlScreening.Application.Interface.IMenuService MenuService
 @{
     var fullName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Admin User";
     var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "Administrator";
     var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
     var initials = string.Join("", fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant();
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
-    var showManagementSection =
-        User.HasClaim(AppPermissions.ClaimType, AppPermissions.UsersView) ||
-        User.HasClaim(AppPermissions.ClaimType, AppPermissions.RolesManage) ||
-        User.HasClaim(AppPermissions.ClaimType, AppPermissions.ReportsView) ||
-        User.HasClaim(AppPermissions.ClaimType, AppPermissions.AuditLogsView) ||
-        User.HasClaim(AppPermissions.ClaimType, AppPermissions.SettingsView);
+    var navigationItems = await MenuService.GetForCurrentUserAsync();
+    bool IsCurrent(NavigationMenuItem item) =>
+        string.Equals(item.ControllerName, currentController, StringComparison.OrdinalIgnoreCase);
+    bool IsOpen(NavigationMenuItem item) => IsCurrent(item) || item.Children.Any(IsCurrent);
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -33,40 +33,49 @@
                 <span class="brand-copy"><strong>AML</strong><small>SCREENING</small></span>
             </a>
             <nav class="sidebar-nav">
-                <div class="nav-section-label">MAIN</div>
-                @* <a class="nav-link @(currentController == "Dashboard" ? "active" : "")" asp-controller="Dashboard" asp-action="Index"><i class="bi bi-house-door-fill"></i><span>Dashboard</span></a> *@
-                @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlRecordsView))
+                @foreach (var section in navigationItems.GroupBy(item => item.SectionName))
                 {
-                    <a class="nav-link @(currentController is "AmlRecords" or "AmlRecordAdd" or "AmlRecordEdit" ? "active" : "")" asp-controller="AmlRecords" asp-action="Index"><i class="bi bi-shield-check"></i><span>AML Records</span></a>
-                }
-                @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.SearchScreeningView))
-                {
-                    <a class="nav-link" href="#"><i class="bi bi-search"></i><span>Search Screening</span></a>
-                }
-                @if (showManagementSection)
-                {
-                    <div class="nav-divider"></div>
-                    <div class="nav-section-label">MANAGEMENT</div>
-                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.UsersView))
+                    @if (!section.Key.Equals("MAIN", StringComparison.OrdinalIgnoreCase))
                     {
-                        <a class="nav-link @(currentController == "Users" ? "active" : "")" asp-controller="Users" asp-action="Index"><i class="bi bi-people"></i><span>Users</span></a>
+                        <div class="nav-divider"></div>
                     }
-                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.RolesManage))
+                    <div class="nav-section-label">@(section.Key)</div>
+                    @foreach (var item in section.OrderBy(item => item.SortOrder))
                     {
-                        <a class="nav-link @(currentController == "Subscription" ? "active" : "")" asp-controller="Subscription" asp-action="Index"><i class="bi bi-credit-card"></i><span>Subscription</span></a>
-                    }
-
-                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.ReportsView))
-                    {
-                        <a class="nav-link" asp-controller="AmlRecords" asp-action="Index" asp-fragment="recordsReport"><i class="bi bi-bar-chart"></i><span>Reports</span></a>
-                    }
-                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.AuditLogsView))
-                    {
-                        <a class="nav-link" href="#"><i class="bi bi-file-earmark-text"></i><span>Audit Logs</span></a>
-                    }
-                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.SettingsView))
-                    {
-                        <a class="nav-link" href="#"><i class="bi bi-gear"></i><span>Settings</span></a>
+                        @if (item.Children.Count > 0)
+                        {
+                            var submenuId = $"menu-{item.MenuId}";
+                            <button class="nav-link submenu-toggle @(IsOpen(item) ? "active" : "")"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#@submenuId"
+                                    aria-expanded="@(IsOpen(item) ? "true" : "false")"
+                                    aria-controls="@submenuId">
+                                <i class="bi @item.IconClass"></i>
+                                <span>@item.DisplayName</span>
+                                <i class="bi bi-chevron-down submenu-arrow"></i>
+                            </button>
+                            <div id="@submenuId" class="collapse @(IsOpen(item) ? "show" : "")">
+                                @foreach (var child in item.Children.OrderBy(child => child.SortOrder))
+                                {
+                                    <a class="nav-link submenu-link @(IsCurrent(child) ? "active" : "")"
+                                       asp-controller="@child.ControllerName"
+                                       asp-action="@child.ActionName">
+                                        <i class="bi @child.IconClass"></i>
+                                        <span>@child.DisplayName</span>
+                                    </a>
+                                }
+                            </div>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(item.ControllerName))
+                        {
+                            <a class="nav-link @(IsCurrent(item) ? "active" : "")"
+                               asp-controller="@item.ControllerName"
+                               asp-action="@item.ActionName">
+                                <i class="bi @item.IconClass"></i>
+                                <span>@item.DisplayName</span>
+                            </a>
+                        }
                     }
                 }
             </nav>
@@ -90,7 +99,7 @@
                     <strong class="page-name">@ViewData["Title"]</strong>
                 </div>
                 <div class="topbar-right">
-                    <button class="notification-button" type="button" aria-label="Notifications"><i class="bi bi-bell"></i><span>5</span></button>
+                    <button class="notification-button" type="button" aria-label="Notifications"><i class="bi bi-bell"></i></button>
                     <div class="topbar-separator"></div>
                     <div class="profile-summary">
                         <span class="avatar">@initials</span>
@@ -116,7 +125,7 @@
                 <div id="dynamicWorkspaceTabs" class="dynamic-workspace-tabs"></div>
             </nav>
             <main class="main-content">@RenderBody()</main>
-            <footer class="portal-footer"><span>&copy; 2026 AML Screening System. All rights reserved.</span><span>Version 1.0.0</span></footer>
+            <footer class="portal-footer"><span>&copy; @DateTime.UtcNow.Year AML Screening System. All rights reserved.</span><span>Version 1.0.0</span></footer>
         </div>
     </div>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>

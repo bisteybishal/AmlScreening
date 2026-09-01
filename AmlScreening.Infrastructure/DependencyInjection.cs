@@ -6,9 +6,12 @@ using AmlScreening.Application.Services;
 using AmlScreening.Infrastructure.Data;
 using AmlScreening.Infrastructure.Persistence;
 using AmlScreening.Infrastructure.Repositories;
+using AmlScreening.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
+using AmlScreening.Application.Interface.Provider;
+using AmlScreening.Infrastructure.Provider;
 
 namespace AmlScreening.Infrastructure
 {
@@ -16,7 +19,6 @@ namespace AmlScreening.Infrastructure
     {
         public static IServiceCollection AddInfrastructure(this IServiceCollection services,IConfiguration configuration)
         {
-            // Register your infrastructure services here
             services.AddScoped<IDBConnectionFactory, DBConnectionFactory>();
              services.AddDbContext<AmlScreeningDbContext>(options => options.UseSqlServer(configuration.GetConnectionString("AMLDatabase")));
 
@@ -26,6 +28,12 @@ namespace AmlScreening.Infrastructure
 
             services.AddScoped<IPasswordService,PasswordService>();
             services.AddScoped<ISubscriptionRepository,SubscriptionRepository>();
+            services.AddScoped<IComplianceRuleRepository, ComplianceRuleRepository>();
+            services.AddScoped<IAuditService, AuditService>();
+            services.AddScoped<IMenuService, MenuService>();
+            services.AddScoped<IAmlWorkflowService, AmlWorkflowService>();
+            services.AddScoped<IAmlImportRepository, AmlImportRepository>();
+            
 
 
             return services;
