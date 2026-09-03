@@ -1,18 +1,21 @@
 ﻿@{
     ViewData["Title"] = "AML Data Sources";
 }
+@{
+    var canAsync = User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlSourceSync);
+}
+
+@section Styles {
+    <link rel="stylesheet"
+          href="~/css/aml-source.css"
+          asp-append-version="true" />
+}
 
 <div class="page-header">
-
     <div>
         <h1>AML Data Sources</h1>
-
-        <p>
-            Synchronize AML and sanctions
-            data from official sources.
-        </p>
+        <p>Synchronize sanctions data from official sources.</p>
     </div>
-
 </div>
 
 @if (TempData["SuccessMessage"] is string success)
@@ -29,33 +32,77 @@
     </div>
 }
 
-<div class="card">
+<div class="source-grid">
 
-    <div class="card-body">
+    <!-- UN -->
+    <div class="source-card">
 
-        <h4>UN Sanctions</h4>
+        <div class="source-card-header">
+            <h3>United Nations Sanctions</h3>
 
-        <p>
-            United Nations Security Council
-            Consolidated Sanctions List
-        </p>
+            <span class="source-code">
+                UN
+            </span>
+        </div>
 
-        <form asp-controller="AmlSource"
-              asp-action="SyncUN"
-              method="post">
+        <div class="source-card-body">
+            @if(canAsync)
+            {
+            <form asp-controller="AmlSource"
+                      asp-action="SyncUN"
+                  method="post">
 
-            @Html.AntiForgeryToken()
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="sourcecode" value="UN" />
+                <button type="submit"
+                        class="sync-source-button">
 
-            <button type="submit"
-                    class="records-primary-button">
+                    <i class="bi bi-arrow-repeat"></i>
+                    Sync UN Data
 
-                <i class="bi bi-arrow-repeat"></i>
+                </button>
 
-                Sync UN Data
+            </form>
+            }
 
-            </button>
+        </div>
 
-        </form>
+    </div>
+
+
+    <!-- EU -->
+    <div class="source-card">
+
+        <div class="source-card-header">
+            <h3>European Union Sanctions</h3>
+
+            <span class="source-code">
+                EU
+            </span>
+        </div>
+
+        <div class="source-card-body">
+            @if (canAsync)
+            {
+                
+           
+            <form asp-controller="AmlSource"
+                      asp-action="SyncUN"
+                  method="post">
+
+                @Html.AntiForgeryToken()
+                    <input type="hidden" name="sourcecode" value="EU" />
+                <button type="submit"
+                        class="sync-source-button">
+
+                    <i class="bi bi-arrow-repeat"></i>
+                    Sync EU Data
+
+                </button>
+
+            </form>
+            }
+        </div>
 
     </div>
 

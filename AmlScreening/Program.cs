@@ -5,6 +5,7 @@ using AmlScreening.Application.Security;
 using AmlScreening.Application.Services;
 using AmlScreening.Infrastructure;
 using AmlScreening.Infrastructure.Provider;
+using AmlScreening.Portal.Extension;
 using AmlScreening.Portal.Security;
 using AmlScreening.Portal.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -20,25 +21,15 @@ if (!builder.Environment.IsDevelopment())
     ValidateHostedConfiguration(builder.Configuration, builder.Environment);
     builder.Logging.AddJsonConsole();
 }
-
-var dataProtectionBuilder = builder.Services.AddDataProtection()
-    .SetApplicationName(builder.Configuration["DataProtection:ApplicationName"] ?? "AmlScreening.Portal");
-var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
-if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
-{
-    dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
-    if (OperatingSystem.IsWindows() && !builder.Environment.IsDevelopment())
-        dataProtectionBuilder.ProtectKeysWithDpapi();
-}
-
 builder.Services.AddControllersWithViews();
+builder.Services.AddCurrentUserAuthorization();
+builder.Services.AddCustomDataProtection(builder.Configuration, builder.Environment);
+
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddHttpClient<IAmlDataProvider, UnDataProvider>();
-builder.Services.AddScoped<UnSyncService>();
-builder.Services.AddScoped<ICurrentUserContext, CurrentUserContext>();
-builder.Services.AddScoped<IAuthorizationHandler, AmlRecordAuthorizationHandler>();
+
+
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
 
     .AddCookie(options =>

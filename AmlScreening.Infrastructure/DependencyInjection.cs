@@ -1,17 +1,17 @@
 ﻿
 
 using AmlScreening.Application.Interface;
+using AmlScreening.Application.Interface.Provider;
 using AmlScreening.Application.Interface.Repositories;
 using AmlScreening.Application.Services;
 using AmlScreening.Infrastructure.Data;
 using AmlScreening.Infrastructure.Persistence;
+using AmlScreening.Infrastructure.Provider;
 using AmlScreening.Infrastructure.Repositories;
 using AmlScreening.Infrastructure.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.EntityFrameworkCore;
-using AmlScreening.Application.Interface.Provider;
-using AmlScreening.Infrastructure.Provider;
 
 namespace AmlScreening.Infrastructure
 {
@@ -33,7 +33,26 @@ namespace AmlScreening.Infrastructure
             services.AddScoped<IMenuService, MenuService>();
             services.AddScoped<IAmlWorkflowService, AmlWorkflowService>();
             services.AddScoped<IAmlImportRepository, AmlImportRepository>();
-            
+
+
+            services.AddHttpClient("UnAmlClient", client =>
+            {
+                client.BaseAddress = new Uri("https://scsanctions.un.org/");
+                client.Timeout = TimeSpan.FromSeconds(300);
+            });
+
+            services.AddHttpClient("EuAmlClient", client =>
+            {
+                client.BaseAddress = new Uri("https://webgate.ec.europa.eu/");
+                client.Timeout = TimeSpan.FromSeconds(600);
+            });
+
+            services.AddScoped<IAmlSourceStrategy, UnAmlSourceStrategy>();
+            services.AddScoped<IAmlSourceStrategy, EuAmlSourceStrategy>();
+
+            // Optional: resolves the right strategy by SourceCode at runtime
+            services.AddScoped<IAmlSourceStrategyFactory, AmlSourceStrategyFactory>();
+
 
 
             return services;

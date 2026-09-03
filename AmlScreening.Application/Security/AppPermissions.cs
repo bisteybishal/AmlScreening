@@ -10,10 +10,7 @@ public static class AppPermissions
     public const string AmlRecordsDelete = "AMLRecords.Delete";
     public const string AmlRecordsViewClient = "AMLRecords.ViewClient";
     public const string AmlRecordsViewAll = "AMLRecords.ViewAll";
-    public const string SearchScreeningView = "SearchScreening.View";
-    public const string ReportsView = "Reports.View";
     public const string AuditLogsView = "AuditLogs.View";
-    public const string SettingsView = "Settings.View";
     public const string UsersView = "Users.View";
     public const string UsersCreate = "Users.Create";
     public const string RolesManage = "Roles.Manage";
@@ -30,15 +27,8 @@ public static class AppPermissions
     public const string ComplianceRulesDelete = "ComplianceRules.Delete";
 
     public const string CustomersView = "Customers.View";
-    public const string CustomersCreate = "Customers.Create";
-    public const string CustomersEdit = "Customers.Edit";
-    public const string CustomersDelete = "Customers.Delete";
 
     public const string TransactionsView = "Transactions.View";
-
-    public const string TransactionsCreate = "Transactions.Create";
-
-    public const string TransactionsEvaluate = "Transactions.Evaluate";
 
     public const string AlertsView = "Alerts.View";
 
@@ -48,6 +38,7 @@ public static class AppPermissions
 
     public const string CasesManage = "Cases.Manage";
     public const string AmlSourceView = "AmlSource.View";
+    public const string AmlSourceSync = "AmlSource.Sync";
 
     public static readonly string[] All =
     {
@@ -57,10 +48,7 @@ public static class AppPermissions
         AmlRecordsDelete,
         AmlRecordsViewClient,
         AmlRecordsViewAll,
-        SearchScreeningView,
-        ReportsView,
         AuditLogsView,
-        SettingsView,
         UsersView,
         UsersCreate,
         RolesManage,
@@ -73,16 +61,12 @@ public static class AppPermissions
         ComplianceRulesEdit,
         ComplianceRulesDelete,
         CustomersView,
-        CustomersCreate,
-        CustomersEdit,
-        CustomersDelete,
         TransactionsView,
-        TransactionsCreate,
-        TransactionsEvaluate,
         AlertsView,
         AlertsManage,
         CasesView,
         CasesManage,
-        AmlSourceView
+        AmlSourceView,
+        AmlSourceSync
     };
 }

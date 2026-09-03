@@ -1,9 +1,6 @@
 ﻿using AmlScreening.Domain.Entities;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace AmlScreening.Application.Interface.Repositories
+namespace AmlScreening.Application.Interface.Provider
 {
     public interface IAmlImportRepository
     {

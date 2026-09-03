@@ -58,10 +58,7 @@ FROM (VALUES
     ('AMLRecords.Delete', 'Soft delete AML records'),
     ('AMLRecords.ViewClient', 'View all AML records for the current client'),
     ('AMLRecords.ViewAll', 'Platform access to AML records across all clients'),
-    ('SearchScreening.View', 'View the Search Screening menu'),
-    ('Reports.View',        'View the Reports menu'),
     ('AuditLogs.View',      'View the Audit Logs menu'),
-    ('Settings.View',       'View the Settings menu'),
     ('Users.View',        'View portal users'),
     ('Users.Create',      'Create portal users'),
     ('Roles.Manage',      'Create roles and assign permissions'),
@@ -74,12 +71,7 @@ FROM (VALUES
     ('ComplianceRules.Edit',   'Edit compliance rules'),
     ('ComplianceRules.Delete', 'Delete compliance rules'),
     ('Customers.View',       'View customer/KYC profiles'),
-    ('Customers.Create',     'Create customer/KYC profiles'),
-    ('Customers.Edit',       'Edit customer/KYC profiles'),
-    ('Customers.Delete',     'Soft delete customer/KYC profiles'),
     ('Transactions.View',   'View compliance transactions'),
-    ('Transactions.Create', 'Create compliance transactions'),
-    ('Transactions.Evaluate', 'Run AML transaction evaluation'),
     ('Alerts.View',         'View compliance alerts'),
     ('Alerts.Manage',       'Assign and resolve compliance alerts'),
     ('Cases.View',          'View compliance cases'),
@@ -88,6 +80,21 @@ FROM (VALUES
 WHERE NOT EXISTS
 (
     SELECT 1 FROM dbo.Permissions p WHERE p.PermissionName = v.PermissionName
+);
+
+-- These functions belong to the separately hosted API or were never implemented.
+UPDATE dbo.Permissions
+SET IsActive = 0
+WHERE PermissionName IN
+(
+    'Customers.Create',
+    'Customers.Edit',
+    'Customers.Delete',
+    'Transactions.Create',
+    'Transactions.Evaluate',
+    'SearchScreening.View',
+    'Reports.View',
+    'Settings.View'
 );
 
 INSERT INTO dbo.Roles (RoleName, IsActive, CreatedDate)

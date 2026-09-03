@@ -571,8 +571,6 @@ Browser / Razor Views
         ("AmlScreening.Domain", "Business entities for users, clients, AML records, customers, transactions, rules, decisions, alerts and cases."),
         ("AmlScreening.Infrastructure", "EF Core DbContext, Dapper connection factory, repositories, menu service, audit service and AML workflow engine."),
         ("Database", "Versioned SQL scripts for isolation, permissions, menus, compliance rules, workflow tables and deployment preparation."),
-        ("IntegrationTests", "Cross-client checks, schema checks and repository behavior tests."),
-        ("DatabaseMigrator", "Small command-line runner for controlled execution of SQL migration scripts."),
     ]
     add_table(doc, ["Layer/project", "Responsibility"], architecture_rows, [2700, 6660], font_size=9.4)
 
@@ -1070,9 +1068,7 @@ AmlScreening/
     Security/                Resource authorization handler
     wwwroot/css/             Portal visual styles
 
-Database/                    Migration and deployment scripts
-AmlScreening.IntegrationTests/  Automated repository/schema/isolation tests
-AmlScreening.DatabaseMigrator/  Controlled SQL script runner
+Database/                    DBA-reviewed SQL and deployment scripts
 """)
 
     doc.add_heading("Appendix B. Database scripts", level=1)

@@ -20,12 +20,9 @@ Run the scripts against the UAT database in this order:
 4. `RolesPermissions.sql`
 5. `PlatformHardening.sql`
 
-Apply a script with the checked-in migrator (the connection string is read from an environment variable and is never printed):
-
-```powershell
-$env:AML_MIGRATION_CONNECTION = '<UAT connection string from the secret store>'
-dotnet run --project AmlScreening.DatabaseMigrator -- Database/PlatformHardening.sql
-```
+Have the DBA review and execute each script manually in SQL Server Management
+Studio against the UAT database. Record the script name, execution date,
+operator and result in the deployment record.
 
 `ClientIsolation.sql` assigns existing rows to a default migration client. Review that client and the migrated ownership assignments before granting UAT access.
 
@@ -46,4 +43,4 @@ Use two clients and at least two ordinary users in one client:
 - Client-facing forms do not accept a client identifier.
 - AML, compliance, subscription, user-access, login, and logout activity appears in Audit Logs.
 
-Set `AML_SQLSERVER_TEST_CONNECTION` to the dedicated UAT test database, then run `dotnet test AmlScreening.IntegrationTests/AmlScreening.IntegrationTests.csproj` as part of the deployment pipeline. SQL tests create uniquely named rows and clean them up.
+Record the result of each verification item in the UAT deployment checklist.

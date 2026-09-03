@@ -229,12 +229,23 @@ INSERT INTO dbo.Permissions (PermissionName, Description)
 SELECT source.PermissionName, source.Description
 FROM (VALUES
     ('Customers.View', 'View customer/KYC profiles'),
-    ('Customers.Create', 'Create customer/KYC profiles'),
-    ('Customers.Edit', 'Edit customer/KYC profiles'),
-    ('Customers.Delete', 'Soft delete customer/KYC profiles'),
-    ('Transactions.Evaluate', 'Run AML transaction evaluation')
+    ('Transactions.View', 'View compliance transactions')
 ) source(PermissionName, Description)
 WHERE NOT EXISTS (SELECT 1 FROM dbo.Permissions existing WHERE existing.PermissionName = source.PermissionName);
+
+UPDATE dbo.Permissions
+SET IsActive = 0
+WHERE PermissionName IN
+(
+    'Customers.Create',
+    'Customers.Edit',
+    'Customers.Delete',
+    'Transactions.Create',
+    'Transactions.Evaluate',
+    'SearchScreening.View',
+    'Reports.View',
+    'Settings.View'
+);
 
 INSERT INTO dbo.RolePermissions (RoleId, PermissionId)
 SELECT role.RoleId, permission.PermissionId

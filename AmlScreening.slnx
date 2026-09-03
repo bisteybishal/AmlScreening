@@ -1,8 +1,6 @@
 <Solution>
   <Project Path="AmlScreening.Application/AmlScreening.Application.csproj" />
   <Project Path="AmlScreening.Domain/AmlScreening.Domain.csproj" />
-  <Project Path="AmlScreening.DatabaseMigrator/AmlScreening.DatabaseMigrator.csproj" />
   <Project Path="AmlScreening.Infrastructure/AmlScreening.Infrastructure.csproj" />
-  <Project Path="AmlScreening.IntegrationTests/AmlScreening.IntegrationTests.csproj" />
   <Project Path="AmlScreening/AmlScreening.Portal.csproj" />
 </Solution>

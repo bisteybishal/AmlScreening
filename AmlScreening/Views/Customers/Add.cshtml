@@ -1,6 +1,0 @@
-@model AmlScreening.Portal.ViewModels.CustomerInputModel
-@{ ViewData["Title"] = "Add Customer"; }
-@section Styles { <link rel="stylesheet" href="~/css/workflow.css" asp-append-version="true" /> }
-<section class="workflow-heading"><div><h1>Add Customer</h1><p>Create the KYC profile used by customer and transaction risk scoring.</p></div></section>
-<section class="workflow-panel workflow-form-panel"><form asp-action="Add" method="post">@Html.AntiForgeryToken()<partial name="_CustomerForm" model="Model" /><div class="workflow-form-actions"><a asp-action="Index">Cancel</a><button class="workflow-primary" type="submit">Save Customer</button></div></form></section>
-@section Scripts { <partial name="_ValidationScriptsPartial" /> }

@@ -1,28 +1,25 @@
 ﻿using AmlScreening.Application.Interface.Provider;
 using AmlScreening.Domain.Entities;
-using Microsoft.Identity.Client;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.Globalization;
-using System.Reflection.Metadata.Ecma335;
-using System.Text;
 using System.Xml.Linq;
 
 namespace AmlScreening.Infrastructure.Provider
 {
-    public class UnDataProvider : IAmlDataProvider
+    public sealed class UnAmlSourceStrategy : IAmlSourceStrategy
     {
         private readonly HttpClient _httpClient;
-        public string sourcecode => "UN";
-        public UnDataProvider(HttpClient httpClient)
+        public string SourceCode => "UN";
+        public UnAmlSourceStrategy(IHttpClientFactory httpClientFactory)
         {
-            _httpClient = httpClient;
+            _httpClient = httpClientFactory.CreateClient("UnAmlClient");
         }
 
         public async Task<List<AmlRecord>> GetRecordsAsync()
         {
-            const string apiUrl = "https://scsanctions.un.org/resources/xml/en/name/consolidated.xml";
+            //const string apiUrl = "https://scsanctions.un.org/resources/xml/en/name/consolidated.xml";
+            //var xml = await _httpClient.GetStringAsync(apiUrl);
+
+            const string apiUrl = "resources/xml/en/name/consolidated.xml"; // relative to BaseAddress
             var xml = await _httpClient.GetStringAsync(apiUrl);
             var document = XDocument.Parse(xml);
             var records = new List<AmlRecord>();
@@ -34,7 +31,9 @@ namespace AmlScreening.Infrastructure.Provider
 
         private static void AddIndividual(XDocument document, List<AmlRecord> records)
         {
-            foreach (var item in document.Descendants("INDIVIDUALS"))
+            var individualcount = document.Descendants().Count(X => X.Name.LocalName == "INDIVIDUAL");
+            var individual = document.Descendants().Where(X => X.Name.LocalName == "INDIVIDUAL");
+            foreach (var item in individual)
             {
                 var firstName =
                  GetValue(item, "FIRST_NAME");
@@ -48,14 +47,18 @@ namespace AmlScreening.Infrastructure.Provider
                 var fourthName =
                     GetValue(item, "FOURTH_NAME");
 
-                var fullname = string.Join("", new[]
+                var fullname = string.Join(" ", new[]
                 { firstName, secondName, thirdName, fourthName }.
                 Where(x => !string.IsNullOrWhiteSpace(x) && !string.Equals(x, "n", StringComparison.OrdinalIgnoreCase)));
                 var referenceNo = GetValue(item, "REFERENCE_NUMBER");
-                var nationality =
-                  item.Element("NATIONALITY")
-                      ?.Element("VALUE")
-                      ?.Value;
+                var nationality = item
+      .Descendants()
+      .FirstOrDefault(x =>
+          x.Name.LocalName == "NATIONALITY")
+      ?.Descendants()
+      .FirstOrDefault(x =>
+          x.Name.LocalName == "VALUE")
+      ?.Value;
 
                 var remarks =
                     GetValue(item, "COMMENTS1");
@@ -66,13 +69,13 @@ namespace AmlScreening.Infrastructure.Provider
                 { continue; }
                 records.Add(new AmlRecord
                 {
-                    RecordType= "Individual",
+                    RecordType = "Individual",
                     FullName = fullname,
-                    ReferenceNo=referenceNo,
-                    Nationality=CleanValue(nationality),
-                    Remarks=CleanValue(remarks),
-                    DateOfBirth=dob,
-                    SourceName="UN Sanctions"
+                    ReferenceNo = referenceNo,
+                    Nationality = CleanValue(nationality),
+                    Remarks = CleanValue(remarks),
+                    DateOfBirth = dob,
+                    SourceName = "UN Sanctions"
                 });
             }
         }
