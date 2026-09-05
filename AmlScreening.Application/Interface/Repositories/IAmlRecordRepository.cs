@@ -12,8 +12,9 @@ public interface IAmlRecordRepository
         int pageNumber,
         int pageSize);
     Task<AmlRecordSummary> GetSummaryAsync();
-    Task<bool> ReferenceExistsAsync(string referenceNo, int? excludedId = null);
-    Task<IReadOnlyList<AmlRecord>> GetAllAsync();
+    Task<IReadOnlyList<AmlRecord>> GetRecentAsync(int maximumRecords);
+    Task<bool> ReferenceExistsAsync(string referenceNo, string sourceName, int? excludedId = null);
+   // Task<IReadOnlyList<AmlRecord>> GetAllAsync();
     Task<AmlRecord?> GetByIdAsync(int id);
     Task<int> CreateAsync(AmlRecord record);
     Task<bool> UpdateAsync(AmlRecord record,string updateby);

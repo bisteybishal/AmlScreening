@@ -95,8 +95,11 @@ IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_AmlRecords_Owner
 IF EXISTS (SELECT 1 FROM sys.key_constraints WHERE name = N'UQ_AmlRecords_ReferenceNo')
     ALTER TABLE dbo.AmlRecords DROP CONSTRAINT UQ_AmlRecords_ReferenceNo;
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_AmlRecords_Client_Reference' AND object_id = OBJECT_ID(N'dbo.AmlRecords'))
-    EXEC(N'CREATE UNIQUE INDEX UX_AmlRecords_Client_Reference ON dbo.AmlRecords(ClientId, ReferenceNo);');
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_AmlRecords_Client_Reference' AND object_id = OBJECT_ID(N'dbo.AmlRecords'))
+    DROP INDEX UX_AmlRecords_Client_Reference ON dbo.AmlRecords;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_AmlRecords_Client_Source_Reference' AND object_id = OBJECT_ID(N'dbo.AmlRecords'))
+    EXEC(N'CREATE UNIQUE INDEX UX_AmlRecords_Client_Source_Reference ON dbo.AmlRecords(ClientId, SourceName, ReferenceNo);');
 
 IF OBJECT_ID(N'dbo.ComplianceRules', N'U') IS NOT NULL
 BEGIN

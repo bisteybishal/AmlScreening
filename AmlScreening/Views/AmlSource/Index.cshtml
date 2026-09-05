@@ -2,7 +2,7 @@
     ViewData["Title"] = "AML Data Sources";
 }
 @{
-    var canAsync = User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlSourceSync);
+    var canSync = User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlSourceSync);
 }
 
 @section Styles {
@@ -46,14 +46,14 @@
         </div>
 
         <div class="source-card-body">
-            @if(canAsync)
+            @if (canSync)
             {
-            <form asp-controller="AmlSource"
-                      asp-action="SyncUN"
-                  method="post">
+                <form asp-controller="AmlSource"
+                      asp-action="Sync"
+                      method="post">
 
                 @Html.AntiForgeryToken()
-                <input type="hidden" name="sourcecode" value="UN" />
+                <input type="hidden" name="sourceCode" value="UN" />
                 <button type="submit"
                         class="sync-source-button">
 
@@ -82,16 +82,16 @@
         </div>
 
         <div class="source-card-body">
-            @if (canAsync)
+            @if (canSync)
             {
                 
            
             <form asp-controller="AmlSource"
-                      asp-action="SyncUN"
+                      asp-action="Sync"
                   method="post">
 
                 @Html.AntiForgeryToken()
-                    <input type="hidden" name="sourcecode" value="EU" />
+                    <input type="hidden" name="sourceCode" value="EU" />
                 <button type="submit"
                         class="sync-source-button">
 

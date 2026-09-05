@@ -67,33 +67,62 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
     {
         var records = ApplyOwnershipScope(_dbContext.AmlRecords.AsNoTracking());
 
+        var aggregate = await records
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                TotalRecords = group.Count(),
+                ActiveRecords = group.Count(record => record.IsActive),
+                IndividualRecords = group.Count(record => record.RecordType == "Individual"),
+                EntityRecords = group.Count(record => record.RecordType == "Entity")
+            })
+            .SingleOrDefaultAsync();
+
+        var countriesCovered = await records
+            .Where(record => record.Country != "")
+            .Select(record => record.Country)
+            .Distinct()
+            .CountAsync();
+
         return new AmlRecordSummary
         {
-            TotalRecords = await records.CountAsync(),
-            ActiveRecords = await records.CountAsync(record => record.IsActive),
-            IndividualRecords = await records.CountAsync(record => record.RecordType == "Individual"),
-            EntityRecords = await records.CountAsync(record => record.RecordType == "Entity"),
-            CountriesCovered = await records
-                .Where(record => record.Country != "")
-                .Select(record => record.Country)
-                .Distinct()
-                .CountAsync()
+            TotalRecords = aggregate?.TotalRecords ?? 0,
+            ActiveRecords = aggregate?.ActiveRecords ?? 0,
+            IndividualRecords = aggregate?.IndividualRecords ?? 0,
+            EntityRecords = aggregate?.EntityRecords ?? 0,
+            CountriesCovered = countriesCovered
         };
     }
 
-    public Task<bool> ReferenceExistsAsync(string referenceNo, int? excludedId = null)
+    public async Task<IReadOnlyList<AmlRecord>> GetRecentAsync(int maximumRecords)
+    {
+        var take = Math.Clamp(maximumRecords, 1, 50);
+        return await ApplyOwnershipScope(_dbContext.AmlRecords.AsNoTracking())
+            .OrderByDescending(record => record.CreatedDate)
+            .ThenByDescending(record => record.Id)
+            .Take(take)
+            .ToListAsync();
+    }
+
+    public Task<bool> ReferenceExistsAsync(
+        string referenceNo,
+        string sourceName,
+        int? excludedId = null)
     {
         var normalizedReference = referenceNo.Trim();
-        return _dbContext.AmlRecords.AsNoTracking().AnyAsync(record =>
+        var normalizedSource = sourceName.Trim();
+        // The unique reference index also includes soft-deleted records.
+        return _dbContext.AmlRecords.IgnoreQueryFilters(["SoftDeleteFilter"]).AsNoTracking().AnyAsync(record =>
             record.ClientId == _currentUser.ClientId &&
             record.ReferenceNo == normalizedReference &&
+            record.SourceName == normalizedSource &&
             (!excludedId.HasValue || record.Id != excludedId.Value));
     }
-    public async Task<IReadOnlyList<AmlRecord>> GetAllAsync()
-    {
-        return await ApplyOwnershipScope(_dbContext.AmlRecords.AsNoTracking()).OrderByDescending(r => r.CreatedDate)
-            .ThenByDescending(r => r.Id).ToListAsync();
-    }
+    //public async Task<IReadOnlyList<AmlRecord>> GetAllAsync()
+    //{
+    //    return await ApplyOwnershipScope(_dbContext.AmlRecords.AsNoTracking()).OrderByDescending(r => r.CreatedDate)
+    //        .ThenByDescending(r => r.Id).ToListAsync();
+    //}
 
 
     public async Task<AmlRecord?> GetByIdAsync(int id)
@@ -105,6 +134,7 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
     {
         record.ClientId = _currentUser.ClientId;
         record.OwnerUserId = _currentUser.UserId;
+        record.IsShared = _currentUser.HasPermission(AppPermissions.AmlRecordsViewAll);
         await using var transaction = await _dbContext.Database.BeginTransactionAsync();
         try
         {
@@ -163,7 +193,7 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
     {
         var record = await ApplyOwnershipScope(_dbContext.AmlRecords)
             .FirstOrDefaultAsync(x => x.Id == id);
-        if (record == null) return false;
+        if (record == null || !CanAccessRecord(record)) return false;
 
         record.DeleteFg = "Y";
         record.DeleteDate = DateTime.UtcNow;
@@ -199,14 +229,13 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
             return query;
         }
 
-        return query.Where(record => record.OwnerUserId == _currentUser.UserId);
+        return query.Where(record => record.OwnerUserId == _currentUser.UserId || record.IsShared);
     }
 
     private bool CanAccessRecord(AmlRecord record) =>
         _currentUser.HasPermission(AppPermissions.AmlRecordsViewAll) ||
         (record.ClientId == _currentUser.ClientId &&
-         (_currentUser.HasPermission(AppPermissions.AmlRecordsViewClient) ||
-          record.OwnerUserId == _currentUser.UserId));
+         record.OwnerUserId == _currentUser.UserId);
 
     private void AddAudit(string action, int entityId, string details)
     {

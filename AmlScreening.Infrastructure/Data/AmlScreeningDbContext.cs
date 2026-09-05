@@ -34,12 +34,27 @@ namespace AmlScreening.Infrastructure.Data
         public DbSet<ComplianceAlert> ComplianceAlerts => Set<ComplianceAlert>();
         public DbSet<ComplianceCase> ComplianceCases => Set<ComplianceCase>();
 
+        public DbSet<RiskFactor> RiskFactors => Set<RiskFactor>();
+        public DbSet<RiskFactorRule> RiskFactorRules => Set<RiskFactorRule>();
+        public DbSet<RiskBand> RiskBands => Set<RiskBand>();
+        public DbSet<RiskModel> RiskModels => Set<RiskModel>();
+        public DbSet<RiskAssessmentFactor> RiskAssessmentFactors => Set<RiskAssessmentFactor>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<AmlRecord>(entity =>
             {
                 entity.ToTable("AmlRecords", "dbo");
-                entity.HasIndex(x => new { x.ClientId, x.ReferenceNo }).IsUnique();
+                entity.HasIndex(x => new { x.ClientId, x.SourceName, x.ReferenceNo }).IsUnique();
+                entity.Property(x => x.IsShared).HasDefaultValue(false);
+                entity.Property(x => x.Country)
+                    .HasMaxLength(100)
+                    .IsRequired(false);
+                entity.Property(x => x.Nationality)
+                    .HasMaxLength(100)
+                    .IsRequired(false);
+                entity.Property(x => x.Remarks)
+                    .IsRequired(false);
                 entity.Property(x => x.DeleteFg)
                     .HasMaxLength(1)
                     .IsFixedLength()
@@ -137,6 +152,13 @@ namespace AmlScreening.Infrastructure.Data
                 entity.Property(x => x.RowVersion).IsRowVersion();
                 entity.HasQueryFilter("SoftDeleteFilter", x => x.DeleteFg == "N");
                 entity.HasQueryFilter("ClientFilter", x => CanAccessAllClients || x.ClientId == CurrentClientId);
+                entity.Property(x => x.PurposeCode)
+    .HasMaxLength(50);
+
+                entity.Property(x => x.RegisteredReceiverCount);
+
+                entity.Property(x => x.RelationshipCode)
+                    .HasMaxLength(50);
             });
 
             modelBuilder.Entity<ScreeningMatch>(entity =>
@@ -232,6 +254,225 @@ namespace AmlScreening.Infrastructure.Data
                 entity.Property(x => x.EntityId).HasMaxLength(100);
                 entity.Property(x => x.Details).HasMaxLength(2000);
             });
+            modelBuilder.Entity<RiskFactor>(entity =>
+            {
+                entity.ToTable("RiskFactors", "dbo");
+
+                entity.HasKey(x => x.Id);
+
+                entity.HasIndex(x => new
+                {
+                    x.ClientId,
+                    x.FactorCode
+                }).IsUnique().HasFilter("[DeleteFg] = 'N'");
+
+                entity.Property(x => x.FactorCode)
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                entity.Property(x => x.FactorName)
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                entity.Property(x => x.ScoreCategory)
+                    .HasMaxLength(20)
+                    .IsRequired();
+
+                entity.Property(x => x.ValueType)
+                    .HasMaxLength(20)
+                    .IsRequired();
+
+                entity.Property(x => x.WeightPercent)
+                    .HasPrecision(5, 2);
+
+                ConfigureCommonFields(entity);
+
+                entity.HasQueryFilter(
+                    "SoftDeleteFilter",
+                    x => x.DeleteFg == "N");
+
+                entity.HasQueryFilter(
+                    "ClientFilter",
+                    x => CanAccessAllClients ||
+                         x.ClientId == CurrentClientId);
+            });
+
+            modelBuilder.Entity<RiskFactorRule>(entity =>
+            {
+                entity.ToTable("RiskFactorRules", "dbo");
+
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.ValueCode)
+                    .HasMaxLength(100);
+
+                entity.Property(x => x.ValueName)
+                    .HasMaxLength(200);
+
+                entity.Property(x => x.MinimumValue)
+                    .HasPrecision(18, 2);
+
+                entity.Property(x => x.MaximumValue)
+                    .HasPrecision(18, 2);
+
+                entity.Property(x => x.ApprovalStatus)
+                    .HasMaxLength(30)
+                    .IsRequired();
+
+                entity.Property(x => x.ApprovedBy)
+                    .HasMaxLength(100);
+
+                entity.HasOne<RiskFactor>()
+                    .WithMany()
+                    .HasForeignKey(x => x.RiskFactorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                ConfigureCommonFields(entity);
+
+                entity.HasQueryFilter(
+                    "SoftDeleteFilter",
+                    x => x.DeleteFg == "N");
+
+                entity.HasQueryFilter(
+                    "ClientFilter",
+                    x => CanAccessAllClients ||
+                         x.ClientId == CurrentClientId);
+            });
+
+            modelBuilder.Entity<RiskBand>(entity =>
+            {
+                entity.ToTable("RiskBands", "dbo");
+
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.RiskLevel)
+                    .HasMaxLength(20)
+                    .IsRequired();
+
+                entity.Property(x => x.Decision)
+                    .HasMaxLength(20)
+                    .IsRequired();
+
+                entity.Property(x => x.ApprovalStatus)
+                    .HasMaxLength(30)
+                    .IsRequired();
+
+                ConfigureCommonFields(entity);
+
+                entity.HasQueryFilter(
+                    "SoftDeleteFilter",
+                    x => x.DeleteFg == "N");
+
+                entity.HasQueryFilter(
+                    "ClientFilter",
+                    x => CanAccessAllClients ||
+                         x.ClientId == CurrentClientId);
+            });
+
+            modelBuilder.Entity<RiskModel>(entity =>
+            {
+                entity.ToTable("RiskModels", "dbo");
+
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.ModelCode)
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                entity.Property(x => x.CustomerWeightPercent)
+                    .HasPrecision(5, 2);
+
+                entity.Property(x => x.TransactionWeightPercent)
+                    .HasPrecision(5, 2);
+
+                entity.Property(x => x.ScreeningWeightPercent)
+                    .HasPrecision(5, 2);
+
+                entity.Property(x => x.ApprovalStatus)
+                    .HasMaxLength(30)
+                    .IsRequired();
+
+                entity.HasIndex(x => new
+                {
+                    x.ClientId,
+                    x.ModelCode,
+                    x.ModelVersion
+                }).IsUnique().HasFilter("[DeleteFg] = 'N'");
+
+                ConfigureCommonFields(entity);
+
+                entity.HasQueryFilter(
+                    "SoftDeleteFilter",
+                    x => x.DeleteFg == "N");
+
+                entity.HasQueryFilter(
+                    "ClientFilter",
+                    x => CanAccessAllClients ||
+                         x.ClientId == CurrentClientId);
+            });
+
+            modelBuilder.Entity<RiskAssessmentFactor>(entity =>
+            {
+                entity.ToTable("RiskAssessmentFactors", "dbo");
+
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.FactorCode)
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                entity.Property(x => x.InputValue)
+                    .HasMaxLength(500)
+                    .IsRequired();
+
+                entity.Property(x => x.WeightPercent)
+                    .HasPrecision(5, 2);
+
+                entity.Property(x => x.WeightedScore)
+                    .HasPrecision(8, 2);
+
+                entity.Property(x => x.Explanation)
+                    .HasMaxLength(1000)
+                    .IsRequired();
+
+                entity.HasOne<RiskAssessment>()
+                    .WithMany()
+                    .HasForeignKey(x => x.RiskAssessmentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                ConfigureCommonFields(entity);
+
+                entity.HasQueryFilter(
+                    "SoftDeleteFilter",
+                    x => x.DeleteFg == "N");
+
+                entity.HasQueryFilter(
+                    "ClientFilter",
+                    x => CanAccessAllClients ||
+                         x.ClientId == CurrentClientId);
+            });
+        }
+        private static void ConfigureCommonFields<TEntity>(
+    Microsoft.EntityFrameworkCore.Metadata.Builders
+        .EntityTypeBuilder<TEntity> entity)
+    where TEntity : AmlScreening.Domain.Common.BaseEntity
+        {
+            entity.Property(x => x.DeleteFg)
+                .HasMaxLength(1)
+                .IsFixedLength()
+                .HasDefaultValue("N");
+
+            entity.Property(x => x.CreatedBy)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.UpdatedBy)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.DeleteBy)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.RowVersion)
+                .IsRowVersion();
         }
     }
 }

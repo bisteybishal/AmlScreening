@@ -6,19 +6,27 @@
 <section class="dashboard-heading">
     <div>
         <h1>Welcome Back, @Model.FullName! <span>👋</span></h1>
-        <p>Here’s what’s happening with your AML screening system today.</p>
     </div>
     <div class="date-chip"><i class="bi bi-calendar3"></i><span id="currentDate"></span></div>
 </section>
 
-@if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.TransactionsView))
+@if (Model.CanViewTransactions || Model.CanViewAlerts || Model.CanViewCases)
 {
     <section class="metric-grid" aria-label="AML decision workflow summary">
-        <article class="metric-card teal"><div class="metric-top"><span class="metric-icon"><i class="bi bi-arrow-left-right"></i></span><div><span class="metric-label">Transactions</span><strong>@Model.TransactionCount</strong></div></div></article>
-        <article class="metric-card amber"><div class="metric-top"><span class="metric-icon"><i class="bi bi-hourglass-split"></i></span><div><span class="metric-label">Under Review</span><strong>@Model.ReviewCount</strong></div></div></article>
-        <article class="metric-card red"><div class="metric-top"><span class="metric-icon"><i class="bi bi-slash-octagon"></i></span><div><span class="metric-label">Blocked</span><strong>@Model.BlockCount</strong></div></div></article>
-        <article class="metric-card amber"><div class="metric-top"><span class="metric-icon"><i class="bi bi-exclamation-triangle"></i></span><div><span class="metric-label">Open Alerts</span><strong>@Model.OpenAlertCount</strong></div></div></article>
-        <article class="metric-card teal"><div class="metric-top"><span class="metric-icon"><i class="bi bi-folder2-open"></i></span><div><span class="metric-label">Open Cases</span><strong>@Model.OpenCaseCount</strong></div></div></article>
+        @if (Model.CanViewTransactions)
+        {
+            <article class="metric-card teal"><div class="metric-top"><span class="metric-icon"><i class="bi bi-arrow-left-right"></i></span><div><span class="metric-label">Transactions</span><strong>@Model.TransactionCount</strong></div></div></article>
+            <article class="metric-card amber"><div class="metric-top"><span class="metric-icon"><i class="bi bi-hourglass-split"></i></span><div><span class="metric-label">Under Review</span><strong>@Model.ReviewCount</strong></div></div></article>
+            <article class="metric-card red"><div class="metric-top"><span class="metric-icon"><i class="bi bi-slash-octagon"></i></span><div><span class="metric-label">Blocked</span><strong>@Model.BlockCount</strong></div></div></article>
+        }
+        @if (Model.CanViewAlerts)
+        {
+            <article class="metric-card amber"><div class="metric-top"><span class="metric-icon"><i class="bi bi-exclamation-triangle"></i></span><div><span class="metric-label">Open Alerts</span><strong>@Model.OpenAlertCount</strong></div></div></article>
+        }
+        @if (Model.CanViewCases)
+        {
+            <article class="metric-card teal"><div class="metric-top"><span class="metric-icon"><i class="bi bi-folder2-open"></i></span><div><span class="metric-label">Open Cases</span><strong>@Model.OpenCaseCount</strong></div></div></article>
+        }
     </section>
 }
 
@@ -29,6 +37,8 @@
     </div>
 }
 
+@if (Model.CanViewAmlRecords)
+{
 <section class="metric-grid" aria-label="AML record summary">
     <article class="metric-card teal">
         <div class="metric-top"><span class="metric-icon"><i class="bi bi-file-earmark-text-fill"></i></span><div><span class="metric-label">Total Records</span><strong>@Model.Summary.TotalRecords.ToString("N0")</strong></div></div>
@@ -74,7 +84,7 @@
                                 <td>@record.ReferenceNo</td>
                                 <td>@record.FullName</td>
                                 <td>@record.RecordType</td>
-                                <td>@record.Country</td>
+                                <td>@(record.Country ?? "Not provided")</td>
                                 <td>@record.SourceName</td>
                                 <td>@record.CreatedDate.ToString("dd MMM yyyy, hh:mm tt")</td>
                             </tr>
@@ -86,6 +96,7 @@
         <p class="table-caption">Showing @Model.RecentRecords.Count recent record@(Model.RecentRecords.Count == 1 ? "" : "s")</p>
     </article>
 </section>
+}
 
 @section Scripts {
     <script>

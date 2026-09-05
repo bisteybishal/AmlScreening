@@ -108,16 +108,16 @@ namespace AmlScreening.Infrastructure.Provider
             return element.Element(name)?.Value?.Trim()
                    ?? string.Empty;
         }
-        private static string? CleanValue(string? value)
+        private static string CleanValue(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
-                return null;
+                return string.Empty;
 
             if (value.Equals(
                 "na",
                 StringComparison.OrdinalIgnoreCase))
             {
-                return null;
+                return string.Empty;
             }
 
             return value.Trim();

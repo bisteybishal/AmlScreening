@@ -1,0 +1,42 @@
+@model AmlScreening.Portal.ViewModels.RiskScoreSetupEditViewModel
+@{ ViewData["Title"] = "Edit Risk Ranges"; }
+@section Styles {
+    <link rel="stylesheet" href="~/css/workflow.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/risk-scoring.css" asp-append-version="true" />
+}
+<section class="workflow-heading">
+    <div><h1>Edit risk ranges</h1><p>Adjust the ranges together. Cover 0–100 without gaps or overlaps.</p></div>
+</section>
+<section class="workflow-panel">
+    <form asp-controller="RiskScoreSetup" asp-action="Edit" method="post">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="All" class="workflow-message error"></div>
+        <div class="table-responsive">
+            <table class="workflow-table risk-simple-table risk-range-form">
+                <thead><tr><th>Risk type</th><th>From</th><th>To</th><th>Remarks</th></tr></thead>
+                <tbody>
+                @for (var i = 0; i < Model.Bands.Count; i++)
+                {
+                    <tr>
+                        <td>
+                            @Model.Bands[i].RiskLevel
+                            <input asp-for="Bands[i].Id" type="hidden" />
+                            <input asp-for="Bands[i].RiskLevel" type="hidden" />
+                            <input asp-for="Bands[i].Decision" type="hidden" />
+                            <input asp-for="Bands[i].RowVersion" type="hidden" />
+                        </td>
+                        <td><input asp-for="Bands[i].MinimumScore" type="number" min="0" max="100" aria-label="Minimum score" /></td>
+                        <td><input asp-for="Bands[i].MaximumScore" type="number" min="0" max="100" placeholder="100" aria-label="Maximum score" /></td>
+                        <td><input asp-for="Bands[i].Remarks" maxlength="1000" aria-label="Remarks" /></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        <div class="workflow-form-actions">
+            <a asp-controller="RiskScoreSetup" asp-action="Index">Cancel</a>
+            <button class="workflow-primary" type="submit">Save ranges</button>
+        </div>
+    </form>
+</section>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

@@ -30,9 +30,14 @@ public sealed class AmlRecordAuthorizationHandler
             return Task.CompletedTask;
         }
 
-        if (resource.ClientId == _currentUser.ClientId &&
-            (_currentUser.HasPermission(AppPermissions.AmlRecordsViewClient) ||
-             resource.OwnerUserId == _currentUser.UserId))
+        var isOwner = resource.ClientId == _currentUser.ClientId &&
+            resource.OwnerUserId == _currentUser.UserId;
+        var canReadForClient = requirement.Name == AmlRecordOperations.Read.Name &&
+            resource.ClientId == _currentUser.ClientId &&
+            (resource.IsShared ||
+             _currentUser.HasPermission(AppPermissions.AmlRecordsViewClient));
+
+        if (isOwner || canReadForClient)
         {
             context.Succeed(requirement);
         }

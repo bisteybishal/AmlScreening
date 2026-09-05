@@ -8,9 +8,14 @@
     var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
     var initials = string.Join("", fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant();
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
     var navigationItems = await MenuService.GetForCurrentUserAsync();
+    // Support existing database menu rows until the manual menu script is applied.
+    string? MenuController(NavigationMenuItem item) => item.ControllerName == "RiskScoring"
+        ? (item.ActionName == "Setup" ? "RiskScoreSetup" : "RiskScores") : item.ControllerName;
+    string? MenuAction(NavigationMenuItem item) => item.ControllerName == "RiskScoring" ? "Index" : item.ActionName;
     bool IsCurrent(NavigationMenuItem item) =>
-        string.Equals(item.ControllerName, currentController, StringComparison.OrdinalIgnoreCase);
+        string.Equals(MenuController(item), currentController, StringComparison.OrdinalIgnoreCase);
     bool IsOpen(NavigationMenuItem item) => IsCurrent(item) || item.Children.Any(IsCurrent);
 }
 <!DOCTYPE html>
@@ -59,8 +64,8 @@
                                 @foreach (var child in item.Children.OrderBy(child => child.SortOrder))
                                 {
                                     <a class="nav-link submenu-link @(IsCurrent(child) ? "active" : "")"
-                                       asp-controller="@child.ControllerName"
-                                       asp-action="@child.ActionName">
+                                       asp-controller="@MenuController(child)"
+                                       asp-action="@MenuAction(child)">
                                         <i class="bi @child.IconClass"></i>
                                         <span>@child.DisplayName</span>
                                     </a>
@@ -70,8 +75,8 @@
                         else if (!string.IsNullOrWhiteSpace(item.ControllerName))
                         {
                             <a class="nav-link @(IsCurrent(item) ? "active" : "")"
-                               asp-controller="@item.ControllerName"
-                               asp-action="@item.ActionName">
+                               asp-controller="@MenuController(item)"
+                               asp-action="@MenuAction(item)">
                                 <i class="bi @item.IconClass"></i>
                                 <span>@item.DisplayName</span>
                             </a>

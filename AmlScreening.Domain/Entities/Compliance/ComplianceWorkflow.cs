@@ -38,6 +38,10 @@ public sealed class AmlTransaction : BaseEntity, IClientOwnedEntity
     public string? ScreeningStatus { get; set; }
     public string? DecisionReasons { get; set; }
     public DateTime? EvaluatedDate { get; set; }
+
+    public string PurposeCode { get; set; } = string.Empty;
+    public int RegisteredReceiverCount { get; set; }
+    public string RelationshipCode { get; set; } = string.Empty;
 }
 
 public sealed class ScreeningMatch : BaseEntity, IClientOwnedEntity

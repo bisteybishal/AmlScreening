@@ -2,8 +2,9 @@
 
 This document is the long-term database reference for the AML Screening portal.
 It was compared with the local `AMLScreening` SQL Server database on
-2026-09-02. The local database currently contains 19 application tables and
-4 stored procedures.
+2026-09-02. That snapshot contained 19 application tables and 4 stored
+procedures. `RiskScoring.sql` adds 5 risk-configuration/evidence tables,
+bringing the expected application-table total to 24 after the upgrade.
 
 The SQL Server `.bak` file is the authoritative backup of schema and data. The
 SQL files in this folder are the version-controlled description of how the
@@ -13,7 +14,8 @@ application expects that database to behave. Keep both.
 
 - `ClientId` separates one client's data from another client's data.
 - `OwnerUserId` applies to AML records that belong to a particular portal user.
-- A user with `AMLRecords.ViewClient` can see records for the user's client.
+- `IsShared = 1` makes administrator/imported watchlist data visible to ordinary users in the same client.
+- A user with `AMLRecords.ViewClient` can view records for the user's client; it does not grant edit or delete ownership.
 - A platform user with `AMLRecords.ViewAll` can cross client boundaries.
 - `DeleteFg = 'Y'` means a row is soft deleted. The row remains available for
   audit and recovery.
@@ -45,8 +47,8 @@ application expects that database to behave. Keep both.
 | `dbo.AML_Subscription_Plan` | `PlanId` | Defines available source subscriptions, duration and price. | Currently a portal administration table and is not client-owned. |
 
 Important AML record identifiers are `SourceName`, `ReferenceNo`, `ClientId`
-and `OwnerUserId`. The local database has uniqueness rules for both
-`(ClientId, ReferenceNo)` and `(SourceName, ReferenceNo)`.
+and `OwnerUserId`. The intended uniqueness rule is
+`(ClientId, SourceName, ReferenceNo)`.
 
 ### Compliance workflow tables
 
@@ -57,6 +59,11 @@ and `OwnerUserId`. The local database has uniqueness rules for both
 | `dbo.AmlTransactions` | `Id` | Transaction submitted for screening and its final status, score and decision. | `ClientId -> Clients.Id`; `CustomerId -> Customers.Id`. |
 | `dbo.ScreeningMatches` | `Id` | Evidence of sender/receiver matches against AML records. | Links transaction, AML record and client. |
 | `dbo.RiskAssessments` | `Id` | Customer, transaction, screening and overall risk components. | One active assessment per transaction. |
+| `dbo.RiskFactors` | `Id` | Client-specific scoring factors such as PEP, amount, country, occupation, purpose, receiver count and relationship. | `ClientId -> Clients.Id`; parent of factor rules. |
+| `dbo.RiskFactorRules` | `Id` | Score assigned to each factor value or numeric range, including version and approval data. | Links to `RiskFactors` and `Clients`. |
+| `dbo.RiskBands` | `Id` | Maps the final 0–100 score to LOW, MEDIUM, HIGH or CRITICAL and an ALLOW/REVIEW/BLOCK recommendation. | `ClientId -> Clients.Id`. |
+| `dbo.RiskModels` | `Id` | Versioned weights for customer, transaction and screening scores. | `ClientId -> Clients.Id`. |
+| `dbo.RiskAssessmentFactors` | `Id` | Immutable factor-level evidence explaining how an assessment was calculated. | `RiskAssessmentId -> RiskAssessments.Id`; `ClientId -> Clients.Id`. |
 | `dbo.AmlDecisions` | `Id` | Persisted `ALLOW`, `REVIEW` or `BLOCK` result and its reasons/versions. | Links transaction and risk assessment; correlation ID is unique per client. |
 | `dbo.ComplianceAlerts` | `Id` | Review queue item generated for REVIEW or BLOCK decisions. | Links transaction, risk assessment, client and assigned user. |
 | `dbo.ComplianceCases` | `Id` | Investigation case, notes and final disposition for an alert. | Links alert, transaction, client and assigned user. |
@@ -69,6 +76,7 @@ Clients
       -> AmlTransactions
           -> ScreeningMatches -> AmlRecords
           -> RiskAssessments
+              -> RiskAssessmentFactors
               -> AmlDecisions
               -> ComplianceAlerts
                   -> ComplianceCases
@@ -88,12 +96,9 @@ The current definitions are preserved in
 
 ### Stored-procedure warning
 
-`spa_AML_Record_BulkInsert` currently checks an existing record by
-`SourceName + ReferenceNo` but then writes the current user's `ClientId` and
-`OwnerUserId`. This can move a shared sanctions record between clients and can
-conflict with the two unique indexes. Review the intended ownership model before
-using source synchronization in UAT. Platform reference-list data should
-normally be separated from client/user-owned AML records.
+The snapshot version of `spa_AML_Record_BulkInsert` checks an existing record
+without `ClientId` and is unsafe for UAT. `UAT-Stabilization.sql` replaces it
+with a client-scoped upsert and marks imported sanctions records as shared.
 
 ## Differences between the local database and checked-in scripts
 
@@ -106,11 +111,9 @@ normally be separated from client/user-owned AML records.
    verifying that no external process uses it.
 4. Local `AmlRecords.CreatedBy`, `UpdatedBy` and `DeleteBy` are `varchar(50)`,
    while newer scripts expect Unicode/a larger length.
-5. Local `AmlRecords.Remarks` is `nvarchar(max)` while `AmlRecords.sql` defines
-   `nvarchar(1000)`.
-6. Local `AmlRecords` includes `LastSyncDate` and `SourceUpdatedDate`, but the
+5. Local `AmlRecords` includes `LastSyncDate` and `SourceUpdatedDate`, but the
    base table script does not create them.
-7. `AmlSource.View` and an AML Sources menu row are defined by application intent
+6. `AmlSource.View` and an AML Sources menu row are defined by application intent
    but are not currently inserted by the checked-in role/menu scripts.
 
 Do not delete or rename columns merely to make the lists match. First take a
@@ -157,7 +160,7 @@ Never keep the only backup on the same drive as the live database.
 
 After restoring into a separate test database, verify:
 
-- All 19 application tables are present.
+- All 24 expected application tables are present after `RiskScoring.sql`.
 - All 4 stored procedures are present.
 - Foreign keys and unique indexes are present.
 - User login succeeds without changing password hashes.

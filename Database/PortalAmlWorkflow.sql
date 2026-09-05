@@ -92,6 +92,9 @@ BEGIN
         Amount DECIMAL(18,2) NOT NULL, Currency NVARCHAR(3) NOT NULL,
         OriginCountry NVARCHAR(100) NOT NULL, DestinationCountry NVARCHAR(100) NOT NULL,
         Channel NVARCHAR(50) NOT NULL, TransactionDate DATETIME2(0) NOT NULL,
+        PurposeCode NVARCHAR(50) NOT NULL CONSTRAINT DF_AmlTransactions_PurposeCode DEFAULT N'UNKNOWN',
+        RegisteredReceiverCount INT NOT NULL CONSTRAINT DF_AmlTransactions_ReceiverCount DEFAULT 0,
+        RelationshipCode NVARCHAR(50) NOT NULL CONSTRAINT DF_AmlTransactions_RelationshipCode DEFAULT N'UNKNOWN',
         Status NVARCHAR(30) NOT NULL CONSTRAINT DF_AmlTransactions_Status DEFAULT N'NEW',
         CorrelationId NVARCHAR(100) NULL, Decision NVARCHAR(20) NULL, RiskScore INT NULL,
         RiskLevel NVARCHAR(20) NULL, ScreeningStatus NVARCHAR(30) NULL,
@@ -104,6 +107,7 @@ BEGIN
         CONSTRAINT FK_AmlTransactions_Clients FOREIGN KEY (ClientId) REFERENCES dbo.Clients(Id),
         CONSTRAINT FK_AmlTransactions_Customers FOREIGN KEY (CustomerId) REFERENCES dbo.Customers(Id),
         CONSTRAINT CK_AmlTransactions_Amount CHECK (Amount > 0),
+        CONSTRAINT CK_AmlTransactions_ReceiverCount CHECK (RegisteredReceiverCount >= 0),
         CONSTRAINT CK_AmlTransactions_RiskScore CHECK (RiskScore IS NULL OR RiskScore BETWEEN 0 AND 100),
         CONSTRAINT CK_AmlTransactions_DeleteFg CHECK (DeleteFg IN ('N','Y'))
     );

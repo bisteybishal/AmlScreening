@@ -11,21 +11,23 @@ namespace AmlScreening.Domain.Entities
 
         public long OwnerUserId { get; set; }
 
+        public bool IsShared { get; set; }
+
         public string RecordType { get; set; } = string.Empty;
 
         public string FullName { get; set; } = string.Empty;
 
         public DateTime? DateOfBirth { get; set; }
 
-        public string Country { get; set; } = string.Empty;
+        public string? Country { get; set; }
 
-        public string Nationality { get; set; } = string.Empty;
+        public string? Nationality { get; set; }
 
         public string ReferenceNo { get; set; } = string.Empty;
 
         public string SourceName { get; set; } = string.Empty;
 
-        public string Remarks { get; set; } = string.Empty;
+        public string? Remarks { get; set; }
 
         public void Activate()
         {

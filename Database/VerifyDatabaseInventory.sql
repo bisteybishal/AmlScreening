@@ -51,6 +51,11 @@ UNION ALL SELECT N'dbo.Customers', COUNT_BIG(*) FROM dbo.Customers
 UNION ALL SELECT N'dbo.AmlTransactions', COUNT_BIG(*) FROM dbo.AmlTransactions
 UNION ALL SELECT N'dbo.ScreeningMatches', COUNT_BIG(*) FROM dbo.ScreeningMatches
 UNION ALL SELECT N'dbo.RiskAssessments', COUNT_BIG(*) FROM dbo.RiskAssessments
+UNION ALL SELECT N'dbo.RiskFactors', COUNT_BIG(*) FROM dbo.RiskFactors
+UNION ALL SELECT N'dbo.RiskFactorRules', COUNT_BIG(*) FROM dbo.RiskFactorRules
+UNION ALL SELECT N'dbo.RiskBands', COUNT_BIG(*) FROM dbo.RiskBands
+UNION ALL SELECT N'dbo.RiskModels', COUNT_BIG(*) FROM dbo.RiskModels
+UNION ALL SELECT N'dbo.RiskAssessmentFactors', COUNT_BIG(*) FROM dbo.RiskAssessmentFactors
 UNION ALL SELECT N'dbo.AmlDecisions', COUNT_BIG(*) FROM dbo.AmlDecisions
 UNION ALL SELECT N'dbo.ComplianceAlerts', COUNT_BIG(*) FROM dbo.ComplianceAlerts
 UNION ALL SELECT N'dbo.ComplianceCases', COUNT_BIG(*) FROM dbo.ComplianceCases

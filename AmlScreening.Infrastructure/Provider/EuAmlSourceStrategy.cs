@@ -125,11 +125,11 @@ namespace AmlScreening.Infrastructure.Provider
             }
         }
 
-        private static string? CleanValue(
+        private static string CleanValue(
             string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
-                return null;
+                return string.Empty;
 
             return value.Trim();
         }

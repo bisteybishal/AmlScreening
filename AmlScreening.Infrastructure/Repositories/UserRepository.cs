@@ -211,7 +211,8 @@ public sealed class UserRepository : IUserRepository
                 ON userOverride.PermissionId = p.PermissionId
                AND userOverride.UserId = @UserId
             WHERE p.IsActive = 1
-              AND (@CanGrantPlatformPermission = 1 OR p.PermissionName <> @ViewAllPermission)
+              AND p.PermissionName IN @ApplicationPermissions
+              AND (@CanGrantPlatformPermission = 1 OR p.PermissionName NOT IN @PlatformPermissions)
             ORDER BY p.PermissionName;
             """;
 
@@ -219,7 +220,8 @@ public sealed class UserRepository : IUserRepository
         {
             UserId = userId,
             CanGrantPlatformPermission = CanViewAllClients(),
-            ViewAllPermission = AppPermissions.AmlRecordsViewAll
+            ApplicationPermissions = AppPermissions.All,
+            PlatformPermissions = AppPermissions.PlatformOnly
         });
         return permissions.AsList();
     }
@@ -242,9 +244,23 @@ public sealed class UserRepository : IUserRepository
                 return false;
             }
 
-            await connection.ExecuteAsync(
-                "DELETE FROM dbo.UserPermissions WHERE UserId = @UserId;",
-                new { UserId = userId }, transaction);
+            const string deleteManageableOverrides = """
+                DELETE userPermission
+                FROM dbo.UserPermissions userPermission
+                INNER JOIN dbo.Permissions permission
+                    ON permission.PermissionId = userPermission.PermissionId
+                WHERE userPermission.UserId = @UserId
+                  AND permission.PermissionName IN @ApplicationPermissions
+                  AND (@CanGrantPlatformPermission = 1 OR permission.PermissionName NOT IN @PlatformPermissions);
+                """;
+
+            await connection.ExecuteAsync(deleteManageableOverrides, new
+            {
+                UserId = userId,
+                CanGrantPlatformPermission = CanViewAllClients(),
+                ApplicationPermissions = AppPermissions.All,
+                PlatformPermissions = AppPermissions.PlatformOnly
+            }, transaction);
 
             const string permissionsSql = """
                 SELECT p.PermissionId,
@@ -258,7 +274,8 @@ public sealed class UserRepository : IUserRepository
                     WHERE ur.UserId = @UserId
                 ) rolePermission ON rolePermission.PermissionId = p.PermissionId
                 WHERE p.IsActive = 1
-                  AND (@CanGrantPlatformPermission = 1 OR p.PermissionName <> @ViewAllPermission);
+                  AND p.PermissionName IN @ApplicationPermissions
+                  AND (@CanGrantPlatformPermission = 1 OR p.PermissionName NOT IN @PlatformPermissions);
                 """;
 
             var availablePermissions = (await connection.QueryAsync<PermissionGrantState>(
@@ -267,7 +284,8 @@ public sealed class UserRepository : IUserRepository
                 {
                     UserId = userId,
                     CanGrantPlatformPermission = CanViewAllClients(),
-                    ViewAllPermission = AppPermissions.AmlRecordsViewAll
+                    ApplicationPermissions = AppPermissions.All,
+                    PlatformPermissions = AppPermissions.PlatformOnly
                 },
                 transaction)).AsList();
             var selectedIds = permissionIds.Distinct().ToHashSet();

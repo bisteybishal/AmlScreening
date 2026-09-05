@@ -136,11 +136,11 @@ public sealed class AmlRecordsController : Controller
             RecordType = record.RecordType,
             FullName = record.FullName,
             DateOfBirth = record.DateOfBirth,
-            Country = record.Country,
-            Nationality = record.Nationality,
+            Country = record.Country ?? string.Empty,
+            Nationality = record.Nationality ?? string.Empty,
             ReferenceNo = record.ReferenceNo,
             SourceName = record.SourceName,
-            Remarks = record.Remarks,
+            Remarks = record.Remarks ?? string.Empty,
             IsActive = record.IsActive,
             RowVersion = record.RowVersion
         }));
@@ -161,7 +161,8 @@ public sealed class AmlRecordsController : Controller
 
         var reference = model.ReferenceNo?.Trim();
         if (!string.IsNullOrWhiteSpace(reference) &&
-            await _repository.ReferenceExistsAsync(reference, model.Id))
+            !string.IsNullOrWhiteSpace(model.SourceName) &&
+            await _repository.ReferenceExistsAsync(reference, model.SourceName, model.Id))
         {
             ModelState.AddModelError(nameof(model.ReferenceNo), "This reference number already exists.");
         }
@@ -218,7 +219,8 @@ public sealed class AmlRecordsController : Controller
 
         var reference = model.ReferenceNo?.Trim();
         if (!string.IsNullOrWhiteSpace(reference) &&
-            await _repository.ReferenceExistsAsync(reference))
+            !string.IsNullOrWhiteSpace(model.SourceName) &&
+            await _repository.ReferenceExistsAsync(reference, model.SourceName))
         {
             ModelState.AddModelError(nameof(model.ReferenceNo), "This reference number already exists.");
         }

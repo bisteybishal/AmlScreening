@@ -39,6 +39,8 @@ public static class AppPermissions
     public const string CasesManage = "Cases.Manage";
     public const string AmlSourceView = "AmlSource.View";
     public const string AmlSourceSync = "AmlSource.Sync";
+    public const string RiskScoringView = "RiskScoring.View";
+    public const string RiskScoringManage = "RiskScoring.Manage";
 
     public static readonly string[] All =
     {
@@ -67,6 +69,18 @@ public static class AppPermissions
         CasesView,
         CasesManage,
         AmlSourceView,
+        AmlSourceSync,
+        RiskScoringView,
+        RiskScoringManage
+    };
+
+    public static readonly string[] PlatformOnly =
+    {
+        AmlRecordsViewAll,
+        RolesManage,
+        SubscriptionCreate,
+        SubscriptionEdit,
+        SubscriptionDelete,
         AmlSourceSync
     };
 }

@@ -38,7 +38,7 @@
                                 <strong>@label</strong>
                                 <small>@permission.Description</small>
                                 <small class="permission-source @(permission.HasOverride ? "override" : "inherited")">
-                                    @(permission.HasOverride ? "User override" : permission.IsRoleGranted ? "Inherited from role" : "Not granted by role")
+                                    @(permission.HasOverride ? "Individual exception" : permission.IsRoleGranted ? "Inherited from role" : "Not granted by role")
                                 </small>
                             </p>
                         </label>

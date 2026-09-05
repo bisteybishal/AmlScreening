@@ -1,6 +1,13 @@
 @model AmlScreening.Portal.ViewModels.AmlRecordsPageViewModel
+@using System.Security.Claims
 @{
     ViewData["Title"] = "AML Records";
+    var currentUserId = long.TryParse(
+        User.FindFirstValue(ClaimTypes.NameIdentifier),
+        out var parsedUserId) ? parsedUserId : 0;
+    var canManageAllRecords = User.HasClaim(
+        AppPermissions.ClaimType,
+        AppPermissions.AmlRecordsViewAll);
 }
 
 @section Styles {
@@ -74,21 +81,22 @@
                 {
                     @foreach (var record in Model.Records)
                     {
+                        var canManageRecord = canManageAllRecords || record.OwnerUserId == currentUserId;
                         <tr>
                             <td><strong class="record-reference">@record.ReferenceNo</strong></td>
                             <td><div class="record-name"><span class="record-avatar">@(record.FullName.Length > 0 ? record.FullName[0].ToString().ToUpperInvariant() : "?")</span><span><strong>@record.FullName</strong><small>@(record.DateOfBirth?.ToString("dd MMM yyyy") ?? "Date not provided")</small></span></div></td>
                             <td><span class="record-type">@record.RecordType</span></td>
-                            <td><strong>@record.Country</strong><small class="table-subtext">@record.Nationality</small></td>
+                            <td><strong>@(record.Country ?? "Not provided")</strong><small class="table-subtext">@(record.Nationality ?? "Not provided")</small></td>
                             <td>@record.SourceName</td>
                             <td><span class="record-status @(record.IsActive ? "active" : "inactive")"><i></i>@(record.IsActive ? "Active" : "Inactive")</span></td>
                             <td>@record.CreatedDate.ToString("dd MMM yyyy")</td>
                             <td>
                                 <div class="record-actions">
-                                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlRecordsEdit))
+                                    @if (canManageRecord && User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlRecordsEdit))
                                     {
                                         <a class="action-button edit" title="Edit record" asp-controller="AmlRecords" asp-action="Edit" asp-route-id="@record.Id"><i class="bi bi-pencil-square"></i><span>Edit</span></a>
                                     }
-                                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlRecordsDelete))
+                                    @if (canManageRecord && User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlRecordsDelete))
                                     {
                                         <button type="button" class="action-button delete" title="Delete record" data-bs-toggle="modal" data-bs-target="#deleteModal" data-id="@record.Id" data-name="@record.FullName"><i class="bi bi-trash3"></i><span>Delete</span></button>
                                     }

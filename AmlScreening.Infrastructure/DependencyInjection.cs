@@ -32,6 +32,7 @@ namespace AmlScreening.Infrastructure
             services.AddScoped<IAuditService, AuditService>();
             services.AddScoped<IMenuService, MenuService>();
             services.AddScoped<IAmlWorkflowService, AmlWorkflowService>();
+            services.AddScoped<IRiskScoringService, RiskScoringService>();
             services.AddScoped<IAmlImportRepository, AmlImportRepository>();
 
 

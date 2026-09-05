@@ -1,5 +1,6 @@
 using AmlScreening.Application.Interface.Repositories;
 using AmlScreening.Application.Interface;
+using AmlScreening.Application.Security;
 using AmlScreening.Portal.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -31,27 +32,27 @@ public sealed class DashboardController : Controller
         {
             FullName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "User",
             Username = User.FindFirst("Username")?.Value ?? User.Identity?.Name ?? "User",
-            RoleName = User.FindFirst(ClaimTypes.Role)?.Value ?? "User"
+            RoleName = User.FindFirst(ClaimTypes.Role)?.Value ?? "User",
+            CanViewAmlRecords = User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlRecordsView),
+            CanViewTransactions = User.HasClaim(AppPermissions.ClaimType, AppPermissions.TransactionsView),
+            CanViewAlerts = User.HasClaim(AppPermissions.ClaimType, AppPermissions.AlertsView),
+            CanViewCases = User.HasClaim(AppPermissions.ClaimType, AppPermissions.CasesView)
         };
 
         try
         {
-            model.Summary = await _amlRecordRepository.GetSummaryAsync();
-            var recentPage = await _amlRecordRepository.GetPageAsync(
-                search: null,
-                recordType: null,
-                isActive: null,
-                pageNumber: 1,
-                pageSize: 5);
-            model.RecentRecords = recentPage.Items;
-            var transactions = await _workflowService.GetTransactionsAsync();
-            var alerts = await _workflowService.GetAlertsAsync();
-            var cases = await _workflowService.GetCasesAsync();
-            model.TransactionCount = transactions.Count;
-            model.ReviewCount = transactions.Count(x => x.Decision == "REVIEW");
-            model.BlockCount = transactions.Count(x => x.Decision == "BLOCK");
-            model.OpenAlertCount = alerts.Count(x => x.Status is not ("RESOLVED" or "CLOSED"));
-            model.OpenCaseCount = cases.Count(x => x.Status != "CLOSED");
+            if (model.CanViewAmlRecords)
+            {
+                model.Summary = await _amlRecordRepository.GetSummaryAsync();
+                model.RecentRecords = await _amlRecordRepository.GetRecentAsync(5);
+            }
+
+            var complianceSummary = await _workflowService.GetDashboardSummaryAsync();
+            model.TransactionCount = complianceSummary.TransactionCount;
+            model.ReviewCount = complianceSummary.ReviewCount;
+            model.BlockCount = complianceSummary.BlockCount;
+            model.OpenAlertCount = complianceSummary.OpenAlertCount;
+            model.OpenCaseCount = complianceSummary.OpenCaseCount;
         }
         catch (Exception exception)
         {

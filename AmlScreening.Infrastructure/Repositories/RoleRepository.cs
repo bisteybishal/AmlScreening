@@ -1,5 +1,6 @@
 using AmlScreening.Application.Interface.Repositories;
 using AmlScreening.Application.Models;
+using AmlScreening.Application.Security;
 using AmlScreening.Infrastructure.Persistence;
 using Dapper;
 using AmlScreening.Application.Interface;
@@ -66,10 +67,15 @@ public sealed class RoleRepository : IRoleRepository
             LEFT JOIN dbo.RolePermissions rp
                 ON rp.PermissionId = p.PermissionId AND rp.RoleId = @RoleId
             WHERE p.IsActive = 1
+              AND p.PermissionName IN @ApplicationPermissions
             ORDER BY p.PermissionName;
             """;
 
-        var permissions = await connection.QueryAsync<PermissionListItem>(sql, new { RoleId = roleId });
+        var permissions = await connection.QueryAsync<PermissionListItem>(sql, new
+        {
+            RoleId = roleId,
+            ApplicationPermissions = AppPermissions.All
+        });
         return permissions.AsList();
     }
 
@@ -125,11 +131,18 @@ public sealed class RoleRepository : IRoleRepository
                     INSERT INTO dbo.RolePermissions (RoleId, PermissionId)
                     SELECT @RoleId, p.PermissionId
                     FROM dbo.Permissions p
-                    WHERE p.PermissionId = @PermissionId AND p.IsActive = 1;
+                    WHERE p.PermissionId = @PermissionId
+                      AND p.IsActive = 1
+                      AND p.PermissionName IN @ApplicationPermissions;
                     """;
 
                 await connection.ExecuteAsync(insert,
-                    permissionIds.Select(id => new { RoleId = roleId, PermissionId = id }), transaction);
+                    permissionIds.Select(id => new
+                    {
+                        RoleId = roleId,
+                        PermissionId = id,
+                        ApplicationPermissions = AppPermissions.All
+                    }), transaction);
             }
 
             await InsertAuditAsync(connection, transaction, "UpdatePermissions", roleId,

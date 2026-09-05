@@ -42,6 +42,7 @@ namespace AmlScreening.Infrastructure.Repositories
                             record.Country,
                             ClientId=_currentUser.ClientId,
                             OwnerUserId= _currentUser.UserId,
+                            IsShared = true,
                             CreatedBy = _currentUser.Username
 
                         },

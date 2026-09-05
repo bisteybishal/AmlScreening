@@ -42,8 +42,10 @@ INSERT INTO @Menus VALUES
 ('Customers',      'Compliance', N'Customers',           'MANAGEMENT', 'Customers',        'Index', 'bi-person-vcard',       'Customers.View',         10),
 ('Transactions',   'Compliance', N'Transactions',        'MANAGEMENT', 'Transactions',     'Index', 'bi-arrow-left-right',    'Transactions.View',      20),
 ('ThresholdRules', 'Compliance', N'Threshold Rules',     'MANAGEMENT', 'ComplianceRules', 'Index', 'bi-sliders',            'ComplianceRules.View',  30),
-('ComplianceAlerts','Compliance',N'Alerts',              'MANAGEMENT', 'Alerts',           'Index', 'bi-exclamation-triangle','Alerts.View',          40),
-('ComplianceCases','Compliance', N'Cases',               'MANAGEMENT', 'Cases',            'Index', 'bi-folder2-open',        'Cases.View',             50),
+('RiskScoring',    'Compliance', N'Risk Scores',         'MANAGEMENT', 'RiskScoring',      'Index', 'bi-speedometer2',        'RiskScoring.View',       35),
+('RiskScoreSetup', 'Compliance', N'Risk Score Setup',    'MANAGEMENT', 'RiskScoring',      'Setup', 'bi-sliders',             'RiskScoring.View',       36),
+('ComplianceAlerts','Compliance',N'Alerts',              'MANAGEMENT', 'Alerts',           'Index', 'bi-exclamation-triangle','Alerts.View',          50),
+('ComplianceCases','Compliance', N'Cases',               'MANAGEMENT', 'Cases',            'Index', 'bi-folder2-open',        'Cases.View',             60),
 ('AuditLogs',      NULL,         N'Audit Logs',          'MANAGEMENT', 'AuditLogs',       'Index', 'bi-file-earmark-text', 'AuditLogs.View',         50);
 
 INSERT INTO dbo.MenuItems

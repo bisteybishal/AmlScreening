@@ -1,0 +1,138 @@
+@model AmlScreening.Portal.ViewModels.RiskScoringPageViewModel
+@{
+    ViewData["Title"] = "Risk Scores";
+    var canManage = User.HasClaim(AppPermissions.ClaimType, AppPermissions.RiskScoringManage);
+    var factorCode = Model.SelectedFactor?.FactorCode;
+    var isRange = Model.SelectedFactor?.ValueType is "NUMBER" or "NUMERIC";
+}
+@section Styles {
+    <link rel="stylesheet" href="~/css/workflow.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/risk-scoring.css" asp-append-version="true" />
+}
+<partial name="_WorkflowMessages" />
+<section class="workflow-heading">
+    <h1>Risk Scores</h1>
+    @if (canManage && Model.SelectedFactor != null)
+    {
+        <a class="workflow-primary" asp-controller="RiskScores" asp-action="Add" asp-route-factorCode="@factorCode">+ Add score</a>
+    }
+</section>
+@if (Model.Factors.Count == 0)
+{
+    <div class="workflow-panel">
+        <h2>Risk categories have not been configured</h2>
+        <p>Your administrator must configure the risk categories for this client before you can add scores. This is not a search or pagination problem.</p>
+    </div>
+}
+else
+{
+    @if (Model.HasRuleDraft)
+    {
+        <div class="risk-review-notice">
+            Changes below are pending review. They do not affect active scoring yet.
+            @if (canManage)
+            {
+                <form asp-controller="RiskScores" asp-action="Apply" method="post" class="risk-inline-form"
+                      onsubmit="return confirm('Apply the reviewed changes for this category?');">
+                    @Html.AntiForgeryToken()
+                    <input name="factorCode" type="hidden" value="@factorCode" />
+                    <button type="submit" class="workflow-primary">Apply reviewed changes</button>
+                </form>
+            }
+        </div>
+    }
+    <section class="workflow-panel">
+        <nav class="risk-factor-tabs" aria-label="Risk categories">
+            @foreach (var factor in Model.Factors)
+            {
+                <a class="@(factor.FactorCode == factorCode ? "active" : "")"
+                   asp-controller="RiskScores" asp-action="Index" asp-route-factorCode="@factor.FactorCode">@factor.FactorName</a>
+            }
+        </nav>
+        <div class="table-responsive">
+            <table class="workflow-table risk-simple-table">
+                <thead><tr><th>S.N.</th><th>@(isRange ? "Range" : Model.SelectedFactor?.FactorName)</th><th>Score</th><th>Action</th></tr></thead>
+                <tbody>
+                @if (Model.Rules.Count == 0)
+                {
+                    <tr><td colspan="4" class="workflow-empty">No scores added yet for this category.</td></tr>
+                }
+                @for (var i = 0; i < Model.Rules.Count; i++)
+                {
+                    var rule = Model.Rules[i];
+                    <tr>
+                        <td>@(Model.FirstRecord + i)</td>
+                        <td>
+                            @if (isRange && rule.ValueCode != "DEFAULT")
+                            {
+                                <span>@(rule.MinimumValue?.ToString("N2") ?? "0") – @(rule.MaximumValue?.ToString("N2") ?? "No maximum")</span>
+                            }
+                            else
+                            {
+                                <span>@(rule.ValueName ?? rule.ValueCode ?? "Other values")</span>
+                            }
+                        </td>
+                        <td>@rule.Score</td>
+                        <td>
+                            @if (canManage)
+                            {
+                                <a class="risk-edit-link" asp-controller="RiskScores" asp-action="Edit" asp-route-id="@rule.Id">Edit</a>
+                                <form asp-controller="RiskScores" asp-action="Delete" method="post" class="risk-inline-form"
+                                      onsubmit="return confirm('Remove this score? The removal takes effect after review and application.');">
+                                    @Html.AntiForgeryToken()
+                                    <input name="id" type="hidden" value="@rule.Id" />
+                                    <input name="factorCode" type="hidden" value="@factorCode" />
+                                    <input name="rowVersion" type="hidden" value="@Convert.ToBase64String(rule.RowVersion)" />
+                                    <button type="submit" class="risk-delete-button">Delete</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <span>View only</span>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        @if (Model.TotalCount > 0)
+        {
+            <footer class="risk-pagination">
+                <span>Showing @Model.FirstRecord–@Model.LastRecord of @Model.TotalCount · 10 records per page</span>
+                @if (Model.TotalPages > 1)
+                {
+                    <nav aria-label="Score pages">
+                        @if (Model.PageNumber > 1)
+                        {
+                            <a asp-controller="RiskScores" asp-action="Index" asp-route-factorCode="@factorCode" asp-route-page="@(Model.PageNumber - 1)">Previous</a>
+                        }
+                        @if (Model.PageNumber > 3)
+                        {
+                            <a asp-controller="RiskScores" asp-action="Index" asp-route-factorCode="@factorCode" asp-route-page="1">1</a><span>…</span>
+                        }
+                        @for (var number = Math.Max(1, Model.PageNumber - 2); number <= Math.Min(Model.TotalPages, Model.PageNumber + 2); number++)
+                        {
+                            if (number == Model.PageNumber)
+                            {
+                                <span class="risk-current-page" aria-current="page">@number</span>
+                            }
+                            else
+                            {
+                                <a asp-controller="RiskScores" asp-action="Index" asp-route-factorCode="@factorCode" asp-route-page="@number">@number</a>
+                            }
+                        }
+                        @if (Model.PageNumber < Model.TotalPages - 2)
+                        {
+                            <span>…</span><a asp-controller="RiskScores" asp-action="Index" asp-route-factorCode="@factorCode" asp-route-page="@Model.TotalPages">@Model.TotalPages</a>
+                        }
+                        @if (Model.PageNumber < Model.TotalPages)
+                        {
+                            <a asp-controller="RiskScores" asp-action="Index" asp-route-factorCode="@factorCode" asp-route-page="@(Model.PageNumber + 1)">Next</a>
+                        }
+                    </nav>
+                }
+            </footer>
+        }
+    </section>
+}

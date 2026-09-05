@@ -17,7 +17,8 @@ namespace AmlScreening.Application.Services
         public bool Verify(string hashedPassword, string enteredPassword)
         {
             var result = _passwordHasher.VerifyHashedPassword(new object(), hashedPassword, enteredPassword);
-            return result == PasswordVerificationResult.Success;
+            return result is PasswordVerificationResult.Success
+                or PasswordVerificationResult.SuccessRehashNeeded;
         }
     }
 }

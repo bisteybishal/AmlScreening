@@ -6,7 +6,7 @@ public abstract class BaseEntity
 
     public bool IsActive { get; set; } = true;
 
-    public DateTime CreatedDate { get; set; } = DateTime.Now;
+    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 
     public string? CreatedBy { get; set; }
 

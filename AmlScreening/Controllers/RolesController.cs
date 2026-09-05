@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace AmlScreening.Portal.Controllers;
 
 [Authorize(Policy = AppPermissions.RolesManage)]
+[Authorize(Policy = AppPermissions.AmlRecordsViewAll)]
 public sealed class RolesController : Controller
 {
     private readonly IRoleRepository _roleRepository;

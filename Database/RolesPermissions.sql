@@ -75,7 +75,11 @@ FROM (VALUES
     ('Alerts.View',         'View compliance alerts'),
     ('Alerts.Manage',       'Assign and resolve compliance alerts'),
     ('Cases.View',          'View compliance cases'),
-    ('Cases.Manage',        'Investigate and manage compliance cases')
+    ('Cases.Manage',        'Investigate and manage compliance cases'),
+    ('AmlSource.View',      'View AML data sources'),
+    ('AmlSource.Sync',      'Synchronize AML data sources'),
+    ('RiskScoring.View',    'View risk scoring configuration'),
+    ('RiskScoring.Manage',  'Edit risk factor scores and risk bands')
 ) v (PermissionName, Description)
 WHERE NOT EXISTS
 (

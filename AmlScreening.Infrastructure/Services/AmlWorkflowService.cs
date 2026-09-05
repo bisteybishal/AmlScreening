@@ -1,5 +1,6 @@
 using AmlScreening.Application.Interface;
 using AmlScreening.Application.Models;
+using AmlScreening.Application.Security;
 using AmlScreening.Domain.Entities;
 using AmlScreening.Domain.Entities.Compliance;
 using AmlScreening.Infrastructure.Data;
@@ -10,16 +11,60 @@ namespace AmlScreening.Infrastructure.Services;
 
 public sealed class AmlWorkflowService : IAmlWorkflowService
 {
-    private const string ModelVersion = "risk-v1.0";
     private readonly AmlScreeningDbContext _db;
     private readonly ICurrentUserContext _currentUser;
+    private readonly IRiskScoringService _riskScoring;
 
     public AmlWorkflowService(
         AmlScreeningDbContext db,
-        ICurrentUserContext currentUser)
+        ICurrentUserContext currentUser,
+        IRiskScoringService riskScoring)
     {
         _db = db;
         _currentUser = currentUser;
+        _riskScoring = riskScoring;
+    }
+
+    public async Task<ComplianceDashboardSummary> GetDashboardSummaryAsync()
+    {
+        var summary = new ComplianceDashboardSummary();
+
+        if (_currentUser.HasPermission(AppPermissions.TransactionsView))
+        {
+            var transactionSummary = await _db.Transactions
+                .AsNoTracking()
+                .GroupBy(_ => 1)
+                .Select(group => new
+                {
+                    Total = group.Count(),
+                    Review = group.Count(transaction => transaction.Decision == "REVIEW"),
+                    Block = group.Count(transaction => transaction.Decision == "BLOCK")
+                })
+                .SingleOrDefaultAsync();
+
+            if (transactionSummary is not null)
+            {
+                summary.TransactionCount = transactionSummary.Total;
+                summary.ReviewCount = transactionSummary.Review;
+                summary.BlockCount = transactionSummary.Block;
+            }
+        }
+
+        if (_currentUser.HasPermission(AppPermissions.AlertsView))
+        {
+            summary.OpenAlertCount = await _db.ComplianceAlerts
+                .AsNoTracking()
+                .CountAsync(alert => alert.Status != "RESOLVED" && alert.Status != "CLOSED");
+        }
+
+        if (_currentUser.HasPermission(AppPermissions.CasesView))
+        {
+            summary.OpenCaseCount = await _db.ComplianceCases
+                .AsNoTracking()
+                .CountAsync(complianceCase => complianceCase.Status != "CLOSED");
+        }
+
+        return summary;
     }
 
     public async Task<IReadOnlyList<Customer>> GetCustomersAsync() =>
@@ -116,19 +161,27 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
             x.Id == id && x.ClientId == _currentUser.ClientId);
         if (transaction is null) return null;
 
+        var assessment = await _db.RiskAssessments.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.TransactionId == id);
+
         return new AmlTransactionDetails
         {
             Transaction = transaction,
             Customer = await _db.Customers.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == transaction.CustomerId),
-            RiskAssessment = await _db.RiskAssessments.AsNoTracking()
-                .FirstOrDefaultAsync(x => x.TransactionId == id),
+            RiskAssessment = assessment,
             Decision = await _db.AmlDecisions.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.TransactionId == id),
             Matches = await _db.ScreeningMatches.AsNoTracking()
                 .Where(x => x.TransactionId == id)
                 .OrderByDescending(x => x.MatchScore)
-                .ToListAsync()
+                .ToListAsync(),
+            Factors = assessment is null
+                ? Array.Empty<RiskAssessmentFactor>()
+                : await _db.RiskAssessmentFactors.AsNoTracking()
+                    .Where(x => x.RiskAssessmentId == assessment.Id)
+                    .OrderBy(x => x.Id)
+                    .ToListAsync()
         };
     }
 
@@ -179,12 +232,6 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
             if (matches.Count > 0)
                 _db.ScreeningMatches.AddRange(matches);
 
-            var customerRisk = CalculateCustomerRisk(customer);
-            customer.RiskScore = customerRisk;
-            customer.RiskLevel = RiskLevel(customerRisk);
-            customer.UpdatedBy = "AML Engine";
-            customer.UpdatedDate = DateTime.UtcNow;
-
             var screeningRisk = matches.Count == 0
                 ? 0
                 : (int)Math.Round(matches.Max(x => x.MatchScore));
@@ -195,34 +242,80 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
             if (screeningStatus != "CLEAR")
                 reasons.Add($"{screeningStatus.Replace('_', ' ')} found during AML screening.");
 
-            var transactionRisk = await CalculateTransactionRiskAsync(transaction, reasons);
-            var overallRisk = Math.Clamp((int)Math.Round(
-                customerRisk * 0.40m + transactionRisk.Score * 0.40m + screeningRisk * 0.20m), 0, 100);
-            var riskLevel = RiskLevel(overallRisk);
+            var transactionRuleRisk = await CalculateTransactionRiskAsync(transaction, reasons);
+            var scoring = await _riskScoring.CalculateAsync(new RiskScoringInput
+            {
+                IsPep = customer.IsPep,
+                Occupation = customer.Occupation,
+                SourceOfFunds = customer.SourceOfFunds,
+                Amount = transaction.Amount,
+                Currency = transaction.Currency,
+                ReceivingCountry = transaction.DestinationCountry,
+                PurposeCode = transaction.PurposeCode,
+                RegisteredReceiverCount = transaction.RegisteredReceiverCount,
+                RelationshipCode = transaction.RelationshipCode,
+                ScreeningRiskScore = screeningRisk,
+                AdditionalTransactionRiskScore = transactionRuleRisk.Score
+            });
+
+            foreach (var factor in scoring.Factors.Where(item => item.RawScore > 0))
+                reasons.Add(factor.Explanation);
+
+            customer.RiskScore = scoring.CustomerRiskScore;
+            customer.RiskLevel = RiskLevel(scoring.CustomerRiskScore);
+            customer.UpdatedBy = "AML Engine";
+            customer.UpdatedDate = DateTime.UtcNow;
 
             var decisionValue = Decide(
                 screeningStatus,
-                overallRisk,
-                transactionRisk.HighestAction);
+                scoring.RecommendedDecision,
+                transactionRuleRisk.HighestAction);
             if (reasons.Count == 0)
                 reasons.Add("No screening match or active compliance rule was triggered.");
+
+            var reasonText = JoinAndTruncate(reasons, 2000);
+            var factorText = JoinAndTruncate(
+                scoring.Factors.Select(item => item.Explanation), 2000);
 
             var assessment = new RiskAssessment
             {
                 ClientId = _currentUser.ClientId,
                 TransactionId = transaction.Id,
-                CustomerRiskScore = customerRisk,
-                TransactionRiskScore = transactionRisk.Score,
+                CustomerRiskScore = scoring.CustomerRiskScore,
+                TransactionRiskScore = scoring.TransactionRiskScore,
                 ScreeningRiskScore = screeningRisk,
-                OverallRiskScore = overallRisk,
-                RiskLevel = riskLevel,
-                ModelVersion = ModelVersion,
-                Factors = string.Join(" | ", reasons),
+                OverallRiskScore = scoring.OverallRiskScore,
+                RiskLevel = scoring.RiskLevel,
+                ModelVersion = scoring.ModelVersion,
+                Factors = factorText,
                 CreatedBy = "AML Engine",
                 CalculatedAt = DateTime.UtcNow
             };
             _db.RiskAssessments.Add(assessment);
             await _db.SaveChangesAsync();
+
+            var assessmentFactors = scoring.Factors.Select(factor =>
+                new RiskAssessmentFactor
+                {
+                    ClientId = _currentUser.ClientId,
+                    RiskAssessmentId = assessment.Id,
+                    FactorCode = factor.FactorCode,
+                    InputValue = factor.InputValue,
+                    RawScore = factor.RawScore,
+                    WeightPercent = factor.WeightPercent,
+                    WeightedScore = factor.WeightedScore,
+                    Explanation = factor.Explanation,
+                    RuleVersion = factor.RuleVersion,
+                    CreatedBy = "AML Engine"
+                }).ToList();
+            _db.RiskAssessmentFactors.AddRange(assessmentFactors);
+
+            var riskRuleVersions = scoring.Factors
+                .Select(item => $"{item.FactorCode}:v{item.RuleVersion}")
+                .Distinct();
+            var appliedVersions = transactionRuleRisk.RuleVersions == "none"
+                ? riskRuleVersions
+                : riskRuleVersions.Append(transactionRuleRisk.RuleVersions);
 
             var decision = new AmlDecision
             {
@@ -231,9 +324,9 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
                 RiskAssessmentId = assessment.Id,
                 CorrelationId = transaction.CorrelationId ?? Guid.NewGuid().ToString("N"),
                 Decision = decisionValue,
-                Reasons = string.Join(" | ", reasons),
-                RuleVersions = transactionRisk.RuleVersions,
-                ModelVersion = ModelVersion,
+                Reasons = reasonText,
+                RuleVersions = JoinAndTruncate(appliedVersions, 1000),
+                ModelVersion = scoring.ModelVersion,
                 ListVersions = matches.Count == 0
                     ? "manual-v1"
                     : string.Join(", ", matches.Select(x => x.ListVersion).Distinct()),
@@ -243,8 +336,8 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
 
             transaction.Decision = decisionValue;
             transaction.Status = decisionValue == "ALLOW" ? "CLEARED" : "HELD";
-            transaction.RiskScore = overallRisk;
-            transaction.RiskLevel = riskLevel;
+            transaction.RiskScore = scoring.OverallRiskScore;
+            transaction.RiskLevel = scoring.RiskLevel;
             transaction.ScreeningStatus = screeningStatus;
             transaction.DecisionReasons = decision.Reasons;
             transaction.EvaluatedDate = DateTime.UtcNow;
@@ -261,7 +354,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
                     AlertReference = Reference("ALT"),
                     TransactionId = transaction.Id,
                     RiskAssessmentId = assessment.Id,
-                    Severity = decisionValue == "BLOCK" ? "CRITICAL" : riskLevel,
+                    Severity = decisionValue == "BLOCK" ? "CRITICAL" : scoring.RiskLevel,
                     Reason = decision.Reasons,
                     Status = "NEW",
                     CreatedBy = "AML Engine"
@@ -282,7 +375,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
             }
 
             AddAudit("Evaluate", "AmlDecision", transaction.Id,
-                $"{transaction.TransactionReference}: {decisionValue}; score {overallRisk}; correlation {decision.CorrelationId}.");
+                $"{transaction.TransactionReference}: {decisionValue}; score {scoring.OverallRiskScore}; correlation {decision.CorrelationId}.");
             await _db.SaveChangesAsync();
             await databaseTransaction.CommitAsync();
 
@@ -292,6 +385,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
                 RiskAssessment = assessment,
                 Decision = decision,
                 Matches = matches,
+                Factors = assessmentFactors,
                 Alert = alert,
                 Case = complianceCase
             };
@@ -378,7 +472,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
         Customer customer)
     {
         var records = await _db.AmlRecords.AsNoTracking()
-            .Where(x => x.ClientId == _currentUser.ClientId && x.IsActive)
+            .Where(x => x.ClientId == _currentUser.ClientId && x.IsActive &&x.IsShared)
             .ToListAsync();
         var subjects = new[] { transaction.SenderName, transaction.ReceiverName };
         var matches = new List<ScreeningMatch>();
@@ -462,17 +556,6 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
             reasons.Add($"Rule {rule.RuleCode} triggered: {rule.RuleName}.");
         }
 
-        if (transaction.Amount >= 1_000_000m)
-        {
-            score = Math.Max(score, 60);
-            reasons.Add("Large transaction amount increased transaction risk.");
-        }
-        else if (transaction.Amount >= 500_000m)
-        {
-            score = Math.Max(score, 35);
-            reasons.Add("Elevated transaction amount increased transaction risk.");
-        }
-
         return new TransactionRiskResult(score, highestAction,
             versions.Count == 0 ? "none" : string.Join(", ", versions));
     }
@@ -486,6 +569,10 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
         var matches = await _db.ScreeningMatches.AsNoTracking()
             .Where(x => x.TransactionId == transaction.Id)
             .ToListAsync();
+        var factors = await _db.RiskAssessmentFactors.AsNoTracking()
+            .Where(x => x.RiskAssessmentId == assessment.Id)
+            .OrderBy(x => x.Id)
+            .ToListAsync();
         var alert = await _db.ComplianceAlerts.AsNoTracking()
             .FirstOrDefaultAsync(x => x.TransactionId == transaction.Id);
         var complianceCase = alert is null ? null : await _db.ComplianceCases.AsNoTracking()
@@ -496,6 +583,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
             RiskAssessment = assessment,
             Decision = decision,
             Matches = matches,
+            Factors = factors,
             Alert = alert,
             Case = complianceCase
         };
@@ -510,17 +598,27 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
         return Math.Clamp(score, 0, 100);
     }
 
-    private static string Decide(string screeningStatus, int score, string ruleAction)
+    private static string Decide(
+        string screeningStatus,
+        string riskBandDecision,
+        string ruleAction)
     {
         if (screeningStatus == "CONFIRMED_MATCH" ||
             ruleAction.Equals("Block", StringComparison.OrdinalIgnoreCase))
             return "BLOCK";
-        if (screeningStatus == "POTENTIAL_MATCH" || score >= 60 ||
-            ruleAction.Equals("Review", StringComparison.OrdinalIgnoreCase) ||
-            ruleAction.Equals("Hold", StringComparison.OrdinalIgnoreCase) ||
-            ruleAction.Equals("Alert", StringComparison.OrdinalIgnoreCase))
-            return "REVIEW";
-        return "ALLOW";
+
+        var normalizedRuleDecision = ruleAction.ToUpperInvariant() switch
+        {
+            "BLOCK" => "BLOCK",
+            "REVIEW" or "HOLD" or "ALERT" => "REVIEW",
+            _ => "ALLOW"
+        };
+        var finalDecision = HigherAction(
+            riskBandDecision.ToUpperInvariant(),
+            normalizedRuleDecision).ToUpperInvariant();
+        return screeningStatus == "POTENTIAL_MATCH"
+            ? HigherAction(finalDecision, "REVIEW").ToUpperInvariant()
+            : finalDecision;
     }
 
     private static string HigherAction(string current, string candidate)
@@ -607,6 +705,12 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
 
     private static string Reference(string prefix) =>
         $"{prefix}-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..Math.Min(40, prefix.Length + 29)];
+
+    private static string JoinAndTruncate(IEnumerable<string> values, int maximumLength)
+    {
+        var text = string.Join(" | ", values.Where(value => !string.IsNullOrWhiteSpace(value)));
+        return text.Length <= maximumLength ? text : text[..maximumLength];
+    }
 
     private sealed record TransactionRiskResult(int Score, string HighestAction, string RuleVersions);
 }

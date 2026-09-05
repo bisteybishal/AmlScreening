@@ -5,6 +5,8 @@ namespace AmlScreening.Application.Interface;
 
 public interface IAmlWorkflowService
 {
+    Task<ComplianceDashboardSummary> GetDashboardSummaryAsync();
+
     Task<IReadOnlyList<Customer>> GetCustomersAsync();
     Task<Customer?> GetCustomerAsync(int id);
     Task<int> CreateCustomerAsync(Customer customer);

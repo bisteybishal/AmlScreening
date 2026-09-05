@@ -1,16 +1,20 @@
 # AML Portal Workflow Prototype
 
-This portal implementation covers the synchronous prototype flow:
+The shared application service covers this synchronous prototype flow. The
+portal configures and reviews it; the separately hosted API will submit
+customers and transactions:
 
-1. Create a customer/KYC profile.
-2. Create an AML transaction.
+1. Receive a customer/KYC profile from the future partner API.
+2. Receive an AML transaction from the future partner API.
 3. Normalize sender and receiver names.
 4. Compare both parties with active AML records for the current client.
-5. Calculate customer, transaction, screening and overall risk scores.
+5. Apply the versioned factor scores from `RiskFactorRules` and the weights in
+   `RiskModels` to calculate customer, transaction, screening and overall risk.
 6. Evaluate active AmountThreshold and Velocity compliance rules.
 7. Persist ALLOW, REVIEW or BLOCK with reasons and version information.
 8. Automatically create an alert and case for REVIEW or BLOCK.
-9. Let investigators update alerts and disposition cases in the portal.
+9. Let portal investigators review factor evidence, update alerts and
+   disposition cases.
 10. Write audit events for every mutation and evaluation.
 
 ## Database setup
@@ -22,6 +26,7 @@ Back up the AMLScreening database, then run the scripts in this order:
 3. `RolesPermissions.sql`
 4. `MenuItems.sql`
 5. `PortalAmlWorkflow.sql`
+6. `RiskScoring.sql`
 
 `PortalAmlWorkflow.sql` is non-destructive. It adds missing columns and creates
 the customer, transaction, screening, risk, decision, alert and case tables.
@@ -29,15 +34,15 @@ the customer, transaction, screening, risk, decision, alert and case tables.
 After applying it, sign out and sign in again so the authentication cookie
 contains the newly assigned Admin permissions.
 
-## Practical portal test
+## Practical end-to-end test
 
 1. Add an AML record named `Example PEP Person`.
-2. Add a customer named `Example PEP Person` and select PEP.
-3. Add an active AmountThreshold rule with threshold `500000`, score `40`, and action `Review`.
-4. Create a transaction for that customer with amount `700000 NPR`.
-5. Keep `Evaluate immediately` selected.
-6. Open the transaction details and verify the four scores, matched record,
-   decision reasons, rule version and correlation ID.
+2. Open Risk Scoring and verify the model, factor rules and risk bands.
+3. Submit a customer named `Example PEP Person` through the API/test harness and select PEP.
+4. Add an active AmountThreshold rule with threshold `500000`, score `40`, and action `Review`.
+5. Submit and evaluate a transaction for that customer with amount `700000 NPR`.
+6. Open the transaction details in the portal and verify the four scores,
+   factor evidence, matched record, decision reasons, rule versions and correlation ID.
 7. Open Alerts and update the generated alert.
 8. Open Cases, review the transaction evidence, add a disposition and close the case.
 
