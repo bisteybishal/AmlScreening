@@ -11,8 +11,11 @@ public sealed class RiskScoringPageViewModel
         ActiveModel = result.ActiveModel, Factors = result.Factors, SelectedFactor = result.SelectedFactor,
         Rules = result.Rules, Bands = result.Bands, PageNumber = result.PageNumber,
         PageSize = result.PageSize, TotalCount = result.TotalCount,
-        HasRuleDraft = result.HasRuleDraft, HasBandDraft = result.HasBandDraft
+        HasRuleDraft = result.HasRuleDraft, HasBandDraft = result.HasBandDraft,
+        CanEditRules = result.CanEditRules, CanEditBands = result.CanEditBands
     };
+    public bool CanEditRules { get; init; }
+    public bool CanEditBands { get; init; }
     public bool HasRuleDraft { get; init; }
     public bool HasBandDraft { get; init; }
     public RiskModel? ActiveModel { get; init; }

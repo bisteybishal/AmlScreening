@@ -24,7 +24,7 @@ namespace AmlScreening.Infrastructure.Repositories
             {
                 connection.Open();
             }
-            var transaction = connection.BeginTransaction();
+            using var transaction = connection.BeginTransaction();
             try
             {
                 foreach (var record in records)

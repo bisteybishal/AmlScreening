@@ -22,8 +22,13 @@ public sealed class SubscriptionRepository : ISubscriptionRepository
 
     public async Task<PagedResult<SubscriptionPlan>> GetPageAsync(
         int pageNumber,
-        int pageSize)
+        int pageSize,
+        CancellationToken cancellationToken=default)
     {
+        pageNumber=Math.Max(1, pageNumber);
+        pageSize= Math.Clamp(pageSize, 1, 50);
+        var offset = ((long)pageNumber - 1) * pageSize;
+
         const string sql = """
             SELECT COUNT(1)
             FROM dbo.AML_Subscription_plan
@@ -31,26 +36,28 @@ public sealed class SubscriptionRepository : ISubscriptionRepository
 
             SELECT PlanId, SourceCode, SourceName, DurationMonths, Rate, IsActive,
                    DeleteFg, DeleteDate, DeleteBy, CreatedDate, CreatedBy,
-                   UpdatedDate, UpdatedBy, RowVersion
+                   UpdatedDate, UpdatedBy, SubscriptionKey,ExpireDate,RowVersion
             FROM dbo.AML_Subscription_plan
             WHERE DeleteFg = 'N'
             ORDER BY CreatedDate DESC, PlanId DESC
             OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
             """;
 
-        pageNumber = Math.Max(1, pageNumber);
-        pageSize = Math.Clamp(pageSize, 1, 50);
         using var connection = _connectionFactory.CreateConnection();
-        using var result = await connection.QueryMultipleAsync(sql, new
-        {
-            Offset = (pageNumber - 1) * pageSize,
-            PageSize = pageSize
-        });
+       var command=new CommandDefinition(sql, new
+       {
+           offset= offset,
+           pageSize = pageSize
+
+       },cancellationToken:cancellationToken);
+        using var result = await connection.QueryMultipleAsync(command);
+        var totalCount = await result.ReadSingleAsync<int>();
+        var items = (await result.ReadAsync<SubscriptionPlan>()).AsList();
 
         return new PagedResult<SubscriptionPlan>
         {
-            TotalCount = await result.ReadSingleAsync<int>(),
-            Items = (await result.ReadAsync<SubscriptionPlan>()).AsList(),
+            TotalCount = totalCount,
+            Items = items,
             PageNumber = pageNumber,
             PageSize = pageSize
         };
@@ -69,32 +76,36 @@ public sealed class SubscriptionRepository : ISubscriptionRepository
         return await connection.QuerySingleOrDefaultAsync<SubscriptionPlan>(sql, new { Id = id });
     }
 
-    public async Task<int> CreateSubscriptionAsync(SubscriptionPlan plan)
+    public async Task<int> CreateSubscriptionAsync(SubscriptionPlan plan,CancellationToken cancellationToken=default)
     {
         const string sql = """
             INSERT INTO dbo.AML_Subscription_plan
                 (SourceCode, SourceName, DurationMonths, Rate, IsActive,
-                 DeleteFg, CreatedDate, CreatedBy)
+                 DeleteFg, CreatedDate, CreatedBy,SubscriptionKey,ExpireDate)
             OUTPUT INSERTED.PlanId
             VALUES
                 (@SourceCode, @SourceName, @DurationMonths, @Rate, @IsActive,
-                 'N', SYSUTCDATETIME(), @CreatedBy);
+                 'N', SYSUTCDATETIME(), @CreatedBy,@SubscriptionKey,@ExpireDate);
             """;
 
-        using var connection = _connectionFactory.CreateConnection();
-        connection.Open();
-        using var transaction = connection.BeginTransaction();
+         await using var connection = _connectionFactory.CreateConnection();
+       await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         try
         {
-            var planId = await connection.ExecuteScalarAsync<int>(sql, new
+            var command= new CommandDefinition(sql, new
             {
                 plan.SourceCode,
                 plan.SourceName,
                 plan.DurationMonths,
                 plan.Rate,
                 plan.IsActive,
-                CreatedBy = _currentUser.Username
-            }, transaction);
+                CreatedBy = _currentUser.Username,
+                plan.SubscriptionKey,
+                plan.ExpireDate
+            }, transaction, cancellationToken: cancellationToken);
+            var planId = await connection.ExecuteScalarAsync<int>(command);
+
             await InsertAuditAsync(connection, transaction, "Create", planId,
                 $"Created subscription plan {plan.SourceCode}.");
             transaction.Commit();
@@ -102,12 +113,12 @@ public sealed class SubscriptionRepository : ISubscriptionRepository
         }
         catch
         {
-            transaction.Rollback();
+            await transaction.RollbackAsync(CancellationToken.None);
             throw;
         }
     }
 
-    public async Task<bool> UpdateAsync(SubscriptionPlan plan)
+    public async Task<bool> UpdateAsync(SubscriptionPlan plan)  
     {
         const string sql = """
             UPDATE dbo.AML_Subscription_plan

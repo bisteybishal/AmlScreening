@@ -40,36 +40,169 @@
 else
 {
     <section class="subscription-grid">
-        @foreach (var plan in Model.Plans)
-        {
-            <article class="subscription-card">
-                <header class="subscription-card-header">
-                    <div><h2>@plan.SourceName</h2><span class="source-code">@plan.SourceCode</span></div>
-                    <span class="subscription-status @(plan.IsActive ? "active" : "inactive")">@(plan.IsActive ? "Active" : "Inactive")</span>
-                </header>
-                <div class="subscription-details">
-                    <div class="subscription-detail"><i class="bi bi-calendar3"></i><div><small>Duration</small><strong>@plan.DurationMonths month@(plan.DurationMonths == 1 ? "" : "s")</strong></div></div>
-                    <div class="subscription-detail"><i class="bi bi-cash-stack"></i><div><small>Subscription Rate</small><strong>@plan.Rate.ToString("N2")</strong></div></div>
+
+    @foreach (var plan in Model.Plans)
+    {
+        <article class="subscription-card">
+
+            <header class="subscription-card-header">
+
+                <div class="subscription-title">
+                    <h2 title="@plan.SourceName">
+                        @plan.SourceName
+                    </h2>
+
+                    <span class="source-code">
+                        @plan.SourceCode
+                    </span>
                 </div>
-                <div class="subscription-id">Plan ID: @plan.PlanId</div>
+
+                <span class="subscription-status @(plan.IsActive ? "active" : "inactive")">
+                    @(plan.IsActive ? "Active" : "Inactive")
+                </span>
+
+            </header>
+
+
+            <div class="subscription-details">
+
+                <!-- Duration -->
+                <div class="subscription-detail">
+                    <i class="bi bi-calendar3"></i>
+
+                    <div>
+                        <small>Duration</small>
+
+                        <strong>
+                            @plan.DurationMonths
+                            month@(plan.DurationMonths == 1 ? "" : "s")
+                        </strong>
+                    </div>
+                </div>
+
+
+                <!-- Rate -->
+                <div class="subscription-detail">
+                    <i class="bi bi-cash-stack"></i>
+
+                    <div>
+                        <small>Subscription Rate</small>
+
+                        <strong>
+                            @plan.Rate.ToString("N2")
+                        </strong>
+                    </div>
+                </div>
+
+
+                <!-- Expire Date -->
+                <div class="subscription-detail">
+                    <i class="bi bi-calendar-check"></i>
+
+                    <div>
+                        <small>Start Date</small>
+
+                        <strong>
+                            @(plan.CreatedDate?.ToString("dd MMM yyyy hh:mm tt") ??"-")
+                        </strong>
+                    </div>
+
+                </div>
+                  <div class="subscription-detail">
+                    <i class="bi bi-calendar-check"></i>
+
+                    <div>
+                        <small>Expire Date</small>
+
+                        <strong>
+                            @(plan.ExpireDate?.ToString("dd MMM yyyy hh:mm tt") ?? "-")
+                        </strong>
+                    </div>
+
+                </div>
+
+
+                <!-- Subscription Key -->
+                <div class="subscription-detail subscription-key-detail">
+
+                    <i class="bi bi-key"></i>
+
+                    <div>
+                        <small>Subscription Key</small>
+
+                        <strong
+                            class="subscription-key-value"
+                            title="@plan.SubscriptionKey">
+                            @plan.SubscriptionKey
+                        </strong>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="subscription-card-footer">
+
+                <div class="subscription-id">
+                    Plan ID: @plan.PlanId
+                </div>
+
+
                 <div class="record-actions">
-                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.SubscriptionEdit))
+
+                    @if (User.HasClaim(
+                        AppPermissions.ClaimType,
+                        AppPermissions.SubscriptionEdit))
                     {
-                        <a class="action-button edit" asp-action="Edit" asp-route-id="@plan.PlanId"><i class="bi bi-pencil-square"></i><span>Edit</span></a>
+                        <a class="action-button edit"
+                           asp-action="Edit"
+                           asp-route-id="@plan.PlanId">
+
+                            <i class="bi bi-pencil-square"></i>
+                            <span>Edit</span>
+
+                        </a>
                     }
-                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.SubscriptionDelete))
+
+
+                    @if (User.HasClaim(
+                        AppPermissions.ClaimType,
+                        AppPermissions.SubscriptionDelete))
                     {
-                        <form asp-action="Delete" method="post" onsubmit="return confirm('Soft delete plan @plan.PlanId?');">
+                        <form asp-action="Delete"
+                              method="post"
+                              onsubmit="return confirm('Soft delete plan @plan.PlanId?');">
+
                             @Html.AntiForgeryToken()
-                            <input name="id" type="hidden" value="@plan.PlanId" />
-                            <input name="rowVersion" type="hidden" value="@Convert.ToBase64String(plan.RowVersion)" />
-                            <button type="submit" class="action-button delete"><i class="bi bi-trash3"></i><span>Delete</span></button>
+
+                            <input name="id"
+                                   type="hidden"
+                                   value="@plan.PlanId" />
+
+                            <input name="rowVersion"
+                                   type="hidden"
+                                   value="@Convert.ToBase64String(plan.RowVersion)" />
+
+                            <button type="submit"
+                                    class="action-button delete">
+
+                                <i class="bi bi-trash3"></i>
+                                <span>Delete</span>
+
+                            </button>
+
                         </form>
                     }
+
                 </div>
-            </article>
-        }
-    </section>
+
+            </div>
+
+        </article>
+    }
+
+</section>
 
     <nav class="records-pagination" aria-label="Subscription pagination">
         <span>Page @Model.Page of @Model.TotalPages</span>

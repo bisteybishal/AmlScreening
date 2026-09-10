@@ -1,7 +1,7 @@
 @model AmlScreening.Portal.ViewModels.RiskScoringPageViewModel
 @{
     ViewData["Title"] = "Risk Score Setup";
-    var canManage = User.HasClaim(AppPermissions.ClaimType, AppPermissions.RiskScoringManage);
+    var canManage = Model.CanEditBands;
     var nepal = TimeZoneInfo.FindSystemTimeZoneById("Nepal Standard Time");
     string LocalTime(DateTime? value) => value.HasValue
         ? TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc), nepal).ToString("dd MMM yyyy HH:mm")
@@ -16,9 +16,9 @@
     <div><h1>Risk Score Setup</h1>
         @* <p>Final risk ranges use the document's 0–100 scale.</p> *@
         </div>
-    @if (canManage && Model.Bands.Count > 0)
+    @if (canManage)
     {
-        <a class="workflow-primary" asp-controller="RiskScoreSetup" asp-action="Edit">Edit ranges</a>
+        <a class="workflow-primary" asp-controller="RiskScoreSetup" asp-action="Edit">@(Model.Bands.Count == 0 ? "Create ranges" : "Edit ranges")</a>
     }
 </section>
 @if (Model.ActiveModel == null)
@@ -32,35 +32,29 @@ else if (Model.ActiveModel.ApprovalStatus != "APPROVED")
 @if (Model.HasBandDraft)
 {
     <div class="risk-review-notice">
-        You have pending range changes. Current scoring stays unchanged until they are applied.
-        @if (canManage)
-        {
-            <form asp-controller="RiskScoreSetup" asp-action="Apply" method="post" class="risk-inline-form"
-                  onsubmit="return confirm('Apply all reviewed risk ranges?');">
-                @Html.AntiForgeryToken()
-                <button class="workflow-primary" type="submit">Apply reviewed changes</button>
-            </form>
-        }
+        <strong>Pending approval.</strong> Active ranges remain unchanged until another administrator approves.
+        <a class="risk-edit-link" asp-action="Review">Review changes</a>
     </div>
 }
 <section class="workflow-panel">
     <div class="table-responsive">
         <table class="workflow-table risk-simple-table">
             <thead>
-                <tr><th rowspan="2">S.N.</th><th rowspan="2">Risk type</th><th colspan="3">Range</th><th rowspan="2">Created by</th><th rowspan="2">Created date (Nepal)</th><th rowspan="2">Updated by</th><th rowspan="2">Updated date (Nepal)</th></tr>
+                <tr><th rowspan="2">S.N.</th><th rowspan="2">Risk type</th><th colspan="3">Range</th><th rowspan="2">Status</th><th rowspan="2">Created by</th><th rowspan="2">Created date (Nepal)</th><th rowspan="2">Updated by</th><th rowspan="2">Updated date (Nepal)</th></tr>
                 <tr><th>From</th><th>To</th><th>Remarks</th></tr>
             </thead>
             <tbody>
             @if (Model.Bands.Count == 0)
             {
-                <tr><td colspan="9" class="workflow-empty">No risk ranges configured. Ask your administrator to complete database setup.</td></tr>
+                <tr><td colspan="10" class="workflow-empty">No risk ranges configured. An administrator with Manage permission can create the initial set.</td></tr>
             }
             @for (var i = 0; i < Model.Bands.Count; i++)
             {
                 var band = Model.Bands[i];
                 <tr>
                     <td>@(i + 1)</td><td>@band.RiskLevel</td><td>@band.MinimumScore</td><td>@(band.MaximumScore ?? 100)</td>
-                    <td>@(band.Remarks ?? "—")</td><td>@(band.CreatedBy ?? "—")</td><td>@LocalTime(band.CreatedDate)</td>
+                    <td>@(band.Remarks ?? "—")</td>
+                    <td><span class="risk-status @(band.ApprovalStatus == "APPROVED" ? "approved" : "pending")">@(band.ApprovalStatus == "APPROVED" ? "Approved" : "Pending")</span></td><td>@(band.CreatedBy ?? "—")</td><td>@LocalTime(band.CreatedDate)</td>
                     <td>@(band.UpdatedBy ?? "—")</td><td>@LocalTime(band.UpdatedDate)</td>
                 </tr>
             }

@@ -78,7 +78,7 @@ public sealed class UserRepository : IUserRepository
         {
             ClientId = _currentUser.ClientId,
             CanViewAll = CanViewAllClients(),
-            Offset = (pageNumber - 1) * pageSize,
+            Offset = ((long)pageNumber - 1) * pageSize,
             PageSize = pageSize
         });
         var summary = await result.ReadSingleAsync<UserSummaryRow>();
@@ -156,6 +156,7 @@ public sealed class UserRepository : IUserRepository
                     (
                         SELECT 1
                         FROM dbo.UserRoles userRole
+                        INNER JOIN dbo.Roles activeRole ON activeRole.RoleId = userRole.RoleId AND activeRole.IsActive = 1
                         INNER JOIN dbo.RolePermissions rolePermission
                             ON rolePermission.RoleId = userRole.RoleId
                         WHERE userRole.UserId = @UserId
@@ -188,6 +189,7 @@ public sealed class UserRepository : IUserRepository
                    (
                        SELECT 1
                        FROM dbo.UserRoles userRole
+                       INNER JOIN dbo.Roles activeRole ON activeRole.RoleId = userRole.RoleId AND activeRole.IsActive = 1
                        INNER JOIN dbo.RolePermissions rolePermission
                            ON rolePermission.RoleId = userRole.RoleId
                        WHERE userRole.UserId = @UserId
@@ -200,6 +202,7 @@ public sealed class UserRepository : IUserRepository
                        (
                            SELECT 1
                            FROM dbo.UserRoles userRole
+                           INNER JOIN dbo.Roles activeRole ON activeRole.RoleId = userRole.RoleId AND activeRole.IsActive = 1
                            INNER JOIN dbo.RolePermissions rolePermission
                                ON rolePermission.RoleId = userRole.RoleId
                            WHERE userRole.UserId = @UserId
@@ -270,6 +273,7 @@ public sealed class UserRepository : IUserRepository
                 (
                     SELECT DISTINCT rp.PermissionId
                     FROM dbo.UserRoles ur
+                    INNER JOIN dbo.Roles activeRole ON activeRole.RoleId = ur.RoleId AND activeRole.IsActive = 1
                     INNER JOIN dbo.RolePermissions rp ON rp.RoleId = ur.RoleId
                     WHERE ur.UserId = @UserId
                 ) rolePermission ON rolePermission.PermissionId = p.PermissionId

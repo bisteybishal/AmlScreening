@@ -4,6 +4,7 @@ using AmlScreening.Application.Interface;
 using AmlScreening.Application.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using AmlScreening.Application.Interface.Repositories;
 
 namespace AmlScreening.Portal.Controllers
 {
@@ -14,15 +15,17 @@ namespace AmlScreening.Portal.Controllers
         private readonly IAmlSourceSyncService _amlSyncService;
         private readonly IAuditService _auditService;
         private readonly ILogger<AmlSourceController> _logger;
+        private readonly IErrorRepository _errorRepository;
 
         public AmlSourceController(
             IAmlSourceSyncService amlSyncService,
             IAuditService auditService,
-            ILogger<AmlSourceController> logger)
+            ILogger<AmlSourceController> logger, IErrorRepository errorRepository)
         {
             _amlSyncService = amlSyncService;
             _auditService = auditService;
             _logger = logger;
+            _errorRepository = errorRepository;
         }
 
         [HttpGet]
@@ -58,11 +61,20 @@ namespace AmlScreening.Portal.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex,
-                    "AML source synchronization failed for {SourceCode}.",
-                    normalizedSourceCode);
+                var errorLog = new ErrorLogModel
+                {
+                    ErrorDescription = ex.Message,
+                    PartnerCode = normalizedSourceCode,
+                    ErrorNumber = ex.HResult.ToString(),
+                    Script = "AmlSourceController.Sync",
+                    ErrorScript = ex.StackTrace ?? string.Empty,
+                    QueryString = Request.QueryString.ToString(),
+                    IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                };
+               await _errorRepository.LogErrorAsync(errorLog);
+                
                 TempData["ErrorMessage"] =
-                    $"{normalizedSourceCode} synchronization failed. Review the server log and try again.";
+                    $"{normalizedSourceCode} {ex.Message}";
             }
 
             return RedirectToAction(nameof(Index));

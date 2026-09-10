@@ -1,0 +1,135 @@
+﻿@model AmlScreening.Portal.ViewModels.ScreeningSearchResultsViewModel
+
+@if (string.IsNullOrWhiteSpace(Model.SearchName))
+{
+    return;
+}
+
+@if (Model.Results.Count == 0)
+{
+    <div class="screening-empty">
+        <h3>No matching names found</h3>
+
+        <p>
+            No active records containing “@Model.SearchName”
+            were found within your permitted records.
+            This is not a clearance decision.
+        </p>
+    </div>
+}
+else
+{
+    @* <div class="live-results-heading">
+        @if (Model.HasResults)
+        {
+            <p>
+                Showing the first 50 matches.
+                Type more characters to narrow the results.
+            </p>
+        }
+        else
+        {
+            <p>
+                @Model.Results.Count matching records
+                for “@Model.SearchName”
+            </p>
+        }
+    </div> *@
+
+    <div class="screening-card-list">
+        @foreach (var record in Model.Results)
+        {
+            var category = record.SourceName switch
+            {
+                "UN Sanctions" or "EU Sanctions" => "Sanctions",
+                "PEP" or "PEP Local" or "PEP International" => "PEP",
+                _ => "AML"
+            };
+
+            <details class="screening-card">
+                <summary>
+                    <span class="screening-record-icon">
+                        <i class="bi bi-person"
+                           aria-hidden="true"></i>
+                    </span>
+
+                    <span class="screening-record-heading">
+                        <span class="screening-record-title">
+                            <strong>@record.FullName</strong>
+
+                            <span class="screening-category">
+                                @category
+                            </span>
+
+                            <small>@record.RecordType</small>
+                        </span>
+
+                        <span class="screening-record-source">
+                            @record.SourceName
+                        </span>
+                    </span>
+
+                    <i class="bi bi-chevron-down screening-chevron"
+                       aria-hidden="true"></i>
+                </summary>
+
+                <dl class="screening-detail-list">
+                    <div>
+                        <dt>Description</dt>
+                        <dd>
+                            @(string.IsNullOrWhiteSpace(record.Remarks)
+                                ? "Not available"
+                                : record.Remarks)
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>Full name</dt>
+                        <dd>@record.FullName</dd>
+                    </div>
+
+                    <div>
+                        <dt>Record type</dt>
+                        <dd>@record.RecordType</dd>
+                    </div>
+
+                    <div>
+                        <dt>Date of birth</dt>
+                        <dd>
+                            @(record.DateOfBirth?.ToString("dd MMM yyyy")
+                                ?? "Not available")
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>Nationality</dt>
+                        <dd>
+                            @(string.IsNullOrWhiteSpace(record.Nationality)
+                                ? "Not available"
+                                : record.Nationality)
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>Country</dt>
+                        <dd>
+                            @(string.IsNullOrWhiteSpace(record.Country)
+                                ? "Not available"
+                                : record.Country)
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>Source</dt>
+                        <dd>@record.SourceName</dd>
+                    </div>
+
+                    <div>
+                        <dt>Reference number</dt>
+                        <dd>@record.ReferenceNo</dd>
+                    </div>
+                </dl>
+            </details>
+        }
+    </div>
+}

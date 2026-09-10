@@ -5,15 +5,19 @@
     <link rel="stylesheet" href="~/css/risk-scoring.css" asp-append-version="true" />
 }
 <section class="workflow-heading">
-    <div><h1>Edit risk ranges</h1><p>Adjust the ranges together. Cover 0–100 without gaps or overlaps.</p></div>
+    <div><h1>Edit risk ranges</h1><p>Cover 0–100 without gaps or overlaps. Changes remain Pending until another administrator approves.</p></div>
 </section>
 <section class="workflow-panel">
+    @if (Model.Bands.All(x => x.Id == 0))
+    {
+        <p class="risk-review-notice">Initial proposed ranges are shown for review, not active settings. Confirm the boundaries and decisions before saving.</p>
+    }
     <form asp-controller="RiskScoreSetup" asp-action="Edit" method="post">
         @Html.AntiForgeryToken()
         <div asp-validation-summary="All" class="workflow-message error"></div>
         <div class="table-responsive">
             <table class="workflow-table risk-simple-table risk-range-form">
-                <thead><tr><th>Risk type</th><th>From</th><th>To</th><th>Remarks</th></tr></thead>
+                <thead><tr><th>Risk type</th><th>From</th><th>To</th><th>Decision</th><th>Remarks</th></tr></thead>
                 <tbody>
                 @for (var i = 0; i < Model.Bands.Count; i++)
                 {
@@ -27,6 +31,7 @@
                         </td>
                         <td><input asp-for="Bands[i].MinimumScore" type="number" min="0" max="100" aria-label="Minimum score" /></td>
                         <td><input asp-for="Bands[i].MaximumScore" type="number" min="0" max="100" placeholder="100" aria-label="Maximum score" /></td>
+                        <td>@Model.Bands[i].Decision</td>
                         <td><input asp-for="Bands[i].Remarks" maxlength="1000" aria-label="Remarks" /></td>
                     </tr>
                 }
@@ -35,7 +40,7 @@
         </div>
         <div class="workflow-form-actions">
             <a asp-controller="RiskScoreSetup" asp-action="Index">Cancel</a>
-            <button class="workflow-primary" type="submit">Save ranges</button>
+            <button class="workflow-primary" type="submit">Save pending ranges</button>
         </div>
     </form>
 </section>

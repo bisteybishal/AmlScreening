@@ -20,6 +20,9 @@ public sealed class RiskFactor : BaseEntity, IClientOwnedEntity
 
 public sealed class RiskFactorRule : BaseEntity, IClientOwnedEntity
 {
+    // Edits/deletions reference only the approved score being changed.
+    public int? ReplacesRuleId { get; set; }
+
     public int ClientId { get; set; }
 
     public int RiskFactorId { get; set; }
@@ -48,10 +51,15 @@ public sealed class RiskFactorRule : BaseEntity, IClientOwnedEntity
         DateTime.UtcNow;
 
     public DateTime? EffectiveTo { get; set; }
+    public long? MakerUserId { get; set; }
+
+    public long? ApprovedByUserId { get; set; }
 }
 
 public sealed class RiskBand : BaseEntity, IClientOwnedEntity
 {
+    public long? MakerUserId { get; set; }
+    public long? ApprovedByUserId { get; set; }
     public int ClientId { get; set; }
 
     public string RiskLevel { get; set; } = string.Empty;

@@ -41,6 +41,8 @@ public static class AppPermissions
     public const string AmlSourceSync = "AmlSource.Sync";
     public const string RiskScoringView = "RiskScoring.View";
     public const string RiskScoringManage = "RiskScoring.Manage";
+    public const string RiskScoringApprove = "RiskScoring.Approve";
+    public const string Screening = "Screening.View";
 
     public static readonly string[] All =
     {
@@ -71,7 +73,9 @@ public static class AppPermissions
         AmlSourceView,
         AmlSourceSync,
         RiskScoringView,
-        RiskScoringManage
+        RiskScoringManage,
+        RiskScoringApprove,
+        Screening
     };
 
     public static readonly string[] PlatformOnly =

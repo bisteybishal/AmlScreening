@@ -1,7 +1,9 @@
 @model AmlScreening.Portal.ViewModels.RiskScoringPageViewModel
+@using System.Security.Claims
 @{
     ViewData["Title"] = "Risk Scores";
-    var canManage = User.HasClaim(AppPermissions.ClaimType, AppPermissions.RiskScoringManage);
+    var canManage = Model.CanEditRules;
+    long.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var currentUserId);
     var factorCode = Model.SelectedFactor?.FactorCode;
     var isRange = Model.SelectedFactor?.ValueType is "NUMBER" or "NUMERIC";
 }
@@ -17,7 +19,7 @@
         <a class="workflow-primary" asp-controller="RiskScores" asp-action="Add" asp-route-factorCode="@factorCode">+ Add score</a>
     }
 </section>
-@if (Model.Factors.Count == 0)
+@if (Model.Factors.Count == 0 && ViewBag.ErrorMessage == null)
 {
     <div class="workflow-panel">
         <h2>Risk categories have not been configured</h2>
@@ -29,16 +31,8 @@ else
     @if (Model.HasRuleDraft)
     {
         <div class="risk-review-notice">
-            Changes below are pending review. They do not affect active scoring yet.
-            @if (canManage)
-            {
-                <form asp-controller="RiskScores" asp-action="Apply" method="post" class="risk-inline-form"
-                      onsubmit="return confirm('Apply the reviewed changes for this category?');">
-                    @Html.AntiForgeryToken()
-                    <input name="factorCode" type="hidden" value="@factorCode" />
-                    <button type="submit" class="workflow-primary">Apply reviewed changes</button>
-                </form>
-            }
+            <strong>Pending approval.</strong> Active scoring is unchanged. A different administrator must approve.
+            Review each pending score using its own Review link below.
         </div>
     }
     <section class="workflow-panel">
@@ -51,15 +45,16 @@ else
         </nav>
         <div class="table-responsive">
             <table class="workflow-table risk-simple-table">
-                <thead><tr><th>S.N.</th><th>@(isRange ? "Range" : Model.SelectedFactor?.FactorName)</th><th>Score</th><th>Action</th></tr></thead>
+                <thead><tr><th>S.N.</th><th>@(isRange ? "Range" : Model.SelectedFactor?.FactorName)</th><th>Score</th><th>Status</th><th>Created by</th><th>Action</th></tr></thead>
                 <tbody>
                 @if (Model.Rules.Count == 0)
                 {
-                    <tr><td colspan="4" class="workflow-empty">No scores added yet for this category.</td></tr>
+                    <tr><td colspan="6" class="workflow-empty">No scores added yet for this category.</td></tr>
                 }
                 @for (var i = 0; i < Model.Rules.Count; i++)
                 {
                     var rule = Model.Rules[i];
+                    var pending = rule.ApprovalStatus is "PENDING" or "DRAFT";
                     <tr>
                         <td>@(Model.FirstRecord + i)</td>
                         <td>
@@ -73,12 +68,18 @@ else
                             }
                         </td>
                         <td>@rule.Score</td>
+                        <td><span class="risk-status @(rule.ApprovalStatus == "APPROVED" ? "approved" : "pending")">@(pending ? (rule.DeleteFg == "N" ? "Pending" : "Pending deletion") : "Approved")</span></td>
+                        <td>@rule.CreatedBy</td>
                         <td>
-                            @if (canManage)
+                            @if (pending)
+                            {
+                                <a class="risk-edit-link" asp-action="Review" asp-route-factorCode="@factorCode" asp-route-ruleId="@rule.Id">Review</a>
+                            }
+                            @if (canManage && rule.DeleteFg == "N" && (!pending || rule.MakerUserId == currentUserId))
                             {
                                 <a class="risk-edit-link" asp-controller="RiskScores" asp-action="Edit" asp-route-id="@rule.Id">Edit</a>
                                 <form asp-controller="RiskScores" asp-action="Delete" method="post" class="risk-inline-form"
-                                      onsubmit="return confirm('Remove this score? The removal takes effect after review and application.');">
+                                      onsubmit="return confirm('Remove this score? The removal takes effect only after another administrator approves.');">
                                     @Html.AntiForgeryToken()
                                     <input name="id" type="hidden" value="@rule.Id" />
                                     <input name="factorCode" type="hidden" value="@factorCode" />

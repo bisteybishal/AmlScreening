@@ -3,14 +3,10 @@ using AmlScreening.Domain.Entities.Compliance;
 using AmlScreening.Application.Interface;
 using AmlScreening.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Text;
 
 namespace AmlScreening.Infrastructure.Repositories
 {
-    public class ComplianceRuleRepository:IComplianceRuleRepository
+    public sealed class ComplianceRuleRepository : IComplianceRuleRepository
     {
         private readonly AmlScreeningDbContext _dbcontext;
         private readonly ICurrentUserContext _currentUser;
@@ -24,15 +20,27 @@ namespace AmlScreening.Infrastructure.Repositories
         }
         public async Task<IReadOnlyList<ComplianceRule>> GetAllAsync()
         {
+            EnsureSignedIn();
             return await _dbcontext.ComplianceRules.AsNoTracking().OrderBy(x => x.RuleType).ThenBy(x => x.RuleName).ToListAsync();
         }
         public async Task<ComplianceRule?> GetByIdAsync(int id)
         {
+            EnsureSignedIn();
             return await _dbcontext.ComplianceRules.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
         }
         public async Task<int> CreateAsync(ComplianceRule rule)
         {
+            EnsureSignedIn();
+            if (rule.Id != 0)
+                throw new ArgumentException("A new rule must not have an existing ID.", nameof(rule));
             rule.ClientId = _currentUser.ClientId;
+            rule.CreatedDate = DateTime.UtcNow;
+            rule.CreatedBy = _currentUser.Username;
+            rule.UpdatedDate = null;
+            rule.UpdatedBy = null;
+            rule.DeleteFg = "N";
+            rule.DeleteDate = null;
+            rule.DeleteBy = null;
             await using var transaction = await _dbcontext.Database.BeginTransactionAsync();
             try
             {
@@ -49,15 +57,35 @@ namespace AmlScreening.Infrastructure.Repositories
                 throw;
             }
         }
-       public async Task<bool> UpdateAsync(ComplianceRule rule, string updatedBy)
+        public async Task<bool> UpdateAsync(ComplianceRule rule, string updatedBy)
         {
-            rule.UpdatedDate = DateTime.UtcNow;
-            rule.UpdatedBy = updatedBy;
+            EnsureSignedIn();
+            // The context's client filter applies when loading the stored row.
+            var existing = await _dbcontext.ComplianceRules.FirstOrDefaultAsync(x => x.Id == rule.Id);
+            if (existing == null || rule.RowVersion is not { Length: 8 })
+                return false;
+
+            existing.RuleCode = rule.RuleCode;
+            existing.RuleName = rule.RuleName;
+            existing.RuleType = rule.RuleType;
+            existing.ThresholdAmount = rule.ThresholdAmount;
+            existing.Currency = rule.Currency;
+            existing.LookbackMinutes = rule.LookbackMinutes;
+            existing.TransactionCount = rule.TransactionCount;
+            existing.RiskScore = rule.RiskScore;
+            existing.Action = rule.Action;
+            existing.RuleVersion = rule.RuleVersion;
+            existing.Priority = rule.Priority;
+            existing.ApprovalStatus = rule.ApprovalStatus;
+            existing.EffectiveFrom = rule.EffectiveFrom;
+            existing.EffectiveTo = rule.EffectiveTo;
+            existing.IsActive = rule.IsActive;
+            existing.UpdatedDate = DateTime.UtcNow;
+            existing.UpdatedBy = _currentUser.Username;
             await using var transaction = await _dbcontext.Database.BeginTransactionAsync();
             try
             {
-                _dbcontext.ComplianceRules.Update(rule);
-                _dbcontext.Entry(rule).Property(x => x.RowVersion).OriginalValue = rule.RowVersion;
+                _dbcontext.Entry(existing).Property(x => x.RowVersion).OriginalValue = rule.RowVersion;
                 var updated = await _dbcontext.SaveChangesAsync() > 0;
                 if (!updated)
                 {
@@ -83,12 +111,13 @@ namespace AmlScreening.Infrastructure.Repositories
         }
         public async Task<bool> DeleteAsync(int id, string deletedBy)
         {
+            EnsureSignedIn();
             var existingRule = await _dbcontext.ComplianceRules.FirstOrDefaultAsync(x => x.Id == id);
             if (existingRule == null)
             {
                 return false;
             }
-            existingRule.DeleteBy = deletedBy;
+            existingRule.DeleteBy = _currentUser.Username;
             existingRule.DeleteDate = DateTime.UtcNow;
             existingRule.DeleteFg = "Y";
             existingRule.IsActive = false;
@@ -113,6 +142,12 @@ namespace AmlScreening.Infrastructure.Repositories
                 throw;
             }
            
+        }
+
+        private void EnsureSignedIn()
+        {
+            if (!_currentUser.IsAuthenticated || _currentUser.ClientId <= 0 || _currentUser.UserId <= 0)
+                throw new UnauthorizedAccessException("A signed-in user with a client is required.");
         }
 
         private void AddAudit(string action, int entityId, string details)

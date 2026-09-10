@@ -1,16 +1,9 @@
 using AmlScreening.Application;
-using AmlScreening.Application.Interface;
-using AmlScreening.Application.Interface.Provider;
 using AmlScreening.Application.Security;
-using AmlScreening.Application.Services;
 using AmlScreening.Infrastructure;
-using AmlScreening.Infrastructure.Provider;
 using AmlScreening.Portal.Extension;
-using AmlScreening.Portal.Security;
-using AmlScreening.Portal.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using System.Threading.RateLimiting;
 

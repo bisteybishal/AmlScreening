@@ -5,7 +5,7 @@ namespace AmlScreening.Application.Interface;
 
 public interface IAmlWorkflowService
 {
-    Task<ComplianceDashboardSummary> GetDashboardSummaryAsync();
+    Task<ComplianceDashboardSummary> GetDashboardSummaryAsync(CancellationToken cancellationToken=default);
 
     Task<IReadOnlyList<Customer>> GetCustomersAsync();
     Task<Customer?> GetCustomerAsync(int id);

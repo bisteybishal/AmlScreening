@@ -1,6 +1,7 @@
 using System.Text;
 using AmlScreening.Application.Interface;
 using AmlScreening.Application.Models;
+using AmlScreening.Application.Security;
 using AmlScreening.Domain.Entities;
 using AmlScreening.Domain.Entities.Compliance;
 using AmlScreening.Infrastructure.Data;
@@ -74,14 +75,8 @@ public sealed partial class RiskScoringService : IRiskScoringService
                            (!item.EffectiveTo.HasValue || item.EffectiveTo >= now))
             .ToListAsync(cancellationToken);
 
-        var currentRules = allRules
-            .GroupBy(item => item.RiskFactorId)
-            .SelectMany(group =>
-            {
-                var latestVersion = group.Max(item => item.RuleVersion);
-                return group.Where(item => item.RuleVersion == latestVersion);
-            })
-            .ToList();
+        // Each approved score has its own revision; do not select a category-wide maximum.
+        var currentRules = allRules;
 
         var factorResults = new List<RiskFactorResult>();
         foreach (var factor in factors)
@@ -170,8 +165,10 @@ public sealed partial class RiskScoringService : IRiskScoringService
         int pageNumber,
         int pageSize,
         CancellationToken cancellationToken = default)
+
     {
-        pageSize = new[] { 5, 10, 20, 50 }.Contains(pageSize) ? pageSize : 10;
+        EnsureConfigurationAccess(AppPermissions.RiskScoringView);
+        pageSize = 10;
         pageNumber = Math.Max(1, pageNumber);
 
         var factors = await _db.RiskFactors.AsNoTracking()
@@ -183,12 +180,11 @@ public sealed partial class RiskScoringService : IRiskScoringService
                        factors.FirstOrDefault();
 
         var selectedFactorId = selected?.Id ?? 0;
-        var ruleVersion = await RuleHistory().Where(x => x.RiskFactorId == selectedFactorId)
-            .MaxAsync(x => (int?)x.RuleVersion, cancellationToken) ?? 0;
         var hasRuleDraft = await RuleHistory().AnyAsync(x => x.RiskFactorId == selectedFactorId &&
-            x.RuleVersion == ruleVersion && x.ApprovalStatus == "DRAFT", cancellationToken);
-        var ruleQuery = _db.RiskFactorRules.AsNoTracking()
-            .Where(item => item.ClientId == _currentUser.ClientId && item.IsActive && item.RuleVersion == ruleVersion);
+            (x.ApprovalStatus == "DRAFT" || x.ApprovalStatus == "PENDING"), cancellationToken);
+        var ruleQuery = RuleHistory().AsNoTracking().Where(item =>
+            (item.ApprovalStatus == "APPROVED" && item.IsActive && item.DeleteFg == "N") ||
+            item.ApprovalStatus == "PENDING" || item.ApprovalStatus == "DRAFT");
         if (selected is not null)
             ruleQuery = ruleQuery.Where(item => item.RiskFactorId == selected.Id);
         else
@@ -216,7 +212,7 @@ public sealed partial class RiskScoringService : IRiskScoringService
             .ToListAsync(cancellationToken);
 
         var bandVersion = await BandHistory().MaxAsync(x => (int?)x.BandVersion, cancellationToken) ?? 0;
-        var hasBandDraft = await BandHistory().AnyAsync(x => x.BandVersion == bandVersion && x.ApprovalStatus == "DRAFT", cancellationToken);
+        var hasBandDraft = await BandHistory().AnyAsync(x => x.BandVersion == bandVersion && (x.ApprovalStatus == "DRAFT" || x.ApprovalStatus == "PENDING"), cancellationToken);
         var bands = await _db.RiskBands.AsNoTracking()
             .Where(item => item.ClientId == _currentUser.ClientId && item.IsActive && item.BandVersion == bandVersion)
             .OrderByDescending(item => item.BandVersion)
@@ -233,8 +229,13 @@ public sealed partial class RiskScoringService : IRiskScoringService
             .OrderByDescending(item => item.ModelVersion)
             .FirstOrDefaultAsync(cancellationToken);
 
+        var canManage = _currentUser.IsAdministrator && _currentUser.HasPermission(AppPermissions.RiskScoringManage);
+        var bandMakers = await BandHistory().Where(x => x.BandVersion == bandVersion)
+            .Select(x => x.MakerUserId).Distinct().ToListAsync(cancellationToken);
         return new RiskScoringSetupResult
         {
+            CanEditRules = canManage,
+            CanEditBands = canManage && (!hasBandDraft || (bandMakers.Count == 1 && bandMakers[0] == _currentUser.UserId)),
             HasRuleDraft = hasRuleDraft,
             HasBandDraft = hasBandDraft,
             ActiveModel = activeModel,
@@ -250,14 +251,20 @@ public sealed partial class RiskScoringService : IRiskScoringService
 
     public Task<RiskFactorRule?> GetRuleAsync(
         int id,
-        CancellationToken cancellationToken = default) =>
-        _db.RiskFactorRules.AsNoTracking().FirstOrDefaultAsync(
+        CancellationToken cancellationToken = default)
+    {
+        EnsureConfigurationAccess(AppPermissions.RiskScoringView);
+        return _db.RiskFactorRules.AsNoTracking().FirstOrDefaultAsync(
             item => item.Id == id && item.ClientId == _currentUser.ClientId,
             cancellationToken);
+    }
 
-    public Task<RiskBand?> GetBandAsync(int id, CancellationToken cancellationToken = default) =>
-        _db.RiskBands.AsNoTracking().FirstOrDefaultAsync(
+    public Task<RiskBand?> GetBandAsync(int id, CancellationToken cancellationToken = default)
+    {
+        EnsureConfigurationAccess(AppPermissions.RiskScoringView);
+        return _db.RiskBands.AsNoTracking().FirstOrDefaultAsync(
             item => item.Id == id && item.ClientId == _currentUser.ClientId, cancellationToken);
+    }
 
     private static ResolvedFactorValue ResolveValue(
         string factorCode,

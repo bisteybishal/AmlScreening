@@ -16,7 +16,7 @@
 </section>
 
 <section class="workflow-panel workflow-form-panel risk-editor">
-    <p>Save your changes, then review and apply them from the list.</p>
+    <p>Save as Pending. Another administrator must review and approve before these scores are used.</p>
     <form asp-action="@(Model.Id == 0 ? "Add" : "Edit")" method="post">
         @Html.AntiForgeryToken()
         <input asp-for="Id" type="hidden" />
@@ -48,7 +48,7 @@
         </div>
         <div class="workflow-form-actions">
             <a asp-action="Index" asp-route-factorCode="@Model.FactorCode">Cancel</a>
-            <button class="workflow-primary" type="submit"><i class="bi bi-check2"></i> Save changes</button>
+            <button class="workflow-primary" type="submit"><i class="bi bi-check2"></i> Save pending score</button>
         </div>
     </form>
 </section>

@@ -1,9 +1,10 @@
-﻿using System.Data;
+﻿using Microsoft.Data.SqlClient;
+using System.Data;
 
 namespace AmlScreening.Infrastructure.Persistence
 {
     public  interface IDBConnectionFactory
     {
-        IDbConnection CreateConnection();
+        SqlConnection CreateConnection();
     }
 }

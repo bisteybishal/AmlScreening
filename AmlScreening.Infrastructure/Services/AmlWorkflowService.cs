@@ -1,4 +1,5 @@
 using AmlScreening.Application.Interface;
+using AmlScreening.Application.Interface.Repositories;
 using AmlScreening.Application.Models;
 using AmlScreening.Application.Security;
 using AmlScreening.Domain.Entities;
@@ -14,57 +15,73 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
     private readonly AmlScreeningDbContext _db;
     private readonly ICurrentUserContext _currentUser;
     private readonly IRiskScoringService _riskScoring;
+    private readonly IComplianceDashboardRepository _complianceDashboardRepository;
 
     public AmlWorkflowService(
         AmlScreeningDbContext db,
         ICurrentUserContext currentUser,
-        IRiskScoringService riskScoring)
+        IRiskScoringService riskScoring,
+        IComplianceDashboardRepository complianceDashboardRepository)
     {
         _db = db;
         _currentUser = currentUser;
         _riskScoring = riskScoring;
+        _complianceDashboardRepository= complianceDashboardRepository;
     }
 
-    public async Task<ComplianceDashboardSummary> GetDashboardSummaryAsync()
+   
+    public async Task<ComplianceDashboardSummary> GetDashboardSummaryAsync(CancellationToken cancellationToken=default)
     {
-        var summary = new ComplianceDashboardSummary();
+        return await _complianceDashboardRepository.GetSummaryAsync(
+       _currentUser.ClientId,
+       _currentUser.HasPermission(
+           AppPermissions.TransactionsView),
 
-        if (_currentUser.HasPermission(AppPermissions.TransactionsView))
-        {
-            var transactionSummary = await _db.Transactions
-                .AsNoTracking()
-                .GroupBy(_ => 1)
-                .Select(group => new
-                {
-                    Total = group.Count(),
-                    Review = group.Count(transaction => transaction.Decision == "REVIEW"),
-                    Block = group.Count(transaction => transaction.Decision == "BLOCK")
-                })
-                .SingleOrDefaultAsync();
+       _currentUser.HasPermission(
+           AppPermissions.AlertsView),
 
-            if (transactionSummary is not null)
-            {
-                summary.TransactionCount = transactionSummary.Total;
-                summary.ReviewCount = transactionSummary.Review;
-                summary.BlockCount = transactionSummary.Block;
-            }
-        }
+       _currentUser.HasPermission(
+           AppPermissions.CasesView),
 
-        if (_currentUser.HasPermission(AppPermissions.AlertsView))
-        {
-            summary.OpenAlertCount = await _db.ComplianceAlerts
-                .AsNoTracking()
-                .CountAsync(alert => alert.Status != "RESOLVED" && alert.Status != "CLOSED");
-        }
+       cancellationToken);
+        //var summary = new ComplianceDashboardSummary();
 
-        if (_currentUser.HasPermission(AppPermissions.CasesView))
-        {
-            summary.OpenCaseCount = await _db.ComplianceCases
-                .AsNoTracking()
-                .CountAsync(complianceCase => complianceCase.Status != "CLOSED");
-        }
+        //if (_currentUser.HasPermission(AppPermissions.TransactionsView))
+        //{
+        //    var transactionSummary = await _db.Transactions
+        //        .AsNoTracking()
+        //        .GroupBy(_ => 1)
+        //        .Select(group => new
+        //        {
+        //            Total = group.Count(),
+        //            Review = group.Count(transaction => transaction.Decision == "REVIEW"),
+        //            Block = group.Count(transaction => transaction.Decision == "BLOCK")
+        //        })
+        //        .SingleOrDefaultAsync();
 
-        return summary;
+        //    if (transactionSummary is not null)
+        //    {
+        //        summary.TransactionCount = transactionSummary.Total;
+        //        summary.ReviewCount = transactionSummary.Review;
+        //        summary.BlockCount = transactionSummary.Block;
+        //    }
+        //}
+
+        //if (_currentUser.HasPermission(AppPermissions.AlertsView))
+        //{
+        //    summary.OpenAlertCount = await _db.ComplianceAlerts
+        //        .AsNoTracking()
+        //        .CountAsync(alert => alert.Status != "RESOLVED" && alert.Status != "CLOSED");
+        //}
+
+        //if (_currentUser.HasPermission(AppPermissions.CasesView))
+        //{
+        //    summary.OpenCaseCount = await _db.ComplianceCases
+        //        .AsNoTracking()
+        //        .CountAsync(complianceCase => complianceCase.Status != "CLOSED");
+        //}
+
+        //return summary;
     }
 
     public async Task<IReadOnlyList<Customer>> GetCustomersAsync() =>

@@ -8,10 +8,11 @@ public interface IRiskScoringService
     Task SaveBandRangesAsync(IReadOnlyList<RiskBandInput> ranges, CancellationToken cancellationToken = default);
     Task SaveRuleAsync(RiskRuleInput input, CancellationToken cancellationToken = default);
     Task DeleteRuleAsync(int id, byte[] rowVersion, CancellationToken cancellationToken = default);
-    Task ActivateRulesAsync(string factorCode, CancellationToken cancellationToken = default);
+    Task<RiskApprovalReview> GetApprovalReviewAsync(string kind, string? factorCode, CancellationToken cancellationToken = default, int ruleId = 0);
+    Task ActivateRulesAsync(string factorCode, int ruleId, string reviewToken, CancellationToken cancellationToken = default);
     Task SaveBandAsync(RiskBandInput input, CancellationToken cancellationToken = default);
     Task DeleteBandAsync(int id, byte[] rowVersion, CancellationToken cancellationToken = default);
-    Task ActivateBandsAsync(CancellationToken cancellationToken = default);
+    Task ActivateBandsAsync(string reviewToken, CancellationToken cancellationToken = default);
     Task<RiskScoringResult> CalculateAsync(
         RiskScoringInput input,
         CancellationToken cancellationToken = default);

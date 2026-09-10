@@ -1,0 +1,72 @@
+@{
+    ViewData["Title"] = "Screening";
+}
+
+@section Styles {
+    <link rel="stylesheet"
+          href="~/css/screening.css"
+          asp-append-version="true" />
+}
+
+<section class="screening-hero">
+    <div class="screening-eyebrow">
+        AML NAME LOOKUP
+    </div>
+
+    <h1>
+        Start with a name.<br />
+        <span>Search your AML records.</span>
+    </h1>
+
+    <p class="screening-intro">
+        Start typing an individual or company name.
+        Matching records appear below.
+    </p>
+
+    <form id="screening-search-form"
+          asp-controller="Screening"
+          asp-action="Search"
+          method="post"
+          class="screening-form"
+          role="search">
+
+        <label for="screening-name" class="screening-label">
+            Individual or company name
+        </label>
+
+        <div class="screening-search">
+            <i class="bi bi-search" aria-hidden="true"></i>
+
+            <input id="screening-name"
+                   name="name"
+                   type="search"
+                   placeholder="Type a name…"
+                   autocomplete="off"
+                   maxlength="200"
+                   aria-controls="screening-results"
+                   aria-describedby="screening-status" />
+
+            <button type="submit">
+                Search
+            </button>
+        </div>
+    </form>
+
+    <p class="screening-note">
+        Name matches require review and do not confirm identity.
+    </p>
+</section>
+
+<p id="screening-status"
+   class="live-search-status"
+   role="status"
+   aria-live="polite">
+    Type at least one character to start.
+</p>
+
+<div id="screening-results" aria-busy="false"></div>
+
+@section Scripts {
+    <script src="~/js/screening.js"
+            asp-append-version="true"></script>
+}

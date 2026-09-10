@@ -14,7 +14,7 @@ namespace AmlScreening.Infrastructure.Persistence
                 ?? throw new InvalidOperationException(
                     "The AMLDatabase connection string was not found.");
         }
-        public IDbConnection CreateConnection()
+        public SqlConnection CreateConnection()
         {
             return new SqlConnection(_connectionString);
         }

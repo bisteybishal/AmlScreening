@@ -12,6 +12,28 @@ public sealed partial class RiskScoringService
         ChangeConfigurationAsync(async () =>
         {
             var version = await BandHistory().MaxAsync(x => (int?)x.BandVersion, cancellationToken) ?? 0;
+            if (version == 0)
+            {
+                if (ranges.Count == 0 || ranges.Any(x => x.Id != 0))
+                    throw new RiskConfigurationException("Reload the initial range form.");
+                var initial = ranges.Select(x => new RiskBand
+                {
+                    ClientId = _currentUser.ClientId, BandVersion = 1,
+                    RiskLevel = x.RiskLevel.Trim().ToUpperInvariant(),
+                    MinimumScore = x.MinimumScore, MaximumScore = x.MaximumScore,
+                    Decision = x.Decision.Trim().ToUpperInvariant(), Remarks = x.Remarks?.Trim(),
+                    MakerUserId = _currentUser.UserId, CreatedBy = _currentUser.Username,
+                    ApprovalStatus = "PENDING"
+                }).ToList();
+                if (initial.Any(x => string.IsNullOrWhiteSpace(x.RiskLevel) || x.RiskLevel.Length > 20 || x.Remarks?.Length > 1000) ||
+                    initial.Select(x => x.RiskLevel).Distinct().Count() != initial.Count)
+                    throw new RiskConfigurationException("Enter unique risk levels and valid explanations.");
+                try { ValidateBands(initial); }
+                catch (InvalidOperationException ex) { throw new RiskConfigurationException(ex.Message); }
+                _db.RiskBands.AddRange(initial);
+                AddAudit("Create", "RiskBand", 0, "Created initial Pending risk ranges.");
+                return;
+            }
             var current = await BandHistory()
                 .Where(x => x.BandVersion == version && x.DeleteFg == "N" && x.IsActive)
                 .ToListAsync(cancellationToken);
@@ -44,6 +66,7 @@ public sealed partial class RiskScoringService
             foreach (var row in draft.Rows.Where(x => x.DeleteFg == "N"))
             {
                 var input = checkedRanges.Single(x => x.RiskLevel == row.RiskLevel);
+                row.ApprovalStatus = "PENDING";
                 row.MinimumScore = input.MinimumScore;
                 row.MaximumScore = input.MaximumScore;
                 row.Remarks = input.Remarks;
@@ -54,11 +77,9 @@ public sealed partial class RiskScoringService
 
     // One SQL transaction saves both the change and its audit record.
     // The transaction-owned lock prevents two editors creating competing drafts.
-    private async Task ChangeConfigurationAsync(Func<Task> change, CancellationToken ct)
+    private async Task ChangeConfigurationAsync(Func<Task> change, CancellationToken ct, string requiredPermission = AppPermissions.RiskScoringManage)
     {
-        if (!_currentUser.IsAuthenticated || _currentUser.ClientId <= 0 ||
-            !_currentUser.HasPermission(AppPermissions.RiskScoringManage))
-            throw new RiskConfigurationException("You do not have permission to manage risk configuration.");
+        EnsureConfigurationAccess(requiredPermission);
 
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
         var resource = $"AML-RiskConfiguration-{_currentUser.ClientId}";
@@ -80,6 +101,15 @@ public sealed partial class RiskScoringService
         }
     }
 
+    // This guard also protects callers that do not go through an MVC controller.
+    private void EnsureConfigurationAccess(string permission)
+    {
+        if (!_currentUser.IsAuthenticated || !_currentUser.IsAdministrator ||
+            _currentUser.ClientId <= 0 || _currentUser.UserId <= 0 ||
+            !_currentUser.HasPermission(permission))
+            throw new RiskConfigurationException("Only an authorized administrator for this client can access risk configuration.");
+    }
+
     private IQueryable<RiskFactorRule> RuleHistory() => _db.RiskFactorRules
         .IgnoreQueryFilters(["SoftDeleteFilter"])
         .Where(x => x.ClientId == _currentUser.ClientId);
@@ -90,7 +120,7 @@ public sealed partial class RiskScoringService
 
     private static void CheckToken(BaseEntity entity, byte[] token)
     {
-        if (token.Length != 8 || !entity.RowVersion.SequenceEqual(token))
+        if (token is not { Length: 8 } || !entity.RowVersion.SequenceEqual(token))
             throw new RiskConfigurationException("This entry changed. Reload the list before editing again.");
     }
 
@@ -109,40 +139,42 @@ public sealed partial class RiskScoringService
         Stamp(entity);
     }
 
-    // Clone the whole factor, so deleting one rule never revives an older rule.
+    // Only the selected record is copied for an edit/delete. Adding copies nothing.
     private async Task<(List<RiskFactorRule> Rows, RiskFactorRule? Target, int Version)> RuleDraftAsync(
         int factorId, int id, byte[] token, CancellationToken ct)
     {
-        var version = await RuleHistory().Where(x => x.RiskFactorId == factorId)
-            .MaxAsync(x => (int?)x.RuleVersion, ct) ?? 0;
-        var rows = await RuleHistory().Where(x => x.RiskFactorId == factorId && x.RuleVersion == version)
-            .ToListAsync(ct);
-        var target = rows.SingleOrDefault(x => x.Id == id && x.DeleteFg == "N");
-        if (id != 0)
-        {
-            if (target is null) throw new RiskConfigurationException("This entry is no longer current. Reload the list.");
-            CheckToken(target, token);
-        }
-        if (rows.Count > 0 && rows.All(x => x.ApprovalStatus == "DRAFT"))
-            return (rows, target, version);
+        var rows = await RuleHistory().Where(x => x.RiskFactorId == factorId).ToListAsync(ct);
+        var version = (rows.Max(x => (int?)x.RuleVersion) ?? 0) + 1;
+        var current = rows.Where(x => (x.ApprovalStatus == "APPROVED" && x.IsActive && x.DeleteFg == "N")
+            || IsPending(x.ApprovalStatus)).ToList();
+        if (id == 0) return (current, null, version);
 
-        var copies = new List<RiskFactorRule>();
-        RiskFactorRule? copyTarget = null;
-        foreach (var row in rows.Where(x => x.DeleteFg == "N" && x.IsActive))
+        var target = current.SingleOrDefault(x => x.Id == id)
+            ?? throw new RiskConfigurationException("This score is no longer current. Reload the list.");
+        CheckToken(target, token);
+        if (IsPending(target.ApprovalStatus))
         {
-            var copy = new RiskFactorRule
-            {
-                ClientId = _currentUser.ClientId, RiskFactorId = factorId,
-                ValueCode = row.ValueCode, ValueName = row.ValueName,
-                MinimumValue = row.MinimumValue, MaximumValue = row.MaximumValue,
-                Score = row.Score, Remarks = row.Remarks, RuleVersion = version + 1,
-                CreatedBy = _currentUser.Username, ApprovalStatus = "DRAFT"
-            };
-            _db.RiskFactorRules.Add(copy);
-            copies.Add(copy);
-            if (row == target) copyTarget = copy;
+            EnsureDraftMaker([target.MakerUserId]);
+            if (target.DeleteFg != "N")
+                throw new RiskConfigurationException("This score has a pending deletion.");
+            return (current, target, target.RuleVersion);
         }
-        return (copies, copyTarget, version + 1);
+        if (current.Any(x => IsPending(x.ApprovalStatus) && x.ReplacesRuleId == id))
+            throw new RiskConfigurationException("This score already has a pending change. Review it first.");
+
+        var copy = new RiskFactorRule
+        {
+            ClientId = _currentUser.ClientId, RiskFactorId = factorId, ReplacesRuleId = target.Id,
+            ValueCode = target.ValueCode, ValueName = target.ValueName,
+            MinimumValue = target.MinimumValue, MaximumValue = target.MaximumValue,
+            Score = target.Score, Remarks = target.Remarks, RuleVersion = version,
+            CreatedBy = _currentUser.Username, MakerUserId = _currentUser.UserId,
+            ApprovalStatus = "PENDING"
+        };
+        _db.RiskFactorRules.Add(copy);
+        current.Remove(target);
+        current.Add(copy);
+        return (current, copy, version);
     }
 
     public Task SaveRuleAsync(RiskRuleInput input, CancellationToken cancellationToken = default) =>
@@ -170,18 +202,20 @@ public sealed partial class RiskScoringService
                     throw new RiskConfigurationException("Receiver counts must be whole numbers.");
             }
             var draft = await RuleDraftAsync(factor.Id, input.Id, input.RowVersion, cancellationToken);
-            if (code is not null && draft.Rows.Any(x => x != draft.Target && x.DeleteFg == "N" && NormalizeCode(x.ValueCode) == code))
+            if (code is not null && draft.Rows.Any(x => x != draft.Target && x.Id != draft.Target?.ReplacesRuleId && x.DeleteFg == "N" && NormalizeCode(x.ValueCode) == code))
                 throw new RiskConfigurationException("This value code already exists in the draft.");
             var row = draft.Target ?? new RiskFactorRule
             {
                 ClientId = _currentUser.ClientId, RiskFactorId = factor.Id,
-                RuleVersion = draft.Version, CreatedBy = _currentUser.Username
+                RuleVersion = draft.Version, CreatedBy = _currentUser.Username,
+                MakerUserId = _currentUser.UserId, ApprovalStatus = "PENDING"
             };
             if (draft.Target is null) _db.RiskFactorRules.Add(row);
             row.ValueCode = code;
             row.ValueName = input.ValueName?.Trim();
             row.MinimumValue = numeric && code != "DEFAULT" ? input.MinimumValue : null;
             row.MaximumValue = numeric && code != "DEFAULT" ? input.MaximumValue : null;
+            row.ApprovalStatus = "PENDING";
             row.Score = input.Score;
             row.Remarks = input.Remarks?.Trim();
             Stamp(row);
@@ -199,38 +233,6 @@ public sealed partial class RiskScoringService
             var draft = await RuleDraftAsync(original.RiskFactorId, id, rowVersion, cancellationToken);
             SoftDelete(draft.Target!);
             AddAudit("Delete", "RiskFactorRule", id, $"Soft-deleted in draft v{draft.Version}; active configuration unchanged.");
-        }, cancellationToken);
-
-    public Task ActivateRulesAsync(string factorCode, CancellationToken cancellationToken = default) =>
-        ChangeConfigurationAsync(async () =>
-        {
-            var factor = await _db.RiskFactors.SingleOrDefaultAsync(x => x.ClientId == _currentUser.ClientId &&
-                x.FactorCode == factorCode && x.IsActive, cancellationToken)
-                ?? throw new RiskConfigurationException("Risk factor was not found.");
-            var history = await RuleHistory().Where(x => x.RiskFactorId == factor.Id).ToListAsync(cancellationToken);
-            var version = history.Max(x => (int?)x.RuleVersion) ?? 0;
-            var draft = history.Where(x => x.RuleVersion == version && x.ApprovalStatus == "DRAFT").ToList();
-            var live = draft.Where(x => x.DeleteFg == "N").ToList();
-            if (live.Count == 0) throw new RiskConfigurationException("Add at least one rule to the draft before activation.");
-            ValidateRuleSet(factor, live);
-            var now = DateTime.UtcNow;
-            foreach (var row in history.Where(x => x.RuleVersion != version && x.IsActive))
-            {
-                row.IsActive = false;
-                row.EffectiveTo = now;
-                Stamp(row);
-            }
-            foreach (var row in draft)
-            {
-                row.ApprovalStatus = "APPROVED";
-                row.ApprovedBy = _currentUser.Username;
-                row.ApprovedDate = now;
-                row.EffectiveFrom = now;
-                row.EffectiveTo = null;
-                row.IsActive = row.DeleteFg == "N";
-                Stamp(row);
-            }
-            AddAudit("Activate", "RiskFactor", factor.Id, $"Activated {factorCode} rule version {version}, {live.Count} rules.");
         }, cancellationToken);
 
     private static void ValidateRuleSet(RiskFactor factor, List<RiskFactorRule> rows)
@@ -274,7 +276,11 @@ public sealed partial class RiskScoringService
             if (target is null) throw new RiskConfigurationException("This band is no longer current. Reload the list.");
             CheckToken(target, token);
         }
-        if (rows.Count > 0 && rows.All(x => x.ApprovalStatus == "DRAFT")) return (rows, target, version);
+        if (rows.Count > 0 && rows.All(x => x.ApprovalStatus is "DRAFT" or "PENDING"))
+        {
+            EnsureDraftMaker(rows.Select(x => x.MakerUserId));
+            return (rows, target, version);
+        }
         var copies = new List<RiskBand>();
         RiskBand? copyTarget = null;
         foreach (var row in rows.Where(x => x.DeleteFg == "N" && x.IsActive))
@@ -284,7 +290,8 @@ public sealed partial class RiskScoringService
                 ClientId = _currentUser.ClientId, RiskLevel = row.RiskLevel,
                 MinimumScore = row.MinimumScore, MaximumScore = row.MaximumScore,
                 Decision = row.Decision, Remarks = row.Remarks, BandVersion = version + 1,
-                CreatedBy = _currentUser.Username, ApprovalStatus = "DRAFT"
+                CreatedBy = _currentUser.Username, ApprovalStatus = "PENDING",
+                MakerUserId = _currentUser.UserId
             };
             _db.RiskBands.Add(copy);
             copies.Add(copy);
@@ -307,9 +314,11 @@ public sealed partial class RiskScoringService
                 throw new RiskConfigurationException("This risk level already exists in the draft.");
             var row = draft.Target ?? new RiskBand
             {
-                ClientId = _currentUser.ClientId, BandVersion = draft.Version, CreatedBy = _currentUser.Username
+                ClientId = _currentUser.ClientId, BandVersion = draft.Version, CreatedBy = _currentUser.Username,
+                MakerUserId = _currentUser.UserId, ApprovalStatus = "PENDING"
             };
             if (draft.Target is null) _db.RiskBands.Add(row);
+            row.ApprovalStatus = "PENDING";
             row.RiskLevel = level;
             row.MinimumScore = input.MinimumScore;
             row.MaximumScore = input.MaximumScore;
@@ -330,28 +339,4 @@ public sealed partial class RiskScoringService
             AddAudit("Delete", "RiskBand", id, $"Soft-deleted in draft v{draft.Version}; active configuration unchanged.");
         }, cancellationToken);
 
-    public Task ActivateBandsAsync(CancellationToken cancellationToken = default) =>
-        ChangeConfigurationAsync(async () =>
-        {
-            var history = await BandHistory().ToListAsync(cancellationToken);
-            var version = history.Max(x => (int?)x.BandVersion) ?? 0;
-            var draft = history.Where(x => x.BandVersion == version && x.ApprovalStatus == "DRAFT").ToList();
-            if (draft.Count == 0) throw new RiskConfigurationException("There are no draft bands to activate.");
-            try { ValidateBands(draft.Where(x => x.DeleteFg == "N")); }
-            catch (InvalidOperationException ex) { throw new RiskConfigurationException(ex.Message); }
-            foreach (var row in history.Where(x => x.BandVersion != version && x.IsActive))
-            {
-                row.IsActive = false;
-                Stamp(row);
-            }
-            foreach (var row in draft)
-            {
-                row.ApprovalStatus = "APPROVED";
-                row.ApprovedBy = _currentUser.Username;
-                row.ApprovedDate = DateTime.UtcNow;
-                row.IsActive = row.DeleteFg == "N";
-                Stamp(row);
-            }
-            AddAudit("Activate", "RiskBand", 0, $"Activated band version {version}.");
-        }, cancellationToken);
 }

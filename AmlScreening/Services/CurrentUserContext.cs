@@ -16,6 +16,7 @@ public sealed class CurrentUserContext : ICurrentUserContext
     private ClaimsPrincipal? Principal => _httpContextAccessor.HttpContext?.User;
 
     public bool IsAuthenticated => Principal?.Identity?.IsAuthenticated == true;
+    public bool IsAdministrator => Principal?.IsInRole("Admin") == true;
 
     public long UserId => ParseRequiredLongClaim(ClaimTypes.NameIdentifier);
 

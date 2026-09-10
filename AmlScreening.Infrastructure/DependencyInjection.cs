@@ -34,6 +34,8 @@ namespace AmlScreening.Infrastructure
             services.AddScoped<IAmlWorkflowService, AmlWorkflowService>();
             services.AddScoped<IRiskScoringService, RiskScoringService>();
             services.AddScoped<IAmlImportRepository, AmlImportRepository>();
+            services.AddScoped<IErrorRepository, ErrorRepository>();
+            services.AddScoped<IComplianceDashboardRepository, ComplianceDashboardRepository>();
 
 
             services.AddHttpClient("UnAmlClient", client =>

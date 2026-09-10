@@ -4,6 +4,7 @@ using AmlScreening.Domain.Entities;
 using AmlScreening.Portal.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text;
 
 namespace AmlScreening.Portal.Controllers;
 
@@ -23,16 +24,16 @@ public sealed class SubscriptionController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index(int page = 1)
+    public async Task<IActionResult> Index(int page = 1,CancellationToken cancellationToken=default)
     {
         try
         {
             var requestedPage = Math.Max(1, page);
-            var result = await _subscriptionRepository.GetPageAsync(requestedPage, PageSize);
+            var result = await _subscriptionRepository.GetPageAsync(requestedPage, PageSize,cancellationToken );
             var totalPages = Math.Max(1, result.TotalPages);
             var currentPage = Math.Clamp(requestedPage, 1, totalPages);
             if (currentPage != requestedPage)
-                result = await _subscriptionRepository.GetPageAsync(currentPage, PageSize);
+                result = await _subscriptionRepository.GetPageAsync(currentPage, PageSize,cancellationToken);
 
             return View(new SubscriptionPageViewModel
             {
@@ -60,21 +61,29 @@ public sealed class SubscriptionController : Controller
     [HttpPost]
     [Authorize(Policy = AppPermissions.SubscriptionCreate)]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Add(SubscriptionAddModel model)
+    public async Task<IActionResult> Add(SubscriptionAddModel model,CancellationToken cancellationToken)
     {
-        if (!ModelState.IsValid)
-            return View(model);
-
         try
         {
-            var planId = await _subscriptionRepository.CreateSubscriptionAsync(new SubscriptionPlan
+            if (!ModelState.IsValid)
+            return View(model);
+            var SourceCode = model.SourceCode.Trim();
+            var SourceName = model.SourceName.Trim();
+            var nepalitimeZone = TimeZoneInfo.FindSystemTimeZoneById("Nepal Standard Time");
+            var nepalNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, nepalitimeZone);
+            var subscriptionKey = Convert.ToBase64String(Encoding.UTF8.GetBytes("${SourceCode}{nepalNow:yyyyMMddHHmmssfff}"));
+            var plan = new SubscriptionPlan
             {
-                SourceCode = model.SourceCode.Trim(),
-                SourceName = model.SourceName.Trim(),
+                SourceCode = SourceCode,
+                SourceName=SourceName,
                 Rate = model.Rate,
                 DurationMonths = model.DurationMonths,
-                IsActive = model.IsActive
-            });
+                IsActive = model.IsActive,
+                SubscriptionKey = subscriptionKey,
+                ExpireDate=nepalNow.AddMonths(model.DurationMonths),
+
+            };
+            var planId = await _subscriptionRepository.CreateSubscriptionAsync(plan,cancellationToken);            
             TempData["SuccessMessage"] = $"Subscription plan {planId} added successfully.";
             return RedirectToAction(nameof(Index));
         }

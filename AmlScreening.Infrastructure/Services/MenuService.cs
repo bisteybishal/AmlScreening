@@ -79,9 +79,24 @@ public sealed class MenuService : IMenuService
         }
     }
 
-    private bool CanView(NavigationMenuItem item) =>
-        string.IsNullOrWhiteSpace(item.PermissionCode) ||
-        _currentUser.HasPermission(item.PermissionCode);
+    private bool CanView(NavigationMenuItem item)
+    {
+        if (!_currentUser.IsAuthenticated) return false;
+
+        // Risk management is administrator-only, even if a regular user has
+        // accidentally been granted a risk permission in the database.
+        var controller = item.ControllerName?.Trim();
+        var isRiskManagement =
+            string.Equals(controller, "RiskScores", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(controller, "RiskScoreSetup", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(controller, "RiskScoring", StringComparison.OrdinalIgnoreCase) ||
+            item.PermissionCode?.StartsWith("RiskScoring.", StringComparison.OrdinalIgnoreCase) == true;
+        if (isRiskManagement && (!_currentUser.IsAdministrator || _currentUser.ClientId <= 0))
+            return false;
+
+        return string.IsNullOrWhiteSpace(item.PermissionCode) ||
+            _currentUser.HasPermission(item.PermissionCode);
+    }
 
     private static NavigationMenuItem CopyWithChildren(
         NavigationMenuItem item,

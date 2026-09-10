@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace AmlScreening.Portal.Controllers;
 
 [Authorize(Policy = AppPermissions.RiskScoringView)]
+[Authorize(Roles = "Admin")]
 public sealed class RiskScoresController(IRiskScoringService riskScoring,
     ILogger<RiskScoresController> logger) : Controller
 {
@@ -87,7 +88,7 @@ public sealed class RiskScoresController(IRiskScoringService riskScoring,
                 ValueName = model.ValueName, MinimumValue = model.MinimumValue, MaximumValue = model.MaximumValue,
                 Score = model.Score, Remarks = model.Remarks, RowVersion = model.RowVersion
             }, ct);
-            TempData["SuccessMessage"] = "Saved for review. Select Apply reviewed changes when ready.";
+            TempData["SuccessMessage"] = "Saved as Pending. Another administrator must review and approve.";
             return RedirectToAction(nameof(Index), new { factorCode = model.FactorCode });
         }
         catch (Exception ex)
@@ -105,23 +106,38 @@ public sealed class RiskScoresController(IRiskScoringService riskScoring,
         {
             if (!ModelState.IsValid) throw new RiskConfigurationException("Reload the list and try again.");
             await riskScoring.DeleteRuleAsync(id, rowVersion, cancellationToken);
-            TempData["SuccessMessage"] = "Score removed from pending changes. Apply the changes after review.";
+            TempData["SuccessMessage"] = "Deletion is Pending. Another administrator must approve it.";
         }
         catch (Exception ex) { TempData["ErrorMessage"] = ErrorMessage(ex); }
         return RedirectToAction(nameof(Index), new { factorCode });
     }
 
     // Publication is separate from editing to preserve the document's controlled-change workflow.
-    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = AppPermissions.RiskScoringManage)]
-    public async Task<IActionResult> Apply(string factorCode, CancellationToken cancellationToken)
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = AppPermissions.RiskScoringApprove)]
+    public async Task<IActionResult> Apply(string factorCode, int ruleId, string reviewToken, CancellationToken cancellationToken)
     {
         try
         {
-            await riskScoring.ActivateRulesAsync(factorCode, cancellationToken);
-            TempData["SuccessMessage"] = "Reviewed scores applied to new evaluations.";
+            await riskScoring.ActivateRulesAsync(factorCode, ruleId, reviewToken, cancellationToken);
+            TempData["SuccessMessage"] = "Selected score change approved. Other scores are unchanged.";
         }
         catch (Exception ex) { TempData["ErrorMessage"] = ErrorMessage(ex); }
         return RedirectToAction(nameof(Index), new { factorCode });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Review(string factorCode, int ruleId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var review = await riskScoring.GetApprovalReviewAsync("Rules", factorCode, cancellationToken, ruleId);
+            return View("~/Views/Shared/RiskApprovalReview.cshtml", review);
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = ErrorMessage(ex);
+            return RedirectToAction(nameof(Index), new { factorCode });
+        }
     }
 
     private string ErrorMessage(Exception ex)

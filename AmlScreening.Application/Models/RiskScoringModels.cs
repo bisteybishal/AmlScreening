@@ -28,6 +28,7 @@ public sealed class RiskFactorResult
     public decimal WeightedScore { get; init; }
     public int RuleVersion { get; init; }
     public required string Explanation { get; init; }
+
 }
 
 public sealed class RiskScoringResult
@@ -44,6 +45,8 @@ public sealed class RiskScoringResult
 
 public sealed class RiskScoringSetupResult
 {
+    public bool CanEditRules { get; init; }
+    public bool CanEditBands { get; init; }
     public bool HasRuleDraft { get; init; }
     public bool HasBandDraft { get; init; }
     public RiskModel? ActiveModel { get; init; }
