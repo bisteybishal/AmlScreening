@@ -5,6 +5,8 @@ using AmlScreening.Application.Security;
 using AmlScreening.Domain.Entities;
 using AmlScreening.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Identity.Client;
+using Microsoft.AspNetCore.Mvc;
 
 namespace AmlScreening.Infrastructure.Repositories;
 
@@ -40,7 +42,8 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
                     Country = x.Country,
                     Nationality = x.Nationality,
                     Remarks = x.Remarks,
-                    ReferenceNo = x.ReferenceNo
+                    ReferenceNo = x.ReferenceNo,
+                    HasPhoto=x.Photo!=null
 
                 }).ToArrayAsync(cancellationToken);
         }
@@ -259,6 +262,20 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
             throw;
         }
     }
+
+    public async Task<AmlRecord>GetPhotoAsync(int id ,CancellationToken cancellationToken = default)
+    {
+        var query = ApplyOwnershipScope(_dbContext.AmlRecords.AsNoTracking());
+        return await query.Where(x => x.Id==id && x.IsActive)
+            .Select(x => new AmlRecord
+            {
+                Id = x.Id,
+                Photo = x.Photo,
+                PhotoContentType = x.PhotoContentType
+            }).FirstOrDefaultAsync(cancellationToken);
+    }
+
+
     private IQueryable<AmlRecord> ApplyOwnershipScope(IQueryable<AmlRecord> query)
     {
         if (!_currentUser.IsAuthenticated || _currentUser.ClientId <= 0 || _currentUser.UserId <= 0)

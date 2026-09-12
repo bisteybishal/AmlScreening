@@ -1,0 +1,43 @@
+@model AmlScreening.Portal.ViewModels.RolePermissionsViewModel
+@{
+    ViewData["Title"] = "Manage Permissions";
+    var groups = Model.Permissions.GroupBy(x => x.PermissionName.Split('.')[0]);
+}
+
+@section Styles { <link rel="stylesheet" href="~/css/roles.css" asp-append-version="true" /> }
+
+<section class="role-editor-heading"><a asp-action="Index"><i class="bi bi-arrow-left"></i> Back to Roles</a><h1>@Model.RoleName Permissions</h1><p>Select what users assigned to this role are allowed to do.</p></section>
+
+@if (TempData["SuccessMessage"] is string message)
+{
+    <div class="roles-alert"><i class="bi bi-info-circle-fill"></i>@message</div>
+}
+
+<form asp-action="Permissions" method="post" class="permission-form">
+    @Html.AntiForgeryToken()
+    <input asp-for="RoleId" type="hidden" />
+    @if (Model.IsAdminRole)
+    {
+        <div class="admin-notice"><i class="bi bi-shield-check"></i><span><strong>Administrator protection</strong><small>The Admin role always keeps every permission to prevent system lockout.</small></span></div>
+    }
+    <div class="permission-groups">
+        @foreach (var group in groups)
+        {
+            <section class="permission-group">
+                <div class="permission-group-title"><span><i class="bi @(group.Key == "AMLRecords" ? "bi-shield-check" : group.Key == "Users" ? "bi-people" : "bi-lock")"></i></span><div><h2>@(group.Key == "AMLRecords" ? "AML Records" : group.Key)</h2><p>@group.Count() available permission@(group.Count() == 1 ? "" : "s")</p></div></div>
+                <div class="permission-list">
+                    @foreach (var permission in group)
+                    {
+                        var actionName = permission.PermissionName.Contains('.') ? permission.PermissionName.Split('.')[1] : permission.PermissionName;
+                        <label class="permission-option @(Model.IsAdminRole ? "locked" : "")">
+                            <input type="checkbox" name="SelectedPermissionIds" value="@permission.PermissionId" checked="@(permission.IsSelected || Model.IsAdminRole)" disabled="@Model.IsAdminRole" />
+                            <span><i class="bi bi-check"></i></span>
+                            <p><strong>@actionName</strong><small>@permission.Description</small></p>
+                        </label>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+    <div class="permission-actions"><a class="roles-secondary-button" asp-action="Index">Cancel</a><button class="roles-primary-button" type="submit"><i class="bi bi-check2"></i> Save Permissions</button></div>
+</form>

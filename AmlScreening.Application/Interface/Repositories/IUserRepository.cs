@@ -16,4 +16,5 @@ public interface IUserRepository
     Task<bool> UsernameExistsAsync(string username);
     Task<long> CreateAsync(User user, int roleId);
     Task<bool> UpdateRoleAsync(long userId, int roleId);
+    Task<IReadOnlyList<ClientOption>> GetActiveClientsAsync();
 }

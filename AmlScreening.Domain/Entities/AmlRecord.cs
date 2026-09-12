@@ -28,6 +28,10 @@ namespace AmlScreening.Domain.Entities
         public string SourceName { get; set; } = string.Empty;
 
         public string? Remarks { get; set; }
+        public byte[]? Photo { get; set; }
+
+        public string? PhotoContentType { get; set; }
+        public bool HasPhoto { get; set; }
 
         public void Activate()
         {

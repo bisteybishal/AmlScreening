@@ -2,6 +2,7 @@ using AmlScreening.Application;
 using AmlScreening.Application.Security;
 using AmlScreening.Infrastructure;
 using AmlScreening.Portal.Extension;
+using AmlScreening.Portal.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Controllers;
@@ -9,11 +10,8 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-if (!builder.Environment.IsDevelopment())
-{
-    ValidateHostedConfiguration(builder.Configuration, builder.Environment);
-    builder.Logging.AddJsonConsole();
-}
+
+//MVC
 builder.Services.AddControllersWithViews();
 builder.Services.AddCurrentUserAuthorization();
 builder.Services.AddCustomDataProtection(builder.Configuration, builder.Environment);
@@ -21,20 +19,22 @@ builder.Services.AddCustomDataProtection(builder.Configuration, builder.Environm
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<PortalCookieEvents>();
 
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
 
     .AddCookie(options =>
     {
-        options.Cookie.Name = "AMLScreening.Auth";
+        options.Cookie.Name = "AMLScreening.Auth.v2";
         options.Cookie.HttpOnly = true;
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.LoginPath = "/Account/Login";
         options.AccessDeniedPath = "/Account/AccessDenied";
-        options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
         options.SlidingExpiration = true;
+        options.EventsType = typeof(PortalCookieEvents);
     });
 builder.Services.AddAuthorization(options =>
 {

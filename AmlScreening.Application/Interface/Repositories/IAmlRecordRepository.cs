@@ -20,4 +20,8 @@ public interface IAmlRecordRepository
     Task<int> CreateAsync(AmlRecord record);
     Task<bool> UpdateAsync(AmlRecord record, string updateby);
     Task<bool> DeleteAsync(int id, string deletedBy);
+
+    Task<AmlRecord?> GetPhotoAsync(
+    int id,
+    CancellationToken cancellationToken = default);
 }

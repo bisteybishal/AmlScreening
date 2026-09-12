@@ -70,7 +70,13 @@ public sealed class UsersController : Controller
     {
         try
         {
-            return View(await LoadRolesAsync(new CreateUserViewModel()));
+            var model = new CreateUserViewModel();
+
+            await LoadCreateOptionsAsync(model);
+
+            return View(model);
+
+           // return View(await LoadRolesAsync(new CreateUserViewModel()));
         }
         catch (Exception exception)
         {
@@ -81,7 +87,9 @@ public sealed class UsersController : Controller
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     [Authorize(Policy = AppPermissions.UsersCreate)]
+    [Authorize(Policy = AppPermissions.RolesManage)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(CreateUserViewModel model)
     {
@@ -90,25 +98,51 @@ public sealed class UsersController : Controller
 
         try
         {
+            await LoadCreateOptionsAsync(model);
+
+            // Validate the selected organization.
+            if (!model.Clients.Any(x => x.ClientId == model.ClientId))
+            {
+                ModelState.AddModelError(
+                    nameof(model.ClientId),
+                    "Select a valid active organization.");
+            }
+
+            // Validate the selected role.
+            var selectedRole = model.Roles
+                .FirstOrDefault(x => x.RoleId == model.RoleId);
+
+            if (selectedRole is null)
+            {
+                ModelState.AddModelError(
+                    nameof(model.RoleId),
+                    "Select a valid active role.");
+            }
+            else if (
+                selectedRole.RoleName.Equals(
+                    "Admin", StringComparison.OrdinalIgnoreCase) &&
+                model.ClientId != _currentUser.ClientId)
+            {
+                ModelState.AddModelError(
+                    nameof(model.RoleId),
+                    "Admin is reserved for your vendor organization.");
+            }
+
+            // Keep usernames unique.
             if (!string.IsNullOrWhiteSpace(model.Username) &&
                 await _userRepository.UsernameExistsAsync(model.Username))
             {
-                ModelState.AddModelError(nameof(model.Username), "This username already exists.");
+                ModelState.AddModelError(
+                    nameof(model.Username),
+                    "This username already exists.");
             }
-
-            var roles = await _userRepository.GetActiveRolesAsync();
-            if (model.RoleId > 0 && roles.All(x => x.RoleId != model.RoleId))
-                ModelState.AddModelError(nameof(model.RoleId), "Select a valid active role.");
 
             if (!ModelState.IsValid)
-            {
-                model.Roles = roles;
                 return View(model);
-            }
 
             var user = new User
             {
-                ClientId = _currentUser.ClientId,
+                ClientId = model.ClientId,
                 Username = model.Username,
                 FullName = model.FullName,
                 PasswordHash = _passwordService.Hash(model.Password),
@@ -117,17 +151,47 @@ public sealed class UsersController : Controller
             };
 
             await _userRepository.CreateAsync(user, model.RoleId);
-            TempData["SuccessMessage"] = $"User {model.Username} created successfully.";
+
+            TempData["SuccessMessage"] =
+                $"User {model.Username} created successfully.";
+
             return RedirectToAction(nameof(Index));
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Unable to create user {Username}.", model.Username);
-            ModelState.AddModelError(string.Empty, "The user could not be created. Please try again.");
-            model.Roles = await TryLoadRolesAsync();
+            _logger.LogError(
+                exception,
+                "Unable to create user {Username} for client {ClientId}.",
+                model.Username,
+                model.ClientId);
+
+            ModelState.AddModelError(
+                string.Empty,
+                "The user could not be created. Please try again.");
+
+            // Reload both dropdowns when displaying an error.
+            try
+            {
+                await LoadCreateOptionsAsync(model);
+            }
+            catch (Exception loadException)
+            {
+                _logger.LogError(
+                    loadException,
+                    "Unable to reload create-user options.");
+
+                TempData["ErrorMessage"] =
+                    "The create-user page is temporarily unavailable.";
+
+                return RedirectToAction(nameof(Index));
+            }
+
             return View(model);
         }
     }
+
+
+
 
     [HttpGet]
     [Authorize(Policy = AppPermissions.RolesManage)]
@@ -188,23 +252,10 @@ public sealed class UsersController : Controller
         }
     }
 
-    private async Task<CreateUserViewModel> LoadRolesAsync(CreateUserViewModel model)
+    private async Task LoadCreateOptionsAsync(CreateUserViewModel model)
     {
+        model.Clients = await _userRepository.GetActiveClientsAsync();
         model.Roles = await _userRepository.GetActiveRolesAsync();
-        return model;
-    }
-
-    private async Task<IReadOnlyList<AmlScreening.Application.Models.RoleOption>> TryLoadRolesAsync()
-    {
-        try
-        {
-            return await _userRepository.GetActiveRolesAsync();
-        }
-        catch (Exception exception)
-        {
-            _logger.LogError(exception, "Unable to reload roles after a create-user error.");
-            return Array.Empty<AmlScreening.Application.Models.RoleOption>();
-        }
     }
 
     private async Task<UserAccessViewModel> BuildAccessModelAsync(AmlScreening.Application.Models.UserListItem user)

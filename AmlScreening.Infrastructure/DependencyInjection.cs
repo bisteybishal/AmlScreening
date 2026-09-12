@@ -36,6 +36,8 @@ namespace AmlScreening.Infrastructure
             services.AddScoped<IAmlImportRepository, AmlImportRepository>();
             services.AddScoped<IErrorRepository, ErrorRepository>();
             services.AddScoped<IComplianceDashboardRepository, ComplianceDashboardRepository>();
+            services.AddScoped<IUserSessionRepository, UserSessionRepository>();
+          
 
 
             services.AddHttpClient("UnAmlClient", client =>

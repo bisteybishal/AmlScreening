@@ -1,0 +1,19 @@
+{
+  "ConnectionStrings": {
+    "AMLDatabase": "Server=YOUR-SQL-SERVER;Database=AMLScreening;Integrated Security=True;Encrypt=True;TrustServerCertificate=False;"
+  },
+  "AllowedHosts": "localhost;YOUR-PORTAL-HOST",
+  "DataProtection": {
+    "ApplicationName": "AmlScreening.Portal",
+    "KeysPath": "C:\\ProgramData\\AmlScreening\\DataProtection"
+  },
+  "SourceSync": {
+    "Enabled": false,
+    "StorageClientId": 1,
+    "IntervalMinutes": 60,
+    "Sources": ["UN", "EU"]
+  },
+  "Logging": {
+    "LogLevel": { "Default": "Information", "Microsoft.AspNetCore": "Warning" }
+  }
+}

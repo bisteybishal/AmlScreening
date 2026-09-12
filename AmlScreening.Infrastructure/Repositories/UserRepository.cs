@@ -340,28 +340,86 @@ public sealed class UserRepository : IUserRepository
 
     public async Task<long> CreateAsync(User user, int roleId)
     {
+        EnsureCanCreateUsers();
+
         using var connection = _dbConnectionFactory.CreateConnection();
         connection.Open();
+
         using var transaction = connection.BeginTransaction();
 
         try
         {
-            const string insertUser = """
-                INSERT INTO dbo.Users
-                    (ClientId, Username, FullName, PasswordHash, IsActive, CreatedDate)
-                OUTPUT INSERTED.UserId
-                VALUES
-                    (@ClientId, @Username, @FullName, @PasswordHash, @IsActive, @CreatedDate);
-                """;
+            // The selected organization must exist and be active.
+            const string clientSql = """
+            SELECT COUNT(1)
+            FROM dbo.Clients WITH (UPDLOCK, HOLDLOCK)
+            WHERE Id = @ClientId
+              AND IsActive = 1
+              AND DeleteFg = 'N';
+            """;
 
-            var userId = await connection.ExecuteScalarAsync<long>(insertUser, user, transaction);
+            var clientExists = await connection.ExecuteScalarAsync<int>(
+                clientSql,
+                new { user.ClientId },
+                transaction);
 
-            const string insertRole = """
-                INSERT INTO dbo.UserRoles (UserId, RoleId)
-                VALUES (@UserId, @RoleId);
-                """;
+            if (clientExists != 1)
+            {
+                throw new InvalidOperationException(
+                    "Select a valid active organization.");
+            }
 
-            await connection.ExecuteAsync(insertRole, new { UserId = userId, RoleId = roleId }, transaction);
+            // The selected role must exist and be active.
+            const string roleSql = """
+            SELECT RoleName
+            FROM dbo.Roles WITH (UPDLOCK, HOLDLOCK)
+            WHERE RoleId = @RoleId
+              AND IsActive = 1;
+            """;
+
+            var roleName = await connection.QuerySingleOrDefaultAsync<string>(
+                roleSql,
+                new { RoleId = roleId },
+                transaction);
+
+            if (string.IsNullOrWhiteSpace(roleName))
+            {
+                throw new InvalidOperationException(
+                    "Select a valid active role.");
+            }
+
+            // Admin is the vendor role, not a partner role.
+            if (roleName.Equals("Admin", StringComparison.OrdinalIgnoreCase) &&
+                user.ClientId != _currentUser.ClientId)
+            {
+                throw new InvalidOperationException(
+                    "Admin can only be assigned within your vendor organization.");
+            }
+
+            const string insertUserSql = """
+            INSERT INTO dbo.Users
+                (ClientId, Username, FullName, PasswordHash,
+                 IsActive, CreatedDate)
+            OUTPUT INSERTED.UserId
+            VALUES
+                (@ClientId, @Username, @FullName, @PasswordHash,
+                 @IsActive, @CreatedDate);
+            """;
+
+            var userId = await connection.ExecuteScalarAsync<long>(
+                insertUserSql,
+                user,
+                transaction);
+
+            const string insertRoleSql = """
+            INSERT INTO dbo.UserRoles (UserId, RoleId)
+            VALUES (@UserId, @RoleId);
+            """;
+
+            await connection.ExecuteAsync(
+                insertRoleSql,
+                new { UserId = userId, RoleId = roleId },
+                transaction);
 
             await InsertAuditAsync(
                 connection,
@@ -369,9 +427,10 @@ public sealed class UserRepository : IUserRepository
                 "Create",
                 "User",
                 userId.ToString(),
-                $"Created user {user.Username}.");
+                $"Created user {user.Username} for ClientId {user.ClientId}.");
 
             transaction.Commit();
+
             return userId;
         }
         catch
@@ -380,7 +439,6 @@ public sealed class UserRepository : IUserRepository
             throw;
         }
     }
-
     public async Task<bool> UpdateRoleAsync(long userId, int roleId)
     {
         using var connection = _dbConnectionFactory.CreateConnection();
@@ -429,6 +487,22 @@ public sealed class UserRepository : IUserRepository
         }
     }
 
+    public async Task<IReadOnlyList<ClientOption>> GetActiveClientsAsync()
+    {
+        EnsureCanCreateUsers();
+        using var connection = _dbConnectionFactory.CreateConnection();
+        const string sql = """
+        SELECT
+            Id AS ClientId,
+            ClientName
+        FROM dbo.Clients
+        WHERE IsActive = 1
+          AND DeleteFg = 'N'
+        ORDER BY ClientName;
+        """;
+        var clients = await connection.QueryAsync<ClientOption>(sql);
+        return clients.ToList();
+    }
     private bool CanViewAllClients() =>
         _currentUser.HasPermission(AppPermissions.AmlRecordsViewAll);
 
@@ -471,5 +545,16 @@ public sealed class UserRepository : IUserRepository
         public int ActiveUsers { get; init; }
         public int InactiveUsers { get; init; }
         public int Administrators { get; init; }
+    }
+    private void EnsureCanCreateUsers()
+    {
+        if (!_currentUser.IsAuthenticated ||
+            !_currentUser.IsAdministrator ||
+            !_currentUser.HasPermission(AppPermissions.UsersCreate) ||
+            !_currentUser.HasPermission(AppPermissions.RolesManage))
+        {
+            throw new UnauthorizedAccessException(
+                "Only authorized vendor administrators can create users.");
+        }
     }
 }

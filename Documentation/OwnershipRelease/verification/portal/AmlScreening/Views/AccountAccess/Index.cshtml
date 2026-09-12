@@ -1,0 +1,52 @@
+@model AmlScreening.Portal.ViewModels.AccountAccessViewModel
+@{ ViewData["Title"] = "Portal and API access"; }
+@section Styles { <link rel="stylesheet" href="~/css/users.css" asp-append-version="true" /> }
+<section class="user-editor-heading">
+    <a asp-controller="Users" asp-action="Index">Back to Users</a>
+    <h1>Portal and API access</h1>
+    <p>@Model.Account.FullName (@Model.Account.Username) — UserId @Model.Account.UserId, ClientId @Model.Account.ClientId</p>
+    <p>Keep this account when adding another access method. No customer records need to move.</p>
+</section>
+@if (TempData["SuccessMessage"] is string success) { <p role="status" class="users-alert">@success</p> }
+@if (TempData["ErrorMessage"] is string error) { <p role="alert" class="users-alert error">@error</p> }
+<section class="user-editor-card" style="padding:24px;margin-bottom:20px">
+    <h2>Portal sign-in</h2>
+    <form asp-action="Portal" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="userId" value="@Model.Account.UserId" />
+        <label><input type="checkbox" name="enabled" value="true" checked="@Model.Account.CanAccessPortal" /> Allow this account to sign in to the portal</label>
+        <p>This does not enable or disable its API applications. Module permissions still apply.</p>
+        <button type="submit" class="users-primary-button">Save portal access</button>
+        <a asp-controller="Users" asp-action="Access" asp-route-id="@Model.Account.UserId">Manage module permissions</a>
+    </form>
+</section>
+<section class="user-editor-card" style="padding:24px;margin-bottom:20px">
+    <h2>Link an API application</h2>
+    <p>Use the exact issuer (iss) and application subject (sub) issued by your configured OAuth provider. Do not enter tokens or passwords.</p>
+    <form asp-action="Link" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="UserId" value="@Model.Account.UserId" />
+        <div class="user-field"><label for="issuer">Verified issuer (iss)</label><input id="issuer" name="Issuer" type="url" maxlength="300" required placeholder="https://your-identity-provider/" /></div>
+        <div class="user-field"><label for="subject">Verified application subject (sub)</label><input id="subject" name="Subject" maxlength="300" required autocomplete="off" /></div>
+        <p><label><input type="checkbox" name="IdentityVerified" value="true" required /> I verified this application's identity and account owner.</label></p>
+        <button type="submit" class="users-primary-button">Link to this account</button>
+    </form>
+</section>
+<section class="user-editor-card" style="padding:24px">
+    <h2>Linked API applications</h2>
+    @if (Model.Applications.Count == 0) { <p>No API applications are linked yet.</p> }
+    @foreach (var application in Model.Applications)
+    {
+        <article style="padding:16px 0;border-bottom:1px solid #ddd;overflow-wrap:anywhere">
+            <p><strong>Application @application.Id</strong> — @(application.IsActive ? "Enabled" : "Disabled")</p>
+            <p>Issuer: @application.Issuer<br />Subject: @application.Subject</p>
+            <form asp-action="Application" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="userId" value="@Model.Account.UserId" />
+                <input type="hidden" name="applicationId" value="@application.Id" />
+                <input type="hidden" name="enabled" value="@((!application.IsActive).ToString().ToLowerInvariant())" />
+                <button class="users-secondary-button" type="submit">@(application.IsActive ? "Disable API access" : "Enable API access")</button>
+            </form>
+        </article>
+    }
+</section>

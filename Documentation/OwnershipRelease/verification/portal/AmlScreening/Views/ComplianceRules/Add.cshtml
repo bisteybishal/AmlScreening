@@ -1,0 +1,123 @@
+@model AmlScreening.Portal.ViewModels.ComplianceRuleViewModel
+
+@{
+    ViewData["Title"] = "Add Compliance Rule";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/aml-records.css" asp-append-version="true" />
+}
+
+<section class="record-editor-heading">
+    <a asp-controller="ComplianceRules" asp-action="Index">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <h1>Add Compliance Rule</h1>
+</section>
+
+<section class="record-editor-card">
+    <div class="record-editor-card-title">
+        <span><i class="bi bi-sliders"></i></span>
+        <div>
+            <h2>Rule details</h2>
+            <p>Enter the rule condition and the action to take.</p>
+        </div>
+    </div>
+
+    <form asp-controller="ComplianceRules" asp-action="Add" method="post">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="records-validation-summary"></div>
+
+        <div class="record-form-grid">
+            <div class="field">
+                <label>Rule code</label>
+                <input asp-for="RuleCode" placeholder="e.g. AMOUNT-001" />
+            </div>
+
+            <div class="field">
+                <label>Rule name</label>
+                <input asp-for="RuleName" placeholder="e.g. High-value transaction" />
+            </div>
+
+            <div class="field">
+                <label>Rule type</label>
+                <select asp-for="RuleType">
+                    <option value="AmountThreshold">Amount threshold</option>
+                    <option value="Velocity">Velocity</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <label>Threshold amount</label>
+                <input asp-for="ThresholdAmount" type="number" step="0.01" placeholder="e.g. 500000" />
+            </div>
+
+            <div class="field">
+                <label>Currency</label>
+                <select asp-for="Currency">
+                    <option value="NPR">NPR</option>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="INR">INR</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <label>Lookback minutes</label>
+                <input asp-for="LookbackMinutes" type="number" placeholder="e.g. 1440" />
+            </div>
+
+            <div class="field">
+                <label>Transaction count</label>
+                <input asp-for="TransactionCount" type="number" placeholder="e.g. 5" />
+            </div>
+
+            <div class="field">
+                <label>Risk score</label>
+                <input asp-for="RiskScore" type="number" />
+            </div>
+
+            <div class="field">
+                <label>Action</label>
+                <select asp-for="Action">
+                    <option value="Allow">Allow</option>
+                    <option value="Review">Review</option>
+                    <option value="Hold">Hold</option>
+                    <option value="Alert">Create alert</option>
+                    <option value="Block">Block</option>
+                </select>
+            </div>
+
+            <div class="field"><label>Rule version</label><input asp-for="RuleVersion" type="number" min="1" /></div>
+            <div class="field"><label>Priority</label><input asp-for="Priority" type="number" min="1" /></div>
+            <div class="field"><label>Approval status</label><select asp-for="ApprovalStatus"><option value="Draft">Draft</option><option value="Active">Active</option><option value="Retired">Retired</option></select></div>
+
+            <div class="field">
+                <label>Effective from</label>
+                <input asp-for="EffectiveFrom" type="datetime-local" asp-format="{0:yyyy-MM-ddTHH:mm}" />
+            </div>
+
+            <div class="field">
+                <label>Effective to</label>
+                <input asp-for="EffectiveTo" type="datetime-local" asp-format="{0:yyyy-MM-ddTHH:mm}" />
+            </div>
+
+            <label class="active-switch full">
+                <input asp-for="IsActive" />
+                <span></span>
+                <strong>Active rule</strong>
+                <small>Use this rule during compliance checking.</small>
+            </label>
+        </div>
+
+        <div class="record-editor-actions">
+            <a class="records-secondary-button"
+               asp-controller="ComplianceRules"
+               asp-action="Index">Cancel</a>
+
+            <button class="records-primary-button" type="submit">
+                <i class="bi bi-check2"></i> Add Rule
+            </button>
+        </div>
+    </form>
+</section>

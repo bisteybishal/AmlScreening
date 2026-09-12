@@ -41,6 +41,20 @@ namespace AmlScreening.Portal.Controllers
                 return PartialView("_SearchResults", model);
             }
         }
+        [HttpGet]
+        public async Task<IActionResult> GetPhoto(int id, CancellationToken cancellationToken = default)
+        {
+            var record = await repository.GetPhotoAsync(id, cancellationToken);
+
+            if (record == null || record.Photo == null)
+            {
+                return NotFound();
+            }
+
+            return File(
+                record.Photo,
+                record.PhotoContentType ?? "image/jpeg");
+        }
     }
 }
 

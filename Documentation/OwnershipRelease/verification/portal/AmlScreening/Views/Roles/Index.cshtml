@@ -1,0 +1,41 @@
+@model AmlScreening.Portal.ViewModels.RolesPageViewModel
+@{
+    ViewData["Title"] = "Roles & Permissions";
+}
+
+@section Styles { <link rel="stylesheet" href="~/css/roles.css" asp-append-version="true" /> }
+
+<section class="roles-heading">
+    <div><h1>Roles &amp; Permissions</h1><p>Control which parts of the AML portal each role can access.</p></div>
+    <a class="roles-primary-button" asp-action="Create"><i class="bi bi-plus-lg"></i> Add Role</a>
+</section>
+
+@if (TempData["SuccessMessage"] is string message)
+{
+    <div class="roles-alert"><i class="bi bi-check-circle-fill"></i>@message</div>
+}
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+
+<section class="roles-guide">
+    <div><span>1</span><p><strong>Create a role</strong><small>For example AML User or Viewer.</small></p></div><i class="bi bi-chevron-right"></i>
+    <div><span>2</span><p><strong>Assign permissions</strong><small>Select the allowed portal actions.</small></p></div><i class="bi bi-chevron-right"></i>
+    <div><span>3</span><p><strong>Assign users</strong><small>Choose the role when creating a user.</small></p></div>
+</section>
+
+<section class="roles-grid">
+    @foreach (var role in Model.Roles)
+    {
+        <article class="role-card @(role.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase) ? "admin" : "")">
+            <div class="role-card-top"><span><i class="bi bi-shield-lock"></i></span><div><h2>@role.RoleName</h2><small class="@(role.IsActive ? "active" : "inactive")">@(role.IsActive ? "Active" : "Inactive")</small></div></div>
+            <div class="role-metrics"><p><strong>@role.UserCount</strong><small>Users</small></p><p><strong>@role.PermissionCount</strong><small>Permissions</small></p></div>
+            <div class="role-card-footer"><span>Created @role.CreatedDate.ToString("dd MMM yyyy")</span><a asp-action="Permissions" asp-route-id="@role.RoleId"><i class="bi bi-sliders"></i> Manage Permissions</a></div>
+        </article>
+    }
+</section>

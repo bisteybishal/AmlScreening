@@ -45,6 +45,10 @@ public sealed class CreateUserViewModel
     public bool IsActive { get; set; } = true;
 
     public IReadOnlyList<RoleOption> Roles { get; set; } = Array.Empty<RoleOption>();
+    [Range(1, int.MaxValue, ErrorMessage = "Select an organization.")]
+    [Display(Name = "Organization")]
+    public int ClientId { get; set; }
+    public IReadOnlyList<ClientOption> Clients { get; set; } = Array.Empty<ClientOption>();
 }
 
 public sealed class UserAccessViewModel

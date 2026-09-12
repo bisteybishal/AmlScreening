@@ -19,6 +19,9 @@
         @Html.AntiForgeryToken()
         <div asp-validation-summary="ModelOnly" class="users-validation"></div>
         <div class="user-form-grid">
+            
+
+  
             <div class="user-field"><label asp-for="FullName"></label><input asp-for="FullName" placeholder="e.g. Sita Sharma" autocomplete="name" /><span asp-validation-for="FullName"></span></div>
             <div class="user-field"><label asp-for="Username"></label><input asp-for="Username" placeholder="e.g. sita.sharma" autocomplete="username" /><span asp-validation-for="Username"></span></div>
             <div class="user-field"><label asp-for="RoleId"></label><select asp-for="RoleId"><option value="0">Select a role</option>@foreach (var role in Model.Roles){<option value="@role.RoleId">@role.RoleName</option>}</select><span asp-validation-for="RoleId"></span></div>

@@ -1,0 +1,18 @@
+﻿@model ErrorViewModel
+@{
+    ViewData["Title"] = "Error";
+}
+
+<section class="content-card">
+    <h1>We could not complete your request</h1>
+    <p>Please try again. If the problem continues, give the request ID below to the support team.</p>
+
+    @if (Model.ShowRequestId)
+    {
+        <p>
+            <strong>Request ID:</strong> <code>@Model.RequestId</code>
+        </p>
+    }
+
+    <a asp-controller="Dashboard" asp-action="Index" class="btn btn-primary">Return to dashboard</a>
+</section>

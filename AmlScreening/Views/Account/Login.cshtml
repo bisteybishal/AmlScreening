@@ -46,7 +46,7 @@
 
                 <header>
                     <span class="welcome-icon" aria-hidden="true">↗</span>
-                    <h2>Welcome back</h2>
+                    <h2>Welcome Back</h2>
                     <p>Enter your account details to continue.</p>
                 </header>
 
@@ -73,10 +73,10 @@
                         <span asp-validation-for="Password" class="field-error"></span>
                     </div>
 
-                    <label class="remember-option">
+                    @* <label class="remember-option">
                         <input asp-for="RememberMe" />
                         <span>Keep me signed in on this device</span>
-                    </label>
+                    </label> *@
 
                     <button class="login-button" type="submit">
                         <span>Sign in securely</span><span aria-hidden="true">→</span>

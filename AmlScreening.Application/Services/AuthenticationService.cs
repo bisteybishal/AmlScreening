@@ -44,7 +44,6 @@ namespace AmlScreening.Application.Services
             }
 
             var permissions = await _userRepository.GetPermissionsAsync(user.Id);
-            await _userRepository.UpdateLastLoginAsync(user.Id);
 
             return new LoginResult
             {

@@ -48,9 +48,22 @@ else
 
             <details class="screening-card">
                 <summary>
-                    <span class="screening-record-icon">
+                   @* <span class="screening-record-icon">
                         <i class="bi bi-person"
                            aria-hidden="true"></i>
+                    </span>*@
+                    <span class="screening-record-icon">
+                        @if (record.HasPhoto)
+                        {
+                            <img src="@Url.Action("GetPhoto", "Screening", new { id = record.Id })"
+                                 alt="@record.FullName"
+                                 class="screening-record-photo" />
+                        }
+                        else
+                        {
+                            <i class="bi bi-person"
+                               aria-hidden="true"></i>
+                        }
                     </span>
 
                     <span class="screening-record-heading">

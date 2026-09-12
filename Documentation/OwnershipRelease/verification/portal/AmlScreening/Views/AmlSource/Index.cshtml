@@ -1,0 +1,109 @@
+﻿@{
+    ViewData["Title"] = "AML Data Sources";
+}
+@{
+    var canSync = User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlSourceSync);
+}
+
+@section Styles {
+    <link rel="stylesheet"
+          href="~/css/aml-source.css"
+          asp-append-version="true" />
+}
+
+<div class="page-header">
+    <div>
+        <h1>AML Data Sources</h1>
+        <p>Synchronize sanctions data from official sources.</p>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] is string success)
+{
+    <div class="alert alert-success">
+        @success
+    </div>
+}
+
+@if (TempData["ErrorMessage"] is string error)
+{
+    <div class="alert alert-danger">
+        @error
+    </div>
+}
+
+<div class="source-grid">
+
+    <!-- UN -->
+    <div class="source-card">
+
+        <div class="source-card-header">
+            <h3>United Nations Sanctions</h3>
+
+            <span class="source-code">
+                UN
+            </span>
+        </div>
+
+        <div class="source-card-body">
+            @if (canSync)
+            {
+                <form asp-controller="AmlSource"
+                      asp-action="Sync"
+                      method="post">
+
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="sourceCode" value="UN" />
+                <button type="submit"
+                        class="sync-source-button">
+
+                    <i class="bi bi-arrow-repeat"></i>
+                    Sync UN Data
+
+                </button>
+
+            </form>
+            }
+
+        </div>
+
+    </div>
+
+
+    <!-- EU -->
+    <div class="source-card">
+
+        <div class="source-card-header">
+            <h3>European Union Sanctions</h3>
+
+            <span class="source-code">
+                EU
+            </span>
+        </div>
+
+        <div class="source-card-body">
+            @if (canSync)
+            {
+                
+           
+            <form asp-controller="AmlSource"
+                      asp-action="Sync"
+                  method="post">
+
+                @Html.AntiForgeryToken()
+                    <input type="hidden" name="sourceCode" value="EU" />
+                <button type="submit"
+                        class="sync-source-button">
+
+                    <i class="bi bi-arrow-repeat"></i>
+                    Sync EU Data
+
+                </button>
+
+            </form>
+            }
+        </div>
+
+    </div>
+
+</div>

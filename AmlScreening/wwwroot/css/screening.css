@@ -559,3 +559,11 @@
 .screening-card {
     scroll-margin-top: 90px;
 }
+
+.screening-record-photo {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    object-fit: cover;
+    display: block;
+}

@@ -1,0 +1,31 @@
+@model AmlScreening.Portal.ViewModels.SubscriptionAddModel
+@{
+    ViewData["Title"] = "Edit Subscription Plan";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/aml-records.css" asp-append-version="true" />
+}
+
+<section class="record-editor-heading">
+    <a asp-controller="Subscription" asp-action="Index"><i class="bi bi-arrow-left"></i> Back to Subscription Plans</a>
+    <h1>Edit Subscription Plan</h1>
+</section>
+
+<section class="record-editor-card">
+    <div class="record-editor-card-title">
+        <span><i class="bi bi-credit-card"></i></span>
+        <div><h2>Subscription details</h2><p>Update the plan information, then save the changes.</p></div>
+    </div>
+    <form asp-controller="Subscription" asp-action="Edit" method="post">
+        @Html.AntiForgeryToken()
+        <input asp-for="PlanId" type="hidden" />
+        <partial name="_SubscriptionForm" model="Model" />
+        <div class="record-editor-actions">
+            <a class="records-secondary-button" asp-controller="Subscription" asp-action="Index">Cancel</a>
+            <button class="records-primary-button" type="submit"><i class="bi bi-check2"></i> Save Changes</button>
+        </div>
+    </form>
+</section>
+
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

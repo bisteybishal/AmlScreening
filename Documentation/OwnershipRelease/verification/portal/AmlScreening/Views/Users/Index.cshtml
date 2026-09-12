@@ -1,0 +1,100 @@
+@model AmlScreening.Portal.ViewModels.UsersPageViewModel
+@{
+    ViewData["Title"] = "Users";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/aml-records.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/users.css" asp-append-version="true" />
+}
+
+<section class="users-heading">
+    <div><h1>User Management</h1><p>Create accounts and review access to the AML screening portal.</p></div>
+    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.UsersCreate))
+    {
+        <a class="users-primary-button" asp-action="Create"><i class="bi bi-person-plus"></i> Add User</a>
+    }
+</section>
+
+@if (TempData["SuccessMessage"] is string message)
+{
+    <div class="users-alert"><i class="bi bi-check-circle-fill"></i>@message</div>
+}
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="users-alert error" role="alert"><i class="bi bi-exclamation-triangle-fill"></i>@errorMessage</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="users-alert error" role="alert"><i class="bi bi-exclamation-triangle-fill"></i>@Model.ErrorMessage</div>
+}
+
+<section class="users-summary" aria-label="User summary">
+    <article><span class="teal"><i class="bi bi-people"></i></span><div><small>Total Users</small><strong>@Model.TotalUsers</strong></div></article>
+    <article><span class="green"><i class="bi bi-person-check"></i></span><div><small>Active Users</small><strong>@Model.ActiveUsers</strong></div></article>
+    <article><span class="gray"><i class="bi bi-person-dash"></i></span><div><small>Inactive Users</small><strong>@Model.InactiveUsers</strong></div></article>
+    <article><span class="blue"><i class="bi bi-shield-lock"></i></span><div><small>Administrators</small><strong>@Model.Administrators</strong></div></article>
+</section>
+
+<section class="users-panel">
+    <div class="users-panel-title"><div><h2>Portal users</h2><p>Accounts currently registered in the system.</p></div><span>@Model.TotalUsers user@(Model.TotalUsers == 1 ? "" : "s")</span></div>
+    <div class="table-responsive">
+        <table class="users-table">
+            <thead><tr><th>Sno</th><th>User</th><th>Username</th><th>Role</th><th>Status</th><th>Last Login</th><th>Created</th></tr></thead>
+            <tbody>
+                @if (Model.Users.Count == 0)
+                {
+                    <tr><td colspan="7"><div class="users-empty"><i class="bi bi-people"></i><strong>No users found</strong><span>Create the first portal user.</span></div></td></tr>
+                }
+                else
+                {
+                    @for (int i = 0; i < Model.Users.Count; i++)
+                    {
+                        var user = Model.Users[i];
+                        <tr>
+                            <td>@(((Model.Page - 1) * Model.PageSize) + i + 1)</td>
+                            <td>
+                                <div class="users-person">
+                                    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.RolesManage) &&
+                                         !user.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <a class="user-permission-link" asp-action="Access" asp-route-id="@user.UserId">@user.FullName</a>
+                                    }
+                                    else
+                                    {
+                                        <strong>@user.FullName</strong>
+                                    }
+                                </div>
+                            </td>
+                            <td>@user.Username
+                            @if (User.IsInRole("Admin") && User.HasClaim(AppPermissions.ClaimType, AppPermissions.RolesManage) && User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlRecordsViewAll))
+                            {
+                                <br /><a asp-controller="AccountAccess" asp-action="Index" asp-route-id="@user.UserId">Portal / API access</a>
+                            }
+                            </td>
+                            <td><span class="users-role">@user.RoleName</span></td>
+                            <td><span class="users-status @(user.IsActive ? "active" : "inactive")"><i></i>@(user.IsActive ? "Active" : "Inactive")</span></td>
+                            <td>@(user.LastLoginDate?.ToString("dd MMM yyyy, hh:mm tt") ?? "Never")</td>
+                            <td>@user.CreatedDate.ToString("dd MMM yyyy")</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@if (Model.TotalPages > 1)
+{
+    <nav class="records-pagination mt-3" aria-label="Users pagination">
+        <span>Page @Model.Page of @Model.TotalPages</span>
+        <div>
+            <a class="page-button @(Model.HasPreviousPage ? "" : "disabled")" asp-action="Index" asp-route-page="@(Model.Page - 1)" aria-disabled="@(!Model.HasPreviousPage)"><i class="bi bi-chevron-left"></i> Previous</a>
+            @for (var pageNumber = 1; pageNumber <= Model.TotalPages; pageNumber++)
+            {
+                <a class="page-number @(pageNumber == Model.Page ? "active" : "")" asp-action="Index" asp-route-page="@pageNumber">@pageNumber</a>
+            }
+            <a class="page-button @(Model.HasNextPage ? "" : "disabled")" asp-action="Index" asp-route-page="@(Model.Page + 1)" aria-disabled="@(!Model.HasNextPage)">Next <i class="bi bi-chevron-right"></i></a>
+        </div>
+    </nav>
+}

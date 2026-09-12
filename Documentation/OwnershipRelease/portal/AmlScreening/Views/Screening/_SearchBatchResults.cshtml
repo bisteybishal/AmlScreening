@@ -1,0 +1,17 @@
+@model AmlScreening.Portal.ViewModels.ScreeningBatchResultsViewModel
+
+@foreach (var group in Model.Groups)
+{
+    <section class="screening-name-group">
+        <h2>@group.SearchName</h2>
+        @if (group.HasResults)
+        {
+            <p>Showing the first 50 matches for this name. Enter more characters to narrow the results.</p>
+        }
+        else
+        {
+            <p>@group.Results.Count matching records for this name.</p>
+        }
+        <partial name="_SearchResults" model="group" />
+    </section>
+}
