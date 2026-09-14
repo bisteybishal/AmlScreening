@@ -66,7 +66,7 @@ public sealed class AuditService : IAuditService
             {
                 MaximumRecords = Math.Clamp(maximumRecords, 1, 1000),
                 ClientId = _currentUser.ClientId,
-                CanViewAll = _currentUser.HasPermission(AppPermissions.AmlRecordsViewAll)
+                CanViewAll = _currentUser.HasPermission(AppPermissions.PlatformCrossClientAccess)
             },
             cancellationToken: cancellationToken));
         return records.AsList();

@@ -44,6 +44,11 @@ public static class AppPermissions
     public const string RiskScoringApprove = "RiskScoring.Approve";
     public const string Screening = "Screening.View";
 
+    public const string PlatformCrossClientAccess =
+        "Platform.CrossClientAccess";
+
+
+
     public static readonly string[] All =
     {
         AmlRecordsView,
@@ -75,7 +80,8 @@ public static class AppPermissions
         RiskScoringView,
         RiskScoringManage,
         RiskScoringApprove,
-        Screening
+        Screening,
+        PlatformCrossClientAccess
     };
 
     public static readonly string[] PlatformOnly =
@@ -85,6 +91,7 @@ public static class AppPermissions
         SubscriptionCreate,
         SubscriptionEdit,
         SubscriptionDelete,
-        AmlSourceSync
+        AmlSourceSync,
+        PlatformCrossClientAccess
     };
 }

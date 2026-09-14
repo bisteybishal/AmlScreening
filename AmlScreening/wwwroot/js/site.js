@@ -34,8 +34,15 @@ document.addEventListener("DOMContentLoaded", function () {
     const userKey = tabContainer.dataset.userKey || "anonymous";
     const storageKey = `aml-workspace-tabs-${userKey}`;
     const dashboardUrl = tabContainer.dataset.dashboardUrl;
+
     const currentUrl = tabContainer.dataset.currentUrl;
     const currentTitle = tabContainer.dataset.currentTitle || "Page";
+    const workspaceKey =
+        tabContainer.dataset.workspaceKey || currentUrl;
+
+    const workspaceUrl =
+        tabContainer.dataset.workspaceUrl || currentUrl;
+
     const isDashboard = tabContainer.dataset.isDashboard === "true";
 
     function getTabs() {
@@ -55,14 +62,23 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Dashboard is permanent. Every other MVC page becomes a closable tab.
     if (!isDashboard) {
-        const existingTab = tabs.find(tab => tab.url === currentUrl);
+        const existingTab =
+            tabs.find(tab =>
+                tab.key === workspaceKey);
 
         if (existingTab) {
             existingTab.title = currentTitle;
-        } else {
-            tabs.push({ title: currentTitle, url: currentUrl });
+            existingTab.currentUrl = currentUrl;
+            existingTab.url = workspaceUrl;
         }
-
+        else {
+            tabs.push({
+                key: workspaceKey,
+                title: currentTitle,
+                url: workspaceUrl,
+                currentUrl: currentUrl
+            });
+        }
         // Keep the tab strip manageable on smaller screens.
         tabs = tabs.slice(-8);
         saveTabs(tabs);
@@ -75,13 +91,13 @@ document.addEventListener("DOMContentLoaded", function () {
             const tabElement = document.createElement("div");
             tabElement.className = "workspace-tab closable-tab";
 
-            if (!isDashboard && tab.url === currentUrl) {
+            if (!isDashboard && tab.key === workspaceKey) {
                 tabElement.classList.add("active");
             }
 
             const link = document.createElement("a");
             link.className = "workspace-tab-link";
-            link.href = tab.url;
+            link.href =tab.currentTitle || tab.url;
             link.textContent = tab.title;
 
             const closeButton = document.createElement("button");
@@ -94,8 +110,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 event.preventDefault();
                 event.stopPropagation();
 
-                const closingCurrentTab = !isDashboard && tab.url === currentUrl;
-                tabs = tabs.filter(existingTab => existingTab.url !== tab.url);
+                const closingCurrentTab = !isDashboard && tab.key === workspaceKey;
+                tabs = tabs.filter(existingTab => existingTab.key !== tab.key);
                 saveTabs(tabs);
 
                 if (closingCurrentTab) {

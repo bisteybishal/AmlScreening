@@ -1,6 +1,11 @@
 @model AmlScreening.Portal.ViewModels.CreateUserViewModel
 @{
     ViewData["Title"] = "Add User";
+
+    ViewData["WorkspaceKey"] = "Users";
+
+    ViewData["WorkspaceUrl"] =
+        Url.Action("Index", "Users");
 }
 
 @section Styles {
@@ -19,18 +24,50 @@
         @Html.AntiForgeryToken()
         <div asp-validation-summary="ModelOnly" class="users-validation"></div>
         <div class="user-form-grid">
-            
 
-  
-            <div class="user-field"><label asp-for="FullName"></label><input asp-for="FullName" placeholder="e.g. Sita Sharma" autocomplete="name" /><span asp-validation-for="FullName"></span></div>
-            <div class="user-field"><label asp-for="Username"></label><input asp-for="Username" placeholder="e.g. sita.sharma" autocomplete="username" /><span asp-validation-for="Username"></span></div>
-            <div class="user-field"><label asp-for="RoleId"></label><select asp-for="RoleId"><option value="0">Select a role</option>@foreach (var role in Model.Roles){<option value="@role.RoleId">@role.RoleName</option>}</select><span asp-validation-for="RoleId"></span></div>
-            <div class="user-field user-password"><label asp-for="Password"></label><div><input asp-for="Password" placeholder="Minimum 8 characters" autocomplete="new-password" /><button type="button" aria-label="Show password"><i class="bi bi-eye"></i></button></div><span asp-validation-for="Password"></span></div>
-            <div class="user-field user-password"><label asp-for="ConfirmPassword"></label><div><input asp-for="ConfirmPassword" placeholder="Enter the password again" autocomplete="new-password" /><button type="button" aria-label="Show password"><i class="bi bi-eye"></i></button></div><span asp-validation-for="ConfirmPassword"></span></div>
-            <label class="user-active-switch"><input asp-for="IsActive" /><span></span><strong>Active user</strong><small>The user can sign in immediately.</small></label>
+            
+            <div class="user-field"><label asp-for="FullName"></label><input asp-for="FullName" autocomplete="name" /><span asp-validation-for="FullName"></span></div><div class="user-field">
+            <label asp-for="CompanyName"></label><input asp-for="CompanyName" autocomplete="organization" /> <span asp-validation-for="CompanyName"></span>
         </div>
-        <div class="user-editor-actions"><a class="users-secondary-button" asp-action="Index">Cancel</a><button class="users-primary-button" type="submit"><i class="bi bi-check2"></i> Create User</button></div>
-    </form>
+
+        <div class="user-field"><label asp-for="Email"></label> <input asp-for="Email" autocomplete="email" /> <span asp-validation-for="Email"></span></div>
+
+        <div class="user-field"> <label asp-for="Address"></label> <input asp-for="Address" autocomplete="street-address" /><span asp-validation-for="Address"></span> </div>
+
+        <div class="user-field"><label asp-for="PhoneNumber"></label> <input asp-for="PhoneNumber" autocomplete="tel" /> <span asp-validation-for="PhoneNumber"></span> </div>
+        <div class="user-field"><label asp-for="Username"></label><input asp-for="Username" autocomplete="username" /><span asp-validation-for="Username"></span></div>
+
+        <div class="user-field">
+            <label asp-for="SelectedRoleIds"> Roles </label><div class="role-checkbox-list">
+
+            @foreach (var role in Model.Roles)
+            {
+                <label class="role-checkbox">
+
+                    <input type="checkbox"
+                           name="SelectedRoleIds"
+                           value="@role.RoleId"
+                           checked="@Model.SelectedRoleIds.Contains(role.RoleId)" />
+
+                    <span>
+                        @role.RoleName
+                    </span>
+
+                </label>
+            }
+
+        </div>
+
+        <span asp-validation-for="SelectedRoleIds">
+        </span>
+    </div>
+
+    <div class="user-field user-password"><label asp-for="Password"></label><div><input asp-for="Password" placeholder="Minimum 8 characters" autocomplete="new-password" /><button type="button" aria-label="Show password"><i class="bi bi-eye"></i></button></div><span asp-validation-for="Password"></span></div>
+    <div class="user-field user-password"><label asp-for="ConfirmPassword"></label><div><input asp-for="ConfirmPassword" placeholder="Enter the password again" autocomplete="new-password" /><button type="button" aria-label="Show password"><i class="bi bi-eye"></i></button></div><span asp-validation-for="ConfirmPassword"></span></div>
+    <label class="user-active-switch"><input asp-for="IsActive" /><span></span><strong>Active user</strong><small>The user can sign in immediately.</small></label>
+</div>
+<div class="user-editor-actions"><a class="users-secondary-button" asp-action="Index">Cancel</a><button class="users-primary-button" type="submit"><i class="bi bi-check2"></i> Create User</button></div>
+</form>
 </section>
 
 @section Scripts {

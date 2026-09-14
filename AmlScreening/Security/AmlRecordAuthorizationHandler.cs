@@ -24,7 +24,8 @@ public sealed class AmlRecordAuthorizationHandler
         if (!_currentUser.IsAuthenticated)
             return Task.CompletedTask;
 
-        if (_currentUser.HasPermission(AppPermissions.AmlRecordsViewAll))
+        var canViewAcrossClients = _currentUser.HasPermission(AppPermissions.PlatformCrossClientAccess) && _currentUser.HasPermission(AppPermissions.AmlRecordsViewAll);
+        if (canViewAcrossClients)
         {
             context.Succeed(requirement);
             return Task.CompletedTask;

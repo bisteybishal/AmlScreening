@@ -18,7 +18,9 @@ namespace AmlScreening.Application.Models
 
         public string FullName { get; set; } = string.Empty;
 
-        public string Role { get; set; } = string.Empty;
+        //public string Role { get; set; } = string.Empty;
+
+        public IReadOnlyList<string> Roles { get; set; }=Array.Empty<string>();
 
         public IReadOnlyList<string> Permissions { get; set; } = Array.Empty<string>();
     }

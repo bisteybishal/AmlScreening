@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AmlScreening.Application.Security;
 using System.Security.Claims;
+using AmlScreening.Application.Models;
 
 namespace AmlScreening.Portal.Controllers;
 
@@ -76,7 +77,7 @@ public sealed class UsersController : Controller
 
             return View(model);
 
-           // return View(await LoadRolesAsync(new CreateUserViewModel()));
+            // return View(await LoadRolesAsync(new CreateUserViewModel()));
         }
         catch (Exception exception)
         {
@@ -87,50 +88,62 @@ public sealed class UsersController : Controller
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    //[Authorize(Roles = "Admin")]
     [Authorize(Policy = AppPermissions.UsersCreate)]
-    [Authorize(Policy = AppPermissions.RolesManage)]
+    //[Authorize(Policy = AppPermissions.RolesManage)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(CreateUserViewModel model)
     {
-        model.Username = model.Username?.Trim() ?? string.Empty;
-        model.FullName = model.FullName?.Trim() ?? string.Empty;
+        model.Username =
+            model.Username?.Trim() ?? string.Empty;
+
+        model.FullName =
+            model.FullName?.Trim() ?? string.Empty;
+
+        model.CompanyName =
+            model.CompanyName?.Trim() ?? string.Empty;
+
+        model.Email =
+            model.Email?.Trim() ?? string.Empty;
+
+        model.Address =
+            model.Address?.Trim() ?? string.Empty;
+
+        model.PhoneNumber =
+            model.PhoneNumber?.Trim() ?? string.Empty;
+
+        // Never trust ClientId from browser.
+        model.ClientId = _currentUser.ClientId;
 
         try
         {
             await LoadCreateOptionsAsync(model);
 
-            // Validate the selected organization.
-            if (!model.Clients.Any(x => x.ClientId == model.ClientId))
+            if (model.SelectedRoleIds.Count == 0)
             {
-                ModelState.AddModelError(
-                    nameof(model.ClientId),
-                    "Select a valid active organization.");
+                ModelState.AddModelError(nameof(model.SelectedRoleIds), "Select at least one role.");
             }
 
-            // Validate the selected role.
-            var selectedRole = model.Roles
-                .FirstOrDefault(x => x.RoleId == model.RoleId);
+            var validRoleIds = model.Roles
+                    .Select(x => x.RoleId)
+                    .ToHashSet();
 
-            if (selectedRole is null)
+            var invalidRoleSelected =
+                model.SelectedRoleIds
+                    .Distinct()
+                    .Any(roleId =>
+                        !validRoleIds.Contains(roleId));
+
+            if (invalidRoleSelected)
             {
                 ModelState.AddModelError(
-                    nameof(model.RoleId),
-                    "Select a valid active role.");
-            }
-            else if (
-                selectedRole.RoleName.Equals(
-                    "Admin", StringComparison.OrdinalIgnoreCase) &&
-                model.ClientId != _currentUser.ClientId)
-            {
-                ModelState.AddModelError(
-                    nameof(model.RoleId),
-                    "Admin is reserved for your vendor organization.");
+                    nameof(model.SelectedRoleIds),
+                    "One or more selected roles are invalid.");
             }
 
-            // Keep usernames unique.
             if (!string.IsNullOrWhiteSpace(model.Username) &&
-                await _userRepository.UsernameExistsAsync(model.Username))
+                await _userRepository.UsernameExistsAsync(
+                    model.Username))
             {
                 ModelState.AddModelError(
                     nameof(model.Username),
@@ -138,19 +151,36 @@ public sealed class UsersController : Controller
             }
 
             if (!ModelState.IsValid)
+            {
                 return View(model);
+            }
 
             var user = new User
             {
-                ClientId = model.ClientId,
+                ClientId = _currentUser.ClientId,
+
                 Username = model.Username,
+
                 FullName = model.FullName,
+
+                CompanyName = model.CompanyName,
+
+                Email = model.Email,
+
+                Address = model.Address,
+
+                PhoneNumber = model.PhoneNumber,
+
                 PasswordHash = _passwordService.Hash(model.Password),
+
                 IsActive = model.IsActive,
+
                 CreatedDate = DateTime.UtcNow
             };
 
-            await _userRepository.CreateAsync(user, model.RoleId);
+            await _userRepository.CreateAsync(
+                user,
+                model.SelectedRoleIds);
 
             TempData["SuccessMessage"] =
                 $"User {model.Username} created successfully.";
@@ -169,28 +199,11 @@ public sealed class UsersController : Controller
                 string.Empty,
                 "The user could not be created. Please try again.");
 
-            // Reload both dropdowns when displaying an error.
-            try
-            {
-                await LoadCreateOptionsAsync(model);
-            }
-            catch (Exception loadException)
-            {
-                _logger.LogError(
-                    loadException,
-                    "Unable to reload create-user options.");
-
-                TempData["ErrorMessage"] =
-                    "The create-user page is temporarily unavailable.";
-
-                return RedirectToAction(nameof(Index));
-            }
+            await LoadCreateOptionsAsync(model);
 
             return View(model);
         }
     }
-
-
 
 
     [HttpGet]
@@ -227,16 +240,30 @@ public sealed class UsersController : Controller
             {
                 ModelState.AddModelError(string.Empty, "You cannot change your own permissions while signed in.");
             }
+            var existingRoles = await _userRepository.GetUserRolesAsync(model.UserId);
+            var isplatformAdmin = existingRoles.Any(x => x.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase));
 
-            if (user.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase))
-                ModelState.AddModelError(string.Empty, "Administrator permissions are protected to prevent system lockout.");
+            if (isplatformAdmin)
+            {
+                ModelState.AddModelError(string.Empty, "PlatForm Administrator access is protected.");
+            }
+
+            if (model.SelectedRoleIds.Count == 0)
+            {
+                ModelState.AddModelError(nameof(model.SelectedRoleIds), "Select at least one role.");
+            }
+
 
             if (!ModelState.IsValid)
             {
                 var invalidModel = await BuildAccessModelAsync(user);
+                invalidModel.SelectedRoleIds = model.SelectedRoleIds;
                 invalidModel.SelectedPermissionIds = model.SelectedPermissionIds;
                 return View(invalidModel);
             }
+
+            if (!await _userRepository.UpdateRolesAsync(model.UserId, model.SelectedRoleIds))
+                return NotFound();
 
             if (!await _userRepository.UpdatePermissionsAsync(model.UserId, model.SelectedPermissionIds))
                 return NotFound();
@@ -254,22 +281,42 @@ public sealed class UsersController : Controller
 
     private async Task LoadCreateOptionsAsync(CreateUserViewModel model)
     {
-        model.Clients = await _userRepository.GetActiveClientsAsync();
+        //model.ClientId = await _userRepository.GetActiveClientsAsync();
+        model.ClientId = _currentUser.ClientId;
         model.Roles = await _userRepository.GetActiveRolesAsync();
     }
 
-    private async Task<UserAccessViewModel> BuildAccessModelAsync(AmlScreening.Application.Models.UserListItem user)
+    private async Task<UserAccessViewModel> BuildAccessModelAsync(UserListItem user)
     {
         var permissions = await _userRepository.GetPermissionOptionsAsync(user.UserId);
+        var availableRoles = await _userRepository.GetActiveRolesAsync();
+        var userRoles = await _userRepository.GetUserRolesAsync(user.UserId);
+
+        var selectedRolesIds = userRoles.Select(x => x.RoleId).ToHashSet();
+        var roleAccess = new List<RoleAccessViewModel>();
+        foreach (var role in availableRoles)
+        {
+            var rolePermissions = await _userRepository.GetRolePermissionAsync(role.RoleId);
+            roleAccess.Add(new RoleAccessViewModel
+            {
+                RoleId = role.RoleId,
+                RoleName = role.RoleName,
+                IsSelected = selectedRolesIds.Contains(role.RoleId),
+                Permissions = rolePermissions
+            });
+        }
 
         return new UserAccessViewModel
         {
             UserId = user.UserId,
             Username = user.Username,
             FullName = user.FullName,
-            RoleName = user.RoleName,
+            Roles = availableRoles,
+            SelectedRoleIds = selectedRolesIds.ToList(),
+            RoleNames = string.Join(",", userRoles.Select(x => x.RoleName)),
             Permissions = permissions,
-            SelectedPermissionIds = permissions.Where(x => x.IsSelected).Select(x => x.PermissionId).ToList()
+            SelectedPermissionIds = permissions.Where(x => x.IsSelected).Select(x => x.PermissionId).ToList(),
+            RoleAccess=roleAccess
         };
     }
 }

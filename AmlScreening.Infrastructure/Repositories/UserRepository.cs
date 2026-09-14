@@ -1,10 +1,11 @@
-using AmlScreening.Application.Interface.Repositories;
 using AmlScreening.Application.Interface;
+using AmlScreening.Application.Interface.Repositories;
 using AmlScreening.Application.Models;
 using AmlScreening.Application.Security;
 using AmlScreening.Domain.Entities;
 using AmlScreening.Infrastructure.Persistence;
 using Dapper;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace AmlScreening.Infrastructure.Repositories;
 
@@ -25,101 +26,280 @@ public sealed class UserRepository : IUserRepository
     {
         using var connection = _dbConnectionFactory.CreateConnection();
         const string sql = """
-            SELECT u.UserId AS Id,
-                   u.ClientId,
-                   u.Username,
-                   u.FullName,
-                   u.PasswordHash,
-                   u.IsActive,
-                   r.RoleName AS Role
-            FROM dbo.Users u
-            INNER JOIN dbo.UserRoles ur ON ur.UserId = u.UserId
-            INNER JOIN dbo.Roles r ON r.RoleId = ur.RoleId
-            WHERE u.Username = @Username
-              AND r.IsActive = 1;
-            """;
+        SELECT
+            u.UserId AS Id,
+            u.ClientId,
+            u.Username,
+            u.FullName,
+            u.PasswordHash,
+            u.IsActive,
+            u.CreatedDate,
+            u.CompanyName,
+            u.Email,
+            u.Address,
+            u.PhoneNumber
+        FROM dbo.Users u
+        WHERE u.Username = @Username;
+        """;
 
         return await connection.QueryFirstOrDefaultAsync<User>(sql, new { Username = username });
     }
 
-    public async Task<UserPageResult> GetPageAsync(int pageNumber, int pageSize)
+    public async Task<UserPageResult> GetPageAsync(
+    int pageNumber,
+    int pageSize)
     {
         using var connection = _dbConnectionFactory.CreateConnection();
         const string sql = """
-            SELECT COUNT(1) AS TotalUsers,
-                   COALESCE(SUM(CASE WHEN u.IsActive = 1 THEN 1 ELSE 0 END), 0) AS ActiveUsers,
-                   COALESCE(SUM(CASE WHEN u.IsActive = 0 THEN 1 ELSE 0 END), 0) AS InactiveUsers,
-                   COALESCE(SUM(CASE WHEN r.RoleName = 'Admin' THEN 1 ELSE 0 END), 0) AS Administrators
-            FROM dbo.Users u
-            LEFT JOIN dbo.UserRoles ur ON ur.UserId = u.UserId
-            LEFT JOIN dbo.Roles r ON r.RoleId = ur.RoleId
-            WHERE (@CanViewAll = 1 OR u.ClientId = @ClientId);
+    SELECT
+        COUNT(1) AS TotalUsers,
 
-            SELECT u.UserId,
-                   u.ClientId,
-                   u.Username,
-                   u.FullName,
-                   r.RoleId,
-                   r.RoleName,
-                   u.IsActive,
-                   u.LastLoginDate,
-                   u.CreatedDate
-            FROM dbo.Users u
-            LEFT JOIN dbo.UserRoles ur ON ur.UserId = u.UserId
-            LEFT JOIN dbo.Roles r ON r.RoleId = ur.RoleId
-            WHERE (@CanViewAll = 1 OR u.ClientId = @ClientId)
-            ORDER BY u.CreatedDate DESC, u.UserId DESC
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
-            """;
+        COALESCE(
+            SUM(
+                CASE
+                    WHEN u.IsActive = 1
+                    THEN 1
+                    ELSE 0
+                END
+            ),
+            0
+        ) AS ActiveUsers,
 
-        pageNumber = Math.Max(1, pageNumber);
-        pageSize = Math.Clamp(pageSize, 1, 100);
-        using var result = await connection.QueryMultipleAsync(sql, new
+        COALESCE(
+            SUM(
+                CASE
+                    WHEN u.IsActive = 0
+                    THEN 1
+                    ELSE 0
+                END
+            ),
+            0
+        ) AS InactiveUsers,
+
+        (
+            SELECT COUNT(DISTINCT ua.UserId)
+            FROM dbo.Users ua
+            INNER JOIN dbo.UserRoles ura
+                ON ura.UserId = ua.UserId
+            INNER JOIN dbo.Roles ra
+                ON ra.RoleId = ura.RoleId
+            WHERE ra.RoleName = 'Admin'
+              AND
+              (
+                  @CanViewAll = 1
+                  OR ua.ClientId = @ClientId
+              )
+        ) AS Administrators
+
+    FROM dbo.Users u
+
+    WHERE
+    (
+        @CanViewAll = 1
+        OR u.ClientId = @ClientId
+    );
+
+
+    SELECT
+        u.UserId,
+        u.ClientId,
+        u.Username,
+        u.FullName,
+
+        COALESCE
+        (
+            STUFF
+            (
+                (
+                    SELECT
+                        ', ' + r2.RoleName
+                    FROM dbo.UserRoles ur2
+                    INNER JOIN dbo.Roles r2
+                        ON r2.RoleId = ur2.RoleId
+                    WHERE ur2.UserId = u.UserId
+                      AND r2.IsActive = 1
+                    ORDER BY r2.RoleName
+                    FOR XML PATH(''), TYPE
+                ).value(
+                    '.',
+                    'nvarchar(max)'
+                ),
+                1,
+                2,
+                ''
+            ),
+            ''
+        ) AS RoleName,
+
+        CAST
+        (
+            CASE
+                WHEN EXISTS
+                (
+                    SELECT 1
+                    FROM dbo.UserRoles ura
+                    INNER JOIN dbo.Roles ra
+                        ON ra.RoleId = ura.RoleId
+                    WHERE ura.UserId = u.UserId
+                      AND ra.RoleName = 'Admin'
+                )
+                THEN 1
+                ELSE 0
+            END
+            AS BIT
+        ) AS HasAdminRole,
+
+        u.IsActive,
+        u.LastLoginDate,
+        u.CreatedDate
+
+    FROM dbo.Users u
+
+    WHERE
+    (
+        @CanViewAll = 1
+        OR u.ClientId = @ClientId
+    )
+
+    ORDER BY
+        u.CreatedDate DESC,
+        u.UserId DESC
+
+    OFFSET @Offset ROWS
+    FETCH NEXT @PageSize ROWS ONLY;
+    """;
+        using var result =
+    await connection.QueryMultipleAsync(
+        sql,
+        new
         {
             ClientId = _currentUser.ClientId,
-            CanViewAll = CanViewAllClients(),
-            Offset = ((long)pageNumber - 1) * pageSize,
+
+            CanViewAll =
+                CanViewAllClients()
+                    ? 1
+                    : 0,
+
+            Offset =
+                ((long)pageNumber - 1)
+                * pageSize,
+
             PageSize = pageSize
         });
-        var summary = await result.ReadSingleAsync<UserSummaryRow>();
+
+        var summary =
+            await result.ReadSingleAsync<UserSummaryRow>();
+
         return new UserPageResult
         {
-            Items = (await result.ReadAsync<UserListItem>()).AsList(),
-            TotalUsers = summary.TotalUsers,
-            ActiveUsers = summary.ActiveUsers,
-            InactiveUsers = summary.InactiveUsers,
-            Administrators = summary.Administrators,
+            Items =
+                (
+                    await result.ReadAsync<UserListItem>()
+                ).AsList(),
+
+            TotalUsers =
+                summary.TotalUsers,
+
+            ActiveUsers =
+                summary.ActiveUsers,
+
+            InactiveUsers =
+                summary.InactiveUsers,
+
+            Administrators =
+                summary.Administrators,
+
             PageNumber = pageNumber,
+
             PageSize = pageSize
         };
     }
 
-    public async Task<UserListItem?> GetByIdAsync(long userId)
+    public async Task<UserListItem?> GetByIdAsync(
+    long userId)
     {
-        using var connection = _dbConnectionFactory.CreateConnection();
-        const string sql = """
-            SELECT u.UserId,
-                   u.ClientId,
-                   u.Username,
-                   u.FullName,
-                   r.RoleId,
-                   r.RoleName,
-                   u.IsActive,
-                   u.LastLoginDate,
-                   u.CreatedDate
-            FROM dbo.Users u
-            LEFT JOIN dbo.UserRoles ur ON ur.UserId = u.UserId
-            LEFT JOIN dbo.Roles r ON r.RoleId = ur.RoleId
-            WHERE u.UserId = @UserId
-              AND (@CanViewAll = 1 OR u.ClientId = @ClientId);
-            """;
+        using var connection =
+            _dbConnectionFactory.CreateConnection();
 
-        return await connection.QuerySingleOrDefaultAsync<UserListItem>(sql, new
-        {
-            UserId = userId,
-            ClientId = _currentUser.ClientId,
-            CanViewAll = CanViewAllClients()
-        });
+        const string sql = """
+        SELECT
+            u.UserId,
+            u.ClientId,
+            u.Username,
+            u.FullName,
+
+            COALESCE
+            (
+                STUFF
+                (
+                    (
+                        SELECT
+                            ', ' + r2.RoleName
+                        FROM dbo.UserRoles ur2
+                        INNER JOIN dbo.Roles r2
+                            ON r2.RoleId = ur2.RoleId
+                        WHERE ur2.UserId = u.UserId
+                          AND r2.IsActive = 1
+                        ORDER BY r2.RoleName
+                        FOR XML PATH(''), TYPE
+                    ).value(
+                        '.',
+                        'nvarchar(max)'
+                    ),
+                    1,
+                    2,
+                    ''
+                ),
+                ''
+            ) AS RoleName,
+
+            CAST
+            (
+                CASE
+                    WHEN EXISTS
+                    (
+                        SELECT 1
+                        FROM dbo.UserRoles ura
+                        INNER JOIN dbo.Roles ra
+                            ON ra.RoleId = ura.RoleId
+                        WHERE ura.UserId = u.UserId
+                          AND ra.RoleName = 'Admin'
+                    )
+                    THEN 1
+                    ELSE 0
+                END
+                AS BIT
+            ) AS HasAdminRole,
+
+            u.IsActive,
+            u.LastLoginDate,
+            u.CreatedDate
+
+        FROM dbo.Users u
+
+        WHERE u.UserId = @UserId
+          AND
+          (
+              @CanViewAll = 1
+              OR u.ClientId = @ClientId
+          );
+        """;
+
+        return await connection
+            .QuerySingleOrDefaultAsync<UserListItem>(
+                sql,
+                new
+                {
+                    UserId = userId,
+
+                    ClientId =
+                        _currentUser.ClientId,
+
+                    CanViewAll =
+                        CanViewAllClients()
+                            ? 1
+                            : 0
+                });
     }
 
     public async Task<IReadOnlyList<RoleOption>> GetActiveRolesAsync()
@@ -338,18 +518,32 @@ public sealed class UserRepository : IUserRepository
         return await connection.ExecuteScalarAsync<int>(sql, new { Username = username }) > 0;
     }
 
-    public async Task<long> CreateAsync(User user, int roleId)
+    public async Task<long> CreateAsync(User user, IReadOnlyCollection<int> roleIds)
     {
         EnsureCanCreateUsers();
 
-        using var connection = _dbConnectionFactory.CreateConnection();
+        var selectedRoleIds = roleIds
+            .Where(x => x > 0)
+            .Distinct()
+            .ToArray();
+
+        if (selectedRoleIds.Length == 0)
+        {
+            throw new InvalidOperationException(
+                "Select at least one role.");
+        }
+
+        using var connection =
+            _dbConnectionFactory.CreateConnection();
+
         connection.Open();
 
-        using var transaction = connection.BeginTransaction();
+        using var transaction =
+            connection.BeginTransaction();
 
         try
         {
-            // The selected organization must exist and be active.
+            // Validate client.
             const string clientSql = """
             SELECT COUNT(1)
             FROM dbo.Clients WITH (UPDLOCK, HOLDLOCK)
@@ -358,10 +552,14 @@ public sealed class UserRepository : IUserRepository
               AND DeleteFg = 'N';
             """;
 
-            var clientExists = await connection.ExecuteScalarAsync<int>(
-                clientSql,
-                new { user.ClientId },
-                transaction);
+            var clientExists =
+                await connection.ExecuteScalarAsync<int>(
+                    clientSql,
+                    new
+                    {
+                        user.ClientId
+                    },
+                    transaction);
 
             if (clientExists != 1)
             {
@@ -369,57 +567,109 @@ public sealed class UserRepository : IUserRepository
                     "Select a valid active organization.");
             }
 
-            // The selected role must exist and be active.
-            const string roleSql = """
-            SELECT RoleName
+            // Validate all selected roles.
+            const string rolesSql = """
+            SELECT
+                RoleId,
+                RoleName
             FROM dbo.Roles WITH (UPDLOCK, HOLDLOCK)
-            WHERE RoleId = @RoleId
+            WHERE RoleId IN @RoleIds
               AND IsActive = 1;
             """;
 
-            var roleName = await connection.QuerySingleOrDefaultAsync<string>(
-                roleSql,
-                new { RoleId = roleId },
-                transaction);
+            var selectedRoles =
+                (
+                    await connection.QueryAsync<RoleOption>(
+                        rolesSql,
+                        new
+                        {
+                            RoleIds = selectedRoleIds
+                        },
+                        transaction)
+                ).ToList();
 
-            if (string.IsNullOrWhiteSpace(roleName))
+            if (selectedRoles.Count != selectedRoleIds.Length)
             {
                 throw new InvalidOperationException(
-                    "Select a valid active role.");
+                    "One or more selected roles are invalid.");
             }
 
-            // Admin is the vendor role, not a partner role.
-            if (roleName.Equals("Admin", StringComparison.OrdinalIgnoreCase) &&
-                user.ClientId != _currentUser.ClientId)
+            // Protect Admin assignment.
+            var containsAdmin =
+                selectedRoles.Any(x =>
+                    x.RoleName.Equals(
+                        "Admin",
+                        StringComparison.OrdinalIgnoreCase));
+
+            if (containsAdmin &&
+                !CanViewAllClients())
             {
-                throw new InvalidOperationException(
-                    "Admin can only be assigned within your vendor organization.");
+                throw new UnauthorizedAccessException(
+                    "You cannot assign the Admin role.");
             }
 
+            // Insert user.
             const string insertUserSql = """
             INSERT INTO dbo.Users
-                (ClientId, Username, FullName, PasswordHash,
-                 IsActive, CreatedDate)
+            (
+                ClientId,
+                Username,
+                FullName,
+                PasswordHash,
+                IsActive,
+                CreatedDate,
+                Email,
+                Address,
+                PhoneNumber,
+                CompanyName
+            )
             OUTPUT INSERTED.UserId
             VALUES
-                (@ClientId, @Username, @FullName, @PasswordHash,
-                 @IsActive, @CreatedDate);
+            (
+                @ClientId,
+                @Username,
+                @FullName,
+                @PasswordHash,
+                @IsActive,
+                @CreatedDate,
+                @Email,
+                @Address,
+                @PhoneNumber,
+                @CompanyName
+            );
             """;
 
-            var userId = await connection.ExecuteScalarAsync<long>(
-                insertUserSql,
-                user,
-                transaction);
+            var userId =
+                await connection.ExecuteScalarAsync<long>(
+                    insertUserSql,
+                    user,
+                    transaction);
 
+            // Insert all selected roles.
             const string insertRoleSql = """
-            INSERT INTO dbo.UserRoles (UserId, RoleId)
-            VALUES (@UserId, @RoleId);
+            INSERT INTO dbo.UserRoles
+            (
+                UserId,
+                RoleId
+            )
+            VALUES
+            (
+                @UserId,
+                @RoleId
+            );
             """;
 
-            await connection.ExecuteAsync(
-                insertRoleSql,
-                new { UserId = userId, RoleId = roleId },
-                transaction);
+            foreach (var roleId in selectedRoleIds)
+            {
+                await connection.ExecuteAsync(
+                    insertRoleSql,
+                    new
+                    {
+                        UserId = userId,
+                        RoleId = roleId
+                    },
+                    transaction);
+            }
 
             await InsertAuditAsync(
                 connection,
@@ -427,7 +677,7 @@ public sealed class UserRepository : IUserRepository
                 "Create",
                 "User",
                 userId.ToString(),
-                $"Created user {user.Username} for ClientId {user.ClientId}.");
+                $"Created user {user.Username} with roles [{string.Join(", ", selectedRoleIds)}] for ClientId {user.ClientId}.");
 
             transaction.Commit();
 
@@ -439,45 +689,142 @@ public sealed class UserRepository : IUserRepository
             throw;
         }
     }
-    public async Task<bool> UpdateRoleAsync(long userId, int roleId)
+    public async Task<bool> UpdateRolesAsync(long userId, IReadOnlyCollection<int> roleIds)
     {
-        using var connection = _dbConnectionFactory.CreateConnection();
+        EnsureCanCreateUsers();
+
+        var selectedRoleIds = roleIds
+            .Where(x => x > 0)
+            .Distinct()
+            .ToArray();
+
+        if (selectedRoleIds.Length == 0)
+        {
+            return false;
+        }
+
+        using var connection =
+            _dbConnectionFactory.CreateConnection();
+
         connection.Open();
-        using var transaction = connection.BeginTransaction();
+
+        using var transaction =
+            connection.BeginTransaction();
 
         try
         {
-            var userExists = await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(1) FROM dbo.Users WHERE UserId = @UserId AND (@CanViewAll = 1 OR ClientId = @ClientId);",
-                new { UserId = userId, ClientId = _currentUser.ClientId, CanViewAll = CanViewAllClients() }, transaction) > 0;
+            // Check that the user exists and is inside the allowed client scope.
+            var userExists =
+                await connection.ExecuteScalarAsync<int>(
+                    """
+                SELECT COUNT(1)
+                FROM dbo.Users
+                WHERE UserId = @UserId
+                  AND
+                  (
+                      @CanViewAll = 1
+                      OR ClientId = @ClientId
+                  );
+                """,
+                    new
+                    {
+                        UserId = userId,
+                        ClientId = _currentUser.ClientId,
+                        CanViewAll = CanViewAllClients() ? 1 : 0
+                    },
+                    transaction) > 0;
 
-            var roleExists = await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(1) FROM dbo.Roles WHERE RoleId = @RoleId AND IsActive = 1;",
-                new { RoleId = roleId }, transaction) > 0;
-
-            if (!userExists || !roleExists)
+            if (!userExists)
             {
                 transaction.Rollback();
                 return false;
             }
 
-            await connection.ExecuteAsync(
-                "DELETE FROM dbo.UserRoles WHERE UserId = @UserId;",
-                new { UserId = userId }, transaction);
+            // Validate all selected roles.
+            var selectedRoles =
+                (
+                    await connection.QueryAsync<RoleOption>(
+                        """
+                    SELECT
+                        RoleId,
+                        RoleName
+                    FROM dbo.Roles
+                    WHERE RoleId IN @RoleIds
+                      AND IsActive = 1;
+                    """,
+                        new
+                        {
+                            RoleIds = selectedRoleIds
+                        },
+                        transaction)
+                ).ToList();
 
+            if (selectedRoles.Count != selectedRoleIds.Length)
+            {
+                transaction.Rollback();
+                return false;
+            }
+
+            // Protect platform Admin role.
+            var containsAdmin =
+                selectedRoles.Any(x =>
+                    x.RoleName.Equals(
+                        "Admin",
+                        StringComparison.OrdinalIgnoreCase));
+
+            if (containsAdmin &&
+                !CanViewAllClients())
+            {
+                throw new UnauthorizedAccessException(
+                    "You cannot assign the Admin role.");
+            }
+
+            // Remove current roles.
             await connection.ExecuteAsync(
-                "INSERT INTO dbo.UserRoles (UserId, RoleId) VALUES (@UserId, @RoleId);",
-                new { UserId = userId, RoleId = roleId }, transaction);
+                """
+            DELETE FROM dbo.UserRoles
+            WHERE UserId = @UserId;
+            """,
+                new
+                {
+                    UserId = userId
+                },
+                transaction);
+
+            // Add all selected roles.
+            foreach (var roleId in selectedRoleIds)
+            {
+                await connection.ExecuteAsync(
+                    """
+                INSERT INTO dbo.UserRoles
+                (
+                    UserId,
+                    RoleId
+                )
+                VALUES
+                (
+                    @UserId,
+                    @RoleId
+                );
+                """,
+                    new
+                    {
+                        UserId = userId,
+                        RoleId = roleId
+                    },
+                    transaction);
+            }
 
             await InsertAuditAsync(
                 connection,
                 transaction,
-                "UpdateRole",
+                "UpdateRoles",
                 "User",
                 userId.ToString(),
-                $"Assigned role {roleId}.");
+                $"Assigned roles [{string.Join(", ", selectedRoleIds)}].");
 
             transaction.Commit();
+
             return true;
         }
         catch
@@ -498,13 +845,74 @@ public sealed class UserRepository : IUserRepository
         FROM dbo.Clients
         WHERE IsActive = 1
           AND DeleteFg = 'N'
+        AND (
+            @CanViewAll = 1
+            OR Id = @ClientId
+        )
         ORDER BY ClientName;
         """;
-        var clients = await connection.QueryAsync<ClientOption>(sql);
+        var clients =
+        await connection.QueryAsync<ClientOption>(
+            sql,
+            new
+            {
+                ClientId = _currentUser.ClientId,
+                CanViewAll = CanViewAllClients() ? 1 : 0
+            });
+
         return clients.ToList();
     }
+
+    public async Task<IReadOnlyList<RoleOption>> GetUserRolesAsync(long userid)
+    {
+        using var connection = _dbConnectionFactory.CreateConnection();
+        const string sql = """
+        SELECT
+            r.RoleId,
+            r.RoleName
+        FROM dbo.UserRoles ur
+        INNER JOIN dbo.Roles r
+            ON r.RoleId = ur.RoleId
+        WHERE ur.UserId = @UserId
+          AND r.IsActive = 1
+        ORDER BY r.RoleName;
+        """;
+
+        var roles = await connection.QueryAsync<RoleOption>(sql, new
+        {
+            userid = userid
+        });
+        return roles.ToList();
+    }
+
+    public async Task<IReadOnlyList<PermissionListItem>> GetRolePermissionAsync(int roleid)
+    {
+        using var connection = _dbConnectionFactory.CreateConnection();
+        const string sql = """
+            select 
+            p.PermissionId,
+            p.PermissionName,
+            p.Description,
+            CAST(1 AS BIT) AS IsSelected,
+            CAST(1 AS BIT) AS IsRoleGranted,
+            CAST(1 AS BIT) AS HasOverride
+            from dbo.RolePermissions rp
+            inner join dbo.Permissions p
+            on p.PermissionId=rp.PermissionId
+            where rp.roleid=@RoleId
+            and p.IsActive=1
+            order by p.permissionName;
+            """;
+
+        var permissions = await connection.QueryAsync<PermissionListItem>(
+            sql, new
+            {
+                RoleId = roleid
+            });
+        return permissions.ToList();
+    }
     private bool CanViewAllClients() =>
-        _currentUser.HasPermission(AppPermissions.AmlRecordsViewAll);
+        _currentUser.HasPermission(AppPermissions.PlatformCrossClientAccess);
 
     private async Task InsertAuditAsync(
         System.Data.IDbConnection connection,
@@ -557,4 +965,6 @@ public sealed class UserRepository : IUserRepository
                 "Only authorized vendor administrators can create users.");
         }
     }
+
+    
 }

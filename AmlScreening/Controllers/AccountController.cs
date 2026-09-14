@@ -123,18 +123,17 @@ public class AccountController : Controller
             new(AppClaimTypes.ClientId, result.ClientId.ToString()),
             new(ClaimTypes.Name, result.Username ?? string.Empty),
             new("FullName", result.FullName ?? string.Empty),
-            new(ClaimTypes.Role, result.Role ?? string.Empty),
             new(
                 PortalCookieEvents.SessionClaim,
                 sessionid.ToString("D"))
         };
-        if (!string.IsNullOrWhiteSpace(result.Role))
+        foreach (var role in result.Roles
+             .Where(value => !string.IsNullOrWhiteSpace(value))
+             .Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            claims.Add(
-                new Claim(
-                    ClaimTypes.Role,
-                    result.Role));
+            claims.Add(new Claim(ClaimTypes.Role, role));
         }
+
         foreach (var permission in result.Permissions
                      .Where(value => !string.IsNullOrWhiteSpace(value))
                      .Distinct(StringComparer.Ordinal))
@@ -145,9 +144,6 @@ public class AccountController : Controller
                     permission));
         }
 
-
-        claims.AddRange(result.Permissions.Select(permission =>
-                new Claim(AppPermissions.ClaimType, permission)));
         var identity = new ClaimsIdentity(
             claims,
             CookieAuthenticationDefaults.AuthenticationScheme);

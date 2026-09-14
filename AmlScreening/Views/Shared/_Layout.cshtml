@@ -120,14 +120,26 @@
                  data-current-url="@($"{Context.Request.Path}{Context.Request.QueryString}")"
                  data-current-title="@ViewData["Title"]"
                  data-user-key="@userId"
-                 data-is-dashboard="@((currentController == "Dashboard").ToString().ToLowerInvariant())">
+                 data-is-dashboard="@((currentController == "Dashboard").ToString().ToLowerInvariant())"
+                 data-workspace-key="@(ViewData["WorkspaceKey"] ?? currentController)"
+                 data-workspace-url="@(ViewData["WorkspaceUrl"] ?? $"{Context.Request.Path}{Context.Request.QueryString}")">
+
                 <a class="workspace-tab dashboard-tab @(currentController == "Dashboard" ? "active" : "")"
                    asp-controller="Dashboard"
                    asp-action="Index">
+
                     <i class="bi bi-house-door"></i>
-                    <span>Dashboard</span>
+
+                    <span>
+                        Dashboard
+                    </span>
+
                 </a>
-                <div id="dynamicWorkspaceTabs" class="dynamic-workspace-tabs"></div>
+
+                <div id="dynamicWorkspaceTabs"
+                     class="dynamic-workspace-tabs">
+                </div>
+
             </nav>
             <main class="main-content">@RenderBody()</main>
             <footer class="portal-footer"><span>&copy; @DateTime.UtcNow.Year AML Screening System. All rights reserved.</span><span>Version 1.0.0</span></footer>

@@ -21,7 +21,7 @@ namespace AmlScreening.Infrastructure.Data
         }
         public int CurrentClientId => _currentUser.ClientId;
         public bool CanAccessAllClients =>
-            _currentUser.HasPermission(AppPermissions.AmlRecordsViewAll);
+            _currentUser.HasPermission(AppPermissions.PlatformCrossClientAccess);
         public DbSet<Client> Clients => Set<Client>();
         public DbSet<AmlRecord> AmlRecords { get; set; }
         public DbSet<ComplianceRule> ComplianceRules => Set<ComplianceRule>();

@@ -1,3 +1,7 @@
+/* =========================================
+   USERS HEADING
+   ========================================= */
+
 .users-heading {
     display: flex;
     align-items: center;
@@ -7,17 +11,22 @@
 
     .users-heading h1,
     .user-editor-heading h1 {
-        font-size: 23px;
         margin: 0 0 5px;
         color: #102f49;
+        font-size: 23px;
     }
 
     .users-heading p,
     .user-editor-heading p {
-        font-size: 13px;
-        color: var(--muted);
         margin: 0;
+        color: var(--muted);
+        font-size: 13px;
     }
+
+
+/* =========================================
+   BUTTONS
+   ========================================= */
 
 .users-primary-button,
 .users-secondary-button {
@@ -25,29 +34,39 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    border-radius: 7px;
     padding: 10px 15px;
+    border-radius: 7px;
     font-size: 13px;
     font-weight: 650;
-    text-decoration: none;
+    text-decoration: none !important;
 }
 
 .users-primary-button {
     border: 1px solid #06988f;
     background: #079e94;
-    color: #fff;
+    color: #ffffff;
 }
 
     .users-primary-button:hover {
         background: #078a82;
-        color: #fff;
+        color: #ffffff;
     }
 
 .users-secondary-button {
     border: 1px solid var(--line);
-    background: #fff;
+    background: #ffffff;
     color: #173956;
 }
+
+    .users-secondary-button:hover {
+        background: #f4f8fa;
+        color: #173956;
+    }
+
+
+/* =========================================
+   ALERT
+   ========================================= */
 
 .users-alert {
     display: flex;
@@ -62,11 +81,16 @@
     font-size: 13px;
 }
 
-.users-alert.error {
-    border-color: #f1c2c2;
-    background: #fff0f0;
-    color: #b42318;
-}
+    .users-alert.error {
+        border-color: #f1c2c2;
+        background: #fff0f0;
+        color: #b42318;
+    }
+
+
+/* =========================================
+   SUMMARY CARDS
+   ========================================= */
 
 .users-summary {
     display: grid;
@@ -83,15 +107,15 @@
         padding: 16px;
         border: 1px solid var(--line);
         border-radius: 9px;
-        background: #fff;
+        background: #ffffff;
     }
 
         .users-summary article > span {
             width: 43px;
             height: 43px;
-            border-radius: 9px;
             display: grid;
             place-items: center;
+            border-radius: 9px;
             font-size: 19px;
         }
 
@@ -121,21 +145,26 @@
     }
 
     .users-summary small {
-        font-size: 11px;
         color: var(--muted);
+        font-size: 11px;
     }
 
     .users-summary strong {
-        font-size: 25px;
         color: #102f49;
+        font-size: 25px;
     }
+
+
+/* =========================================
+   USERS PANEL / EDITOR CARD
+   ========================================= */
 
 .users-panel,
 .user-editor-card {
+    overflow: hidden;
     border: 1px solid var(--line);
     border-radius: 9px;
-    background: #fff;
-    overflow: hidden;
+    background: #ffffff;
 }
 
 .users-panel-title {
@@ -146,24 +175,29 @@
 }
 
     .users-panel-title h2 {
-        font-size: 16px;
-        color: #102f49;
         margin: 0;
+        color: #102f49;
+        font-size: 16px;
     }
 
     .users-panel-title p {
-        font-size: 11px;
-        color: var(--muted);
         margin: 3px 0 0;
+        color: var(--muted);
+        font-size: 11px;
     }
 
     .users-panel-title > span {
-        font-size: 11px;
-        color: #087e75;
-        background: #e3f6f3;
-        border-radius: 20px;
         padding: 5px 10px;
+        border-radius: 20px;
+        background: #e3f6f3;
+        color: #087e75;
+        font-size: 11px;
     }
+
+
+/* =========================================
+   USERS TABLE
+   ========================================= */
 
 .users-table {
     width: 100%;
@@ -174,9 +208,9 @@
 
     .users-table th {
         padding: 12px 15px;
-        text-align: left;
         background: #eef4f7;
         color: #183c58;
+        text-align: left;
         font-size: 11px;
     }
 
@@ -203,6 +237,18 @@
         font-weight: 750;
     }
 
+.user-permission-link {
+    color: #173956;
+    font-weight: 650;
+    text-decoration: none !important;
+}
+
+    .user-permission-link:hover,
+    .user-permission-link:focus {
+        color: #079e94;
+        text-decoration: none !important;
+    }
+
 .users-role {
     display: inline-block;
     padding: 4px 9px;
@@ -210,6 +256,11 @@
     background: #e8eff7;
     color: #315575;
 }
+
+
+/* =========================================
+   STATUS
+   ========================================= */
 
 .users-status {
     display: inline-flex;
@@ -244,6 +295,11 @@
             background: #8b98a4;
         }
 
+
+/* =========================================
+   EMPTY
+   ========================================= */
+
 .users-empty {
     min-height: 230px;
     display: flex;
@@ -266,6 +322,11 @@
         font-size: 11px;
     }
 
+
+/* =========================================
+   USER EDITOR HEADING
+   ========================================= */
+
 .user-editor-heading {
     margin-bottom: 18px;
 }
@@ -278,12 +339,22 @@
         color: #087f78;
         font-size: 12px;
         font-weight: 650;
-        text-decoration: none;
+        text-decoration: none !important;
     }
+
+        .user-editor-heading > a:hover {
+            color: #079e94;
+            text-decoration: none !important;
+        }
 
 .user-editor-card {
     max-width: 850px;
 }
+
+
+/* =========================================
+   EDITOR TITLE
+   ========================================= */
 
 .user-editor-title {
     display: flex;
@@ -297,25 +368,30 @@
     .user-editor-title > span {
         width: 42px;
         height: 42px;
-        border-radius: 9px;
         display: grid;
         place-items: center;
+        border-radius: 9px;
         background: #ddf5f2;
         color: #078c83;
         font-size: 20px;
     }
 
     .user-editor-title h2 {
-        font-size: 17px;
-        color: #102f49;
         margin: 0;
+        color: #102f49;
+        font-size: 17px;
     }
 
     .user-editor-title p {
-        font-size: 11px;
-        color: var(--muted);
         margin: 3px 0 0;
+        color: var(--muted);
+        font-size: 11px;
     }
+
+
+/* =========================================
+   CREATE USER FORM
+   ========================================= */
 
 .user-form-grid {
     display: grid;
@@ -331,17 +407,17 @@
 
     .user-field label {
         margin-bottom: 6px;
+        color: #29465e;
         font-size: 12px;
         font-weight: 650;
-        color: #29465e;
     }
 
     .user-field input,
     .user-field select {
         width: 100%;
+        padding: 11px 12px;
         border: 1px solid #ccd8e2;
         border-radius: 6px;
-        padding: 11px 12px;
         outline: none;
         color: #122e47;
         font-size: 13px;
@@ -354,10 +430,15 @@
         }
 
     .user-field > span {
-        font-size: 10px;
-        color: #d53131;
         margin-top: 3px;
+        color: #d53131;
+        font-size: 10px;
     }
+
+
+/* =========================================
+   PASSWORD
+   ========================================= */
 
 .user-password > div {
     position: relative;
@@ -369,14 +450,19 @@
 
 .user-password button {
     position: absolute;
-    right: 4px;
     top: 4px;
+    right: 4px;
     width: 34px;
     height: 34px;
     border: 0;
     background: transparent;
     color: #62798d;
 }
+
+
+/* =========================================
+   ACTIVE SWITCH
+   ========================================= */
 
 .user-active-switch {
     position: relative;
@@ -396,7 +482,7 @@
     }
 
     .user-active-switch > span {
-        grid-row: 1/3;
+        grid-row: 1 / 3;
         width: 40px;
         height: 22px;
         padding: 3px;
@@ -404,13 +490,13 @@
         background: #abb8c2;
     }
 
-        .user-active-switch > span:before {
+        .user-active-switch > span::before {
             content: "";
             display: block;
             width: 16px;
             height: 16px;
             border-radius: 50%;
-            background: #fff;
+            background: #ffffff;
             transition: .2s;
         }
 
@@ -418,7 +504,7 @@
         background: #079e94;
     }
 
-        .user-active-switch input:checked + span:before {
+        .user-active-switch input:checked + span::before {
             transform: translateX(18px);
         }
 
@@ -427,9 +513,14 @@
     }
 
     .user-active-switch small {
-        font-size: 10px;
         color: var(--muted);
+        font-size: 10px;
     }
+
+
+/* =========================================
+   VALIDATION
+   ========================================= */
 
 .users-validation {
     margin: 18px 22px 0;
@@ -450,6 +541,11 @@
         padding-left: 18px;
     }
 
+
+/* =========================================
+   ACTIONS
+   ========================================= */
+
 .user-editor-actions {
     display: flex;
     justify-content: flex-end;
@@ -459,20 +555,510 @@
     background: #f8fafb;
 }
 
-@media(max-width:1000px) {
+
+/* =========================================
+   ACCESS FORM
+   ========================================= */
+
+.user-access-form {
+    max-width: 1100px;
+}
+
+    .user-access-form > .users-validation {
+        margin: 0 0 14px;
+    }
+
+    .user-access-form > .user-editor-actions {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+    }
+
+
+/* =========================================
+   USER SUMMARY
+   ========================================= */
+
+.access-user-summary {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+    padding: 16px 18px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #ffffff;
+}
+
+.access-avatar {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #0ea5a4;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.access-user-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+}
+
+    .access-user-info h2 {
+        margin: 0;
+        color: #102f49;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.3;
+    }
+
+    .access-user-info p {
+        margin: 4px 0 0;
+        color: #6b7d90;
+        font-size: 12px;
+        line-height: 1.4;
+        word-break: break-word;
+    }
+
+
+/* =========================================
+   ACCESS HELP
+   ========================================= */
+
+.access-help {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border: 1px solid #bcd9f3;
+    border-radius: 8px;
+    background: #edf6fd;
+    color: #285f8d;
+    font-size: 12px;
+}
+
+
+/* =========================================
+   ACCESS MODULE TABS
+   ========================================= */
+
+.access-module-tabs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 18px 0;
+    padding: 6px;
+    border: 1px solid #dce6ed;
+    border-radius: 10px;
+    background: #ffffff;
+}
+
+.access-module-tab {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 13px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #60778b;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+    .access-module-tab:hover {
+        background: #eef7f7;
+        color: #008f88;
+    }
+
+    .access-module-tab.active {
+        background: #e6f7f5;
+        color: #078f88;
+    }
+
+    .access-module-tab i {
+        font-size: 14px;
+    }
+
+
+/* =========================================
+   ACCESS MODULE PANEL
+   ========================================= */
+
+.access-module-panel {
+    display: none;
+    margin-bottom: 16px;
+    padding: 16px;
+    border: 1px solid #dce6ed;
+    border-radius: 10px;
+    background: #ffffff;
+}
+
+    .access-module-panel.active {
+        display: block;
+    }
+
+.access-panel-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+    .access-panel-heading h2 {
+        margin: 0;
+        color: #173750;
+        font-size: 17px;
+    }
+
+    .access-panel-heading p {
+        margin: 3px 0 0;
+        color: #7c8fa0;
+        font-size: 11px;
+    }
+
+.access-panel-icon {
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 8px;
+    background: #e6f7f5;
+    color: #07958e;
+}
+
+
+/* =========================================
+   ROLE ACCESS
+   ========================================= */
+
+.role-access-card {
+    margin-bottom: 10px;
+    overflow: hidden;
+    border: 1px solid #d9e4ed;
+    border-radius: 10px;
+    background: #ffffff;
+}
+
+.role-access-header {
+    min-height: 62px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+}
+
+.role-access-select {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    margin: 0;
+    cursor: pointer;
+}
+
+    .role-access-select input {
+        position: absolute;
+        opacity: 0;
+    }
+
+.role-access-check {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1px solid #b9c9d6;
+    border-radius: 5px;
+    background: #ffffff;
+}
+
+    .role-access-check i {
+        display: none;
+        font-size: 12px;
+    }
+
+.role-access-select input:checked + .role-access-check {
+    border-color: #0aa39a;
+    background: #0aa39a;
+    color: #ffffff;
+}
+
+    .role-access-select input:checked + .role-access-check i {
+        display: block;
+    }
+
+.role-access-name {
+    display: flex;
+    flex-direction: column;
+}
+
+    .role-access-name strong {
+        color: #163651;
+        font-size: 14px;
+    }
+
+    .role-access-name small {
+        margin-top: 2px;
+        color: #71859a;
+        font-size: 11px;
+    }
+
+.role-access-toggle {
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #557188;
+    cursor: pointer;
+}
+
+    .role-access-toggle:hover {
+        background: #eef6f8;
+        color: #008e86;
+    }
+
+
+/* =========================================
+   ROLE PERMISSIONS
+   ========================================= */
+
+.role-access-permissions {
+    display: none;
+    padding: 14px 18px;
+    border-top: 1px solid #e0e8ef;
+    background: #f8fbfc;
+}
+
+    .role-access-permissions.open {
+        display: block;
+    }
+
+.role-access-empty {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #768a9c;
+    font-size: 13px;
+}
+
+.role-permission-group {
+    margin-bottom: 16px;
+}
+
+    .role-permission-group:last-child {
+        margin-bottom: 0;
+    }
+
+.role-permission-group-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 8px;
+    color: #173552;
+}
+
+    .role-permission-group-title i {
+        color: #079e94;
+    }
+
+    .role-permission-group-title strong {
+        font-size: 12px;
+    }
+
+.role-permission-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.role-permission-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 9px;
+    border: 1px solid #e2e9ee;
+    border-radius: 7px;
+    background: #ffffff;
+}
+
+.role-permission-icon {
+    width: 21px;
+    height: 21px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #e4f7f4;
+    color: #07958d;
+}
+
+.role-permission-item > div {
+    display: flex;
+    flex-direction: column;
+}
+
+.role-permission-item strong {
+    color: #24465f;
+    font-size: 11px;
+}
+
+.role-permission-item small {
+    margin-top: 2px;
+    color: #7890a3;
+    font-size: 10px;
+}
+
+
+/* =========================================
+   MODULE PERMISSIONS
+   ========================================= */
+
+.module-permission-list {
+    overflow: hidden;
+    border: 1px solid #e2e9ee;
+    border-radius: 8px;
+}
+
+.module-permission-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    border-bottom: 1px solid #e7edf1;
+    background: #ffffff;
+    cursor: pointer;
+}
+
+    .module-permission-item:last-child {
+        border-bottom: 0;
+    }
+
+    .module-permission-item:hover {
+        background: #f8fbfc;
+    }
+
+    .module-permission-item input {
+        position: absolute;
+        opacity: 0;
+    }
+
+.module-permission-checkbox {
+    width: 19px;
+    height: 19px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1px solid #b8c8d4;
+    border-radius: 5px;
+    background: #ffffff;
+}
+
+    .module-permission-checkbox i {
+        display: none;
+        font-size: 11px;
+    }
+
+.module-permission-item input:checked + .module-permission-checkbox {
+    border-color: #0aa39a;
+    background: #0aa39a;
+    color: #ffffff;
+}
+
+    .module-permission-item input:checked + .module-permission-checkbox i {
+        display: block;
+    }
+
+.module-permission-copy {
+    display: flex;
+    flex-direction: column;
+}
+
+    .module-permission-copy strong {
+        color: #173750;
+        font-size: 12px;
+    }
+
+    .module-permission-copy small {
+        margin-top: 2px;
+        color: #768b9d;
+        font-size: 10px;
+    }
+
+    .module-permission-copy .permission-source {
+        width: max-content;
+        margin-top: 5px;
+        padding: 2px 7px;
+        border-radius: 10px;
+        font-size: 9px;
+    }
+
+        .module-permission-copy
+        .permission-source.inherited {
+            background: #e4f5ec;
+            color: #167148;
+        }
+
+        .module-permission-copy
+        .permission-source.override {
+            background: #fff1d6;
+            color: #9a6200;
+        }
+
+
+/* =========================================
+   RESPONSIVE
+   ========================================= */
+
+@media (max-width: 1000px) {
+
     .users-summary {
         grid-template-columns: repeat(2, 1fr);
     }
 }
 
-@media(max-width:700px) {
+@media (max-width: 760px) {
+
+    .access-module-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+    }
+
+    .access-module-tab {
+        flex-shrink: 0;
+    }
+
+    .role-permission-list {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+
     .users-heading {
         align-items: flex-start;
         flex-direction: column;
         gap: 14px;
     }
 
-        .users-heading .users-primary-button {
+        .users-heading
+        .users-primary-button {
             width: 100%;
         }
 
@@ -492,208 +1078,8 @@
     .users-panel-title > span {
         display: none;
     }
-}
 
-.user-permission-link,
-.user-permission-link:hover,
-.user-permission-link:focus{
-    text-decoration:none!important
-}
-.user-access-form {
-    max-width: 920px;
-}
-
-.access-user-summary {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 14px;
-    padding: 16px 18px;
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    background: #fff;
-}
-
-    .access-user-summary > span {
-        width: 45px;
-        height: 45px;
-        display: grid;
-        place-items: center;
-        border-radius: 9px;
-        background: #e1f5f2;
-        color: #087f78;
-        font-weight: 750;
-    }
-
-    .access-user-summary h2 {
-        margin: 0;
-        font-size: 16px;
-        color: #102f49;
-    }
-
-    .access-user-summary p {
-        margin: 3px 0 0;
-        font-size: 11px;
-        color: var(--muted);
-    }
-
-.access-help {
-    display: flex;
-    align-items: flex-start;
-    gap: 9px;
-    margin-bottom: 14px;
-    padding: 12px 14px;
-    border: 1px solid #bcd9f3;
-    border-radius: 8px;
-    background: #edf6fd;
-    color: #285f8d;
-    font-size: 12px;
-}
-
-.user-permission-groups {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-    margin-bottom: 14px;
-}
-
-.user-permission-group {
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    background: #fff;
-}
-
-    .user-permission-group > header {
-        display: flex;
-        align-items: center;
-        gap: 11px;
-        padding: 14px 16px;
-        border-bottom: 1px solid var(--line);
-        background: #f8fbfc;
-    }
-
-        .user-permission-group > header > span {
-            width: 36px;
-            height: 36px;
-            display: grid;
-            place-items: center;
-            border-radius: 8px;
-            background: #ddf5f2;
-            color: #078c83;
-            font-size: 17px;
-        }
-
-    .user-permission-group h2 {
-        margin: 0;
-        color: #102f49;
-        font-size: 14px;
-    }
-
-    .user-permission-group header p {
-        margin: 2px 0 0;
-        color: var(--muted);
-        font-size: 10px;
-    }
-
-.user-permission-list {
-    display: flex;
-    flex-direction: column;
-}
-
-.user-permission-option {
-    position: relative;
-    display: grid;
-    grid-template-columns: 24px 1fr;
-    gap: 10px;
-    align-items: center;
-    padding: 13px 16px;
-    border-bottom: 1px solid #edf1f4;
-    cursor: pointer;
-}
-
-    .user-permission-option:last-child {
-        border-bottom: 0;
-    }
-
-    .user-permission-option:hover {
-        background: #f8fcfb;
-    }
-
-    .user-permission-option > input {
-        position: absolute;
-        opacity: 0;
-    }
-
-    .user-permission-option > span {
-        width: 22px;
-        height: 22px;
-        display: grid;
-        place-items: center;
-        border: 1px solid #b7c6d1;
-        border-radius: 5px;
-        background: #fff;
-        color: transparent;
-    }
-
-    .user-permission-option > input:focus-visible + span {
-        outline: 3px solid rgba(7, 158, 148, .2);
-        outline-offset: 2px;
-    }
-
-    .user-permission-option > input:checked + span {
-        border-color: #079e94;
-        background: #079e94;
-        color: #fff;
-    }
-
-    .user-permission-option p {
-        display: flex;
-        flex-direction: column;
-        margin: 0;
-    }
-
-    .user-permission-option strong {
-        color: #173956;
-        font-size: 12px;
-    }
-
-    .user-permission-option small {
-        margin-top: 2px;
-        color: var(--muted);
-        font-size: 10px;
-    }
-
-    .user-permission-option .permission-source {
-        width: max-content;
-        margin-top: 5px;
-        padding: 2px 6px;
-        border-radius: 10px;
-        background: #eef3f6;
-        color: #5e7182;
-    }
-
-    .user-permission-option .permission-source.override {
-        background: #fff1d6;
-        color: #9a6200;
-    }
-
-    .user-permission-option .permission-source.inherited {
-        background: #e4f5ec;
-        color: #167148;
-    }
-
-.user-access-form > .users-validation {
-    margin: 0 0 14px;
-}
-
-.user-access-form > .user-editor-actions {
-    border: 1px solid var(--line);
-    border-radius: 9px;
-}
-
-@media(max-width:760px) {
-    .user-permission-groups {
-        grid-template-columns: 1fr;
+    .access-user-summary {
+        align-items: flex-start;
     }
 }

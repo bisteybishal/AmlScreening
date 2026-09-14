@@ -1,6 +1,0 @@
-bin/
-obj/
-*.pfx
-*.p12
-*.user
-appsettings.*.local.json

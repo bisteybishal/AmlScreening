@@ -13,7 +13,7 @@ namespace AmlScreening.Application.Services
             _passwordService = passwordService;
             _userRepository = userRepository;
         }
-    
+
         public async Task<LoginResult> LoginAsync(string username, string password)
         {
             var user = await _userRepository.GetUserAsync(username);
@@ -43,6 +43,16 @@ namespace AmlScreening.Application.Services
                 };
             }
 
+            var roles = await _userRepository.GetUserRolesAsync(user.Id);
+            if (roles.Count == 0)
+            {
+                return new LoginResult
+                {
+                    Success = false,
+                    Message = "No active role is assigned to this account."
+                };
+            }
+
             var permissions = await _userRepository.GetPermissionsAsync(user.Id);
 
             return new LoginResult
@@ -52,8 +62,8 @@ namespace AmlScreening.Application.Services
                 ClientId = user.ClientId,
                 Username = user.Username,
                 FullName = user.FullName,
-                Role = user.Role,
-                Permissions = permissions
+                Permissions = permissions,
+                Roles=roles.Select(x=>x.RoleName).Where(x=>!string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
             };
         }
 

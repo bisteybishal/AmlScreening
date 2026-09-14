@@ -289,10 +289,18 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
         return query.Where(record => record.OwnerUserId == _currentUser.UserId || record.IsShared);
     }
 
-    private bool CanAccessRecord(AmlRecord record) =>
-        _currentUser.HasPermission(AppPermissions.AmlRecordsViewAll) ||
-        (record.ClientId == _currentUser.ClientId &&
-         record.OwnerUserId == _currentUser.UserId);
+    private bool CanAccessRecord(AmlRecord record) {
+        var canAccessAcrossClients =
+            _currentUser.HasPermission(
+                AppPermissions.PlatformCrossClientAccess) &&
+            _currentUser.HasPermission(
+                AppPermissions.AmlRecordsViewAll);
+        if (canAccessAcrossClients)
+            return true;
+
+        return record.ClientId == _currentUser.ClientId &&
+               record.OwnerUserId == _currentUser.UserId;
+    }
 
     private void EnsureSignedIn()
     {

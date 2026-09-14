@@ -1,6 +1,7 @@
 ﻿using AmlScreening.Domain.Common;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text;
 
 namespace AmlScreening.Domain.Entities
@@ -31,6 +32,7 @@ namespace AmlScreening.Domain.Entities
         public byte[]? Photo { get; set; }
 
         public string? PhotoContentType { get; set; }
+        [NotMapped]
         public bool HasPhoto { get; set; }
 
         public void Activate()
