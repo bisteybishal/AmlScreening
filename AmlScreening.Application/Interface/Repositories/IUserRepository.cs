@@ -5,19 +5,44 @@ namespace AmlScreening.Application.Interface.Repositories;
 
 public interface IUserRepository
 {
-    Task<User?> GetUserAsync(string username);
-    Task<IReadOnlyList<RoleOption>> GetUserRolesAsync(long userId);
-    Task<UserPageResult> GetPageAsync(int pageNumber, int pageSize);
-    Task<UserListItem?> GetByIdAsync(long userId);
-    Task<IReadOnlyList<RoleOption>> GetActiveRolesAsync();
-    Task<IReadOnlyList<string>> GetPermissionsAsync(long userId);
-    Task UpdateLastLoginAsync(long userId);
-    Task<IReadOnlyList<PermissionListItem>> GetPermissionOptionsAsync(long userId);
-    Task<bool> UpdatePermissionsAsync(long userId, IReadOnlyCollection<int> permissionIds);
-    Task<bool> UsernameExistsAsync(string username);
-    Task<long> CreateAsync(User user, IReadOnlyCollection<int> roleIds);
-    Task<bool> UpdateRolesAsync(long userId, IReadOnlyCollection<int> roleIds);
-    Task<IReadOnlyList<ClientOption>> GetActiveClientsAsync();
+    //partner
 
-    Task<IReadOnlyList<PermissionListItem>> GetRolePermissionAsync(int roleid);
+    Task<IReadOnlyList<PartnerOption>>
+       GetActivePartnersAsync();
+
+    Task<bool> PartnerCodeExistsAsync(
+        string partnerCode);
+
+    Task<int> CreatePartnerAsync(
+        Partner partner);
+    //Branch
+
+    Task<IReadOnlyList<BranchOption>>
+        GetActiveBranchesAsync(
+            int partnerId);
+
+    Task<bool> BranchNameExistsAsync(
+        int partnerId,
+        string branchName);
+
+    Task<int> CreateBranchAsync(
+        PartnerBranch branch);
+
+
+    //user
+    Task<UserPageResult> GetPageAsync(
+        int? partnerId,
+        int? branchId,
+        int pageNumber,
+        int pageSize);
+
+    Task<IReadOnlyList<RoleOption>>
+        GetActiveRolesAsync();
+
+    Task<bool> UsernameExistsAsync(
+        string username);
+
+    Task<long> CreateAsync(
+        User user,
+        IReadOnlyCollection<int> roleIds);
 }

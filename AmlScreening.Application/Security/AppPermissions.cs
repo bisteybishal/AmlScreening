@@ -1,97 +1,99 @@
-namespace AmlScreening.Application.Security;
-
-public static class AppPermissions
+﻿public static class AppPermissions
 {
     public const string ClaimType = "Permission";
 
-    public const string AmlRecordsView = "AMLRecords.View";
-    public const string AmlRecordsCreate = "AMLRecords.Create";
-    public const string AmlRecordsEdit = "AMLRecords.Edit";
-    public const string AmlRecordsDelete = "AMLRecords.Delete";
-    public const string AmlRecordsViewClient = "AMLRecords.ViewClient";
-    public const string AmlRecordsViewAll = "AMLRecords.ViewAll";
-    public const string AuditLogsView = "AuditLogs.View";
-    public const string UsersView = "Users.View";
-    public const string UsersCreate = "Users.Create";
-    public const string RolesManage = "Roles.Manage";
-    public const string SubscriptionView = "Subscription.View";
-    public const string SubscriptionCreate = "Subscription.Create";
-    public const string SubscriptionEdit = "Subscription.Edit";
-    public const string SubscriptionDelete = "Subscription.Delete";
-    public const string ComplianceRulesView = "ComplianceRules.View";
+    public static class Portal
+    {
+        public const string Access = "Portal.Access";
+    }
 
-    public const string ComplianceRulesCreate = "ComplianceRules.Create";
+    public static class Users
+    {
+        public const string Manage = "Users.Manage";
+    }
 
-    public const string ComplianceRulesEdit = "ComplianceRules.Edit";
+    public static class Aml
+    {
+        public const string View = "AML.View";
+        public const string Manage = "AML.Manage";
+    }
 
-    public const string ComplianceRulesDelete = "ComplianceRules.Delete";
+    public static class Compliance
+    {
+        public const string View = "Compliance.View";
+        public const string Manage = "Compliance.Manage";
+        public const string Approve = "Compliance.Approve";
+    }
 
-    public const string CustomersView = "Customers.View";
+    public static class Risk
+    {
+        public const string View =
+            "Risk.View";
 
-    public const string TransactionsView = "Transactions.View";
+        public const string Manage =
+            "Risk.Manage";
 
-    public const string AlertsView = "Alerts.View";
-
-    public const string AlertsManage = "Alerts.Manage";
-
-    public const string CasesView = "Cases.View";
-
-    public const string CasesManage = "Cases.Manage";
-    public const string AmlSourceView = "AmlSource.View";
-    public const string AmlSourceSync = "AmlSource.Sync";
-    public const string RiskScoringView = "RiskScoring.View";
-    public const string RiskScoringManage = "RiskScoring.Manage";
-    public const string RiskScoringApprove = "RiskScoring.Approve";
-    public const string Screening = "Screening.View";
-
-    public const string PlatformCrossClientAccess =
-        "Platform.CrossClientAccess";
+        public const string Approve =
+            "Risk.Approve";
+    }
 
 
+    public static class Api
+    {
+        public const string Access = "API.Access";
+    }
 
     public static readonly string[] All =
-    {
-        AmlRecordsView,
-        AmlRecordsCreate,
-        AmlRecordsEdit,
-        AmlRecordsDelete,
-        AmlRecordsViewClient,
-        AmlRecordsViewAll,
-        AuditLogsView,
-        UsersView,
-        UsersCreate,
-        RolesManage,
-        SubscriptionView,
-        SubscriptionCreate,
-        SubscriptionEdit,
-        SubscriptionDelete,
-        ComplianceRulesView,
-        ComplianceRulesCreate,
-        ComplianceRulesEdit,
-        ComplianceRulesDelete,
-        CustomersView,
-        TransactionsView,
-        AlertsView,
-        AlertsManage,
-        CasesView,
-        CasesManage,
-        AmlSourceView,
-        AmlSourceSync,
-        RiskScoringView,
-        RiskScoringManage,
-        RiskScoringApprove,
-        Screening,
-        PlatformCrossClientAccess
-    };
+    [
+        Portal.Access,
+        Users.Manage,
+        Aml.View,
+        Aml.Manage,
+        Compliance.View,
+        Compliance.Manage,
+        Compliance.Approve,
+        Risk.View,
+        Risk.Manage,
+        Risk.Approve,
+        Api.Access
+    ];
 
-    public static readonly string[] PlatformOnly =
-    {
-        AmlRecordsViewAll,
-        RolesManage,
-        SubscriptionCreate,
-        SubscriptionEdit,
-        SubscriptionDelete,
-        AmlSourceSync,
-        PlatformCrossClientAccess
-    };
+    public static readonly string[] AdminDefaults =
+   [
+       Portal.Access,
+
+        Users.Manage,
+
+        Aml.View,
+        Aml.Manage,
+
+        Compliance.View,
+        Compliance.Manage,
+        Compliance.Approve,
+
+        Risk.View,
+        Risk.Manage,
+        Risk.Approve
+   ];
+
+
+    public static readonly string[] UserDefaults =
+    [
+        Portal.Access,
+
+        Aml.View,
+        Aml.Manage,
+
+        Compliance.View,
+        Compliance.Manage,
+
+        Risk.View
+    ];
+
+
+    public static readonly string[] ApiUserDefaults =
+    [
+        Api.Access
+    ];
+
 }

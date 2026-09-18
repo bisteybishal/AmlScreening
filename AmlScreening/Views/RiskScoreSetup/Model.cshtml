@@ -1,0 +1,128 @@
+﻿@model AmlScreening.Portal.ViewModels.RiskModelEditViewModel
+
+@{
+    ViewData["Title"] = "Edit Risk Model";
+}
+
+@section Styles {
+    <link rel="stylesheet"
+          href="~/css/workflow.css"
+          asp-append-version="true" />
+
+    <link rel="stylesheet"
+          href="~/css/risk-scoring.css"
+          asp-append-version="true" />
+}
+
+<section class="workflow-heading">
+
+    <div>
+        <h1>Risk Model</h1>
+
+        <p>
+            Configure the contribution of Customer,
+            Transaction and Screening risk.
+            The total must equal 100%.
+        </p>
+    </div>
+
+</section>
+
+
+<section class="workflow-panel">
+
+    <form asp-action="EditModel"
+          method="post">
+
+        @Html.AntiForgeryToken()
+
+        <input asp-for="Id"
+               type="hidden" />
+
+        <input asp-for="RowVersion"
+               type="hidden" />
+
+
+        <div asp-validation-summary="All"
+             class="workflow-message error">
+        </div>
+
+
+        <div class="risk-model-form">
+
+            <div>
+
+                <label asp-for="CustomerWeightPercent">
+                </label>
+
+                <input asp-for="CustomerWeightPercent"
+                       type="number"
+                       min="0"
+                       max="100"
+                       step="0.01" />
+
+                <span asp-validation-for="CustomerWeightPercent">
+                </span>
+
+            </div>
+
+
+            <div>
+
+                <label asp-for="TransactionWeightPercent">
+                </label>
+
+                <input asp-for="TransactionWeightPercent"
+                       type="number"
+                       min="0"
+                       max="100"
+                       step="0.01" />
+
+                <span asp-validation-for="TransactionWeightPercent">
+                </span>
+
+            </div>
+
+
+            <div>
+
+                <label asp-for="ScreeningWeightPercent">
+                </label>
+
+                <input asp-for="ScreeningWeightPercent"
+                       type="number"
+                       min="0"
+                       max="100"
+                       step="0.01" />
+
+                <span asp-validation-for="ScreeningWeightPercent">
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <div class="workflow-form-actions">
+
+            <a asp-action="Index">
+                Cancel
+            </a>
+
+            <button type="submit"
+                    class="workflow-primary">
+
+                Save pending model
+
+            </button>
+
+        </div>
+
+    </form>
+
+</section>
+
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

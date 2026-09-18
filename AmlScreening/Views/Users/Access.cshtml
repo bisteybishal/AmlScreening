@@ -15,9 +15,10 @@
 
     var permissionGroups =
         Model.Permissions
-            .GroupBy(x => x.PermissionName.Split('.')[0])
-            .OrderBy(x => x.Key)
-            .ToList();
+    .Where(x => !x.PermissionName.StartsWith("Platform.", StringComparison.OrdinalIgnoreCase))
+    .GroupBy(x => x.PermissionName.Split('.')[0]);
+
+    
 
     string GetDisplayName(string key)
     {
@@ -299,12 +300,16 @@
                     else
                     {
                         @foreach (
-                            var group in role.Permissions
-                                .GroupBy(
-                                    x =>
-                                        x.PermissionName
-                                            .Split('.')[0])
-                                .OrderBy(x => x.Key))
+    var group in role.Permissions
+        .Where(x =>
+            !x.PermissionName.StartsWith(
+                "Platform.",
+                StringComparison.OrdinalIgnoreCase))
+        .GroupBy(
+            x =>
+                x.PermissionName
+                    .Split('.')[0])
+        .OrderBy(x => x.Key))
                         {
                             <div class="role-permission-group">
 
@@ -453,8 +458,8 @@
                             <span class="
                                 permission-source
                                 @(permission.HasOverride
-                                      ? "override"
-                                      : "inherited")">
+                                        ? "override"
+                                        : "inherited")">
 
                                 @(
                                     permission.HasOverride

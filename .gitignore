@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Version the reviewed release SQL; exclude generated distribution archives.
+!Database/
+!Database/Release/
+!Database/Release/*.sql
+Artifacts/*.zip

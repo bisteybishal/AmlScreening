@@ -1,3 +1,4 @@
+using AmlScreening.Application.Common;
 using AmlScreening.Application.Interface;
 using AmlScreening.Application.Interface.Repositories;
 using AmlScreening.Application.Models;
@@ -26,11 +27,11 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
         _db = db;
         _currentUser = currentUser;
         _riskScoring = riskScoring;
-        _complianceDashboardRepository= complianceDashboardRepository;
+        _complianceDashboardRepository = complianceDashboardRepository;
     }
 
-   
-    public async Task<ComplianceDashboardSummary> GetDashboardSummaryAsync(CancellationToken cancellationToken=default)
+
+    public async Task<ComplianceDashboardSummary> GetDashboardSummaryAsync(CancellationToken cancellationToken = default)
     {
         return await _complianceDashboardRepository.GetSummaryAsync(
        _currentUser.ClientId,
@@ -352,7 +353,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
             _db.AmlDecisions.Add(decision);
 
             transaction.Decision = decisionValue;
-            transaction.Status = decisionValue == "ALLOW" ? "CLEARED" : "HELD";
+            transaction.Status = decisionValue == "ALLOW" ? "CLEARED" : "HOLD";
             transaction.RiskScore = scoring.OverallRiskScore;
             transaction.RiskLevel = scoring.RiskLevel;
             transaction.ScreeningStatus = screeningStatus;
@@ -488,14 +489,17 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
         AmlTransaction transaction,
         Customer customer)
     {
-        var records = await _db.AmlRecords.AsNoTracking()
-            .Where(x => x.ClientId == _currentUser.ClientId && x.IsActive &&x.IsShared)
-            .ToListAsync();
-        var subjects = new[] { transaction.SenderName, transaction.ReceiverName };
+        var subjects = new[]
+        {
+            transaction.SenderName,
+            transaction.ReceiverName
+        };
         var matches = new List<ScreeningMatch>();
+
 
         foreach (var subject in subjects.Where(x => !string.IsNullOrWhiteSpace(x)))
         {
+            var records = await GetScreeningCandidatesAsync(subject);
             foreach (var record in records)
             {
                 var score = Similarity(subject, record.FullName);
@@ -518,7 +522,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
                     SubjectName = subject,
                     MatchedName = record.FullName,
                     MatchScore = score,
-                    MatchStatus = score >= 95 ? "CONFIRMED_MATCH" : "POTENTIAL_MATCH",
+                    MatchStatus = "POTENTIAL_MATCH", // A name score cannot establish identity.
                     SourceName = record.SourceName,
                     ListVersion = "manual-v1",
                     ComparedFields = "Name, DateOfBirth, Nationality",
@@ -537,7 +541,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
         var now = DateTime.UtcNow;
         var rules = await _db.ComplianceRules.AsNoTracking()
             .Where(x => x.ClientId == _currentUser.ClientId && x.IsActive &&
-                x.ApprovalStatus == "Active" && x.EffectiveFrom <= now &&
+                x.ApprovalStatus == "APPROVED" && x.EffectiveFrom <= now &&
                 (!x.EffectiveTo.HasValue || x.EffectiveTo >= now))
             .OrderBy(x => x.Priority)
             .ToListAsync();
@@ -657,37 +661,55 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
         _ => "LOW"
     };
 
-    private static decimal Similarity(string first, string second)
+    private static decimal Similarity(
+    string first,
+    string second)
     {
-        var left = Normalize(first);
-        var right = Normalize(second);
-        if (left.Length == 0 || right.Length == 0) return 0;
-        if (left == right) return 100;
+        var left =
+            AmlNameNormalizer.Normalize(
+                first);
 
-        var distance = Levenshtein(left, right);
-        return Math.Round((1m - distance / (decimal)Math.Max(left.Length, right.Length)) * 100m, 2);
-    }
+        var right =
+            AmlNameNormalizer.Normalize(
+                second);
 
-    private static string Normalize(string value)
-    {
-        var builder = new StringBuilder(value.Length);
-        var previousWasSpace = false;
-        foreach (var character in value.Trim().ToUpperInvariant())
+
+        if (left.Length == 0
+            ||
+            right.Length == 0)
         {
-            if (char.IsLetterOrDigit(character))
-            {
-                builder.Append(character);
-                previousWasSpace = false;
-            }
-            else if (!previousWasSpace)
-            {
-                builder.Append(' ');
-                previousWasSpace = true;
-            }
+            return 0;
         }
-        return builder.ToString().Trim();
+
+
+        if (left == right)
+        {
+            return 100;
+        }
+
+
+        var distance =
+            Levenshtein(
+                left,
+                right);
+
+
+        return Math.Round(
+            (
+                1m
+                -
+                distance
+                /
+                (decimal)Math.Max(
+                    left.Length,
+                    right.Length)
+            )
+            *
+            100m,
+            2);
     }
 
+    
     private static int Levenshtein(string left, string right)
     {
         var previous = Enumerable.Range(0, right.Length + 1).ToArray();
@@ -730,4 +752,44 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
     }
 
     private sealed record TransactionRiskResult(int Score, string HighestAction, string RuleVersions);
+    private async Task<List<AmlRecord>>
+        GetScreeningCandidatesAsync(
+            string name)
+    {
+        var prefix =
+            AmlNameNormalizer.GetPrefix(
+                name);
+
+        if (string.IsNullOrWhiteSpace(prefix))
+        {
+            return [];
+        }
+
+        // Scan all eligible candidates; a prefix-only search can miss spelling differences.
+        var candidates = await _db.AmlRecords
+            .AsNoTracking()
+            .Where(x =>
+                x.IsActive
+                &&
+                x.DeleteFg == "N"
+                &&
+                (
+                    x.RecordScope == "GLOBAL"
+                    ||
+                    x.ClientId ==
+                        _currentUser.ClientId
+                ))
+            .OrderBy(x => x.FullName)
+            .Take(10001)
+            .Select(x => new AmlRecord
+            {
+                Id=x.Id, ClientId=x.ClientId, RecordScope=x.RecordScope, FullName=x.FullName,
+                DateOfBirth=x.DateOfBirth, Nationality=x.Nationality, SourceName=x.SourceName,
+                LastSyncDate=x.LastSyncDate, SourceUpdatedDate=x.SourceUpdatedDate
+            })
+            .ToListAsync();
+        if (candidates.Count > 10000)
+            throw new InvalidOperationException("AML candidate limit exceeded. Screening was not completed; do not treat this result as clear.");
+        return candidates;
+    }
 }

@@ -1,64 +1,571 @@
 @model AmlScreening.Portal.ViewModels.RiskScoringPageViewModel
+
 @{
     ViewData["Title"] = "Risk Score Setup";
-    var canManage = Model.CanEditBands;
-    var nepal = TimeZoneInfo.FindSystemTimeZoneById("Nepal Standard Time");
-    string LocalTime(DateTime? value) => value.HasValue
-        ? TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc), nepal).ToString("dd MMM yyyy HH:mm")
-        : "—";
+
+    var canManageBands = Model.CanEditBands;
+    var canManageModel = Model.CanEditModel;
+
+    var nepal =
+        TimeZoneInfo.FindSystemTimeZoneById(
+            "Nepal Standard Time");
+
+    string LocalTime(DateTime? value) =>
+        value.HasValue
+            ? TimeZoneInfo
+                .ConvertTimeFromUtc(
+                    DateTime.SpecifyKind(
+                        value.Value,
+                        DateTimeKind.Utc),
+                    nepal)
+                .ToString("dd MMM yyyy HH:mm")
+            : "—";
 }
+
 @section Styles {
-    <link rel="stylesheet" href="~/css/workflow.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/risk-scoring.css" asp-append-version="true" />
+    <link rel="stylesheet"
+          href="~/css/workflow.css"
+          asp-append-version="true" />
+
+    <link rel="stylesheet"
+          href="~/css/risk-scoring.css"
+          asp-append-version="true" />
 }
+
 <partial name="_WorkflowMessages" />
+
+
+<!-- ================================================= -->
+<!-- PAGE HEADING -->
+<!-- ================================================= -->
+
 <section class="workflow-heading">
-    <div><h1>Risk Score Setup</h1>
-        @* <p>Final risk ranges use the document's 0–100 scale.</p> *@
-        </div>
-    @if (canManage)
-    {
-        <a class="workflow-primary" asp-controller="RiskScoreSetup" asp-action="Edit">@(Model.Bands.Count == 0 ? "Create ranges" : "Edit ranges")</a>
-    }
+
+    <div>
+        <h1>Risk Score Setup</h1>
+
+        <p>
+            Manage the risk model and final risk ranges.
+        </p>
+    </div>
+
 </section>
-@if (Model.ActiveModel == null)
-{
-    @* <div class="risk-review-notice">Risk calculation is not configured. Please contact your administrator.</div> *@
-}
-else if (Model.ActiveModel.ApprovalStatus != "APPROVED")
-{
-    <div class="risk-review-notice">The risk model is waiting for approval.</div>
-}
+
+
+<!-- ================================================= -->
+<!-- RISK MODEL GOVERNANCE -->
+<!-- ================================================= -->
+
+<section class="workflow-panel">
+
+    <div class="risk-model-heading">
+
+        <div>
+
+            <h2>Risk Model</h2>
+
+            <p>
+                Defines how Customer,
+                Transaction and Screening risk
+                contribute to the final risk score.
+            </p>
+
+        </div>
+
+
+        @if (canManageModel)
+        {
+            <a class="workflow-primary"
+               asp-controller="RiskScoreSetup"
+               asp-action="EditModel">
+
+                <i class="bi bi-pencil-square"></i>
+
+                @(
+                    Model.ActiveModel == null
+                        ? "Create Model"
+                        : Model.HasModelDraft
+                            ? "Edit Pending Model"
+                            : "Create New Version"
+                )
+
+            </a>
+        }
+
+    </div>
+
+
+    <!-- ============================================= -->
+    <!-- ACTIVE APPROVED MODEL -->
+    <!-- ============================================= -->
+    @if (Model.ActiveModel == null)
+    {
+        <div class="risk-review-notice warning">
+
+            <i class="bi bi-exclamation-triangle"></i>
+
+            <div>
+
+                <strong>
+                    No approved risk model is active.
+                </strong>
+
+                <p>
+                    Risk calculation cannot run until
+                    a model is approved.
+                </p>
+
+            </div>
+
+        </div>
+    }
+    else
+    {
+        <div class="risk-model-status-row">
+
+            <div>
+
+                <span class="risk-status-badge approved">
+
+                    <i class="bi bi-check-circle"></i>
+
+                    APPROVED
+
+                </span>
+
+                <strong>
+                    @Model.ActiveModel.ModelCode
+                    v@Model.ActiveModel.ModelVersion
+                </strong>
+
+            </div>
+
+
+            <small>
+                Effective:
+                @LocalTime(
+                    Model.ActiveModel.EffectiveFrom)
+            </small>
+
+        </div>
+
+
+        <div class="risk-model-summary">
+
+            <article>
+
+                <span>
+                    <i class="bi bi-person"></i>
+                </span>
+
+                <div>
+
+                    <small>
+                        Customer Risk
+                    </small>
+
+                    <strong>
+                        @Model.ActiveModel.CustomerWeightPercent%
+                    </strong>
+
+                </div>
+
+            </article>
+
+
+            <article>
+
+                <span>
+                    <i class="bi bi-arrow-left-right"></i>
+                </span>
+
+                <div>
+
+                    <small>
+                        Transaction Risk
+                    </small>
+
+                    <strong>
+                        @Model.ActiveModel.TransactionWeightPercent%
+                    </strong>
+
+                </div>
+
+            </article>
+
+
+            <article>
+
+                <span>
+                    <i class="bi bi-shield-check"></i>
+                </span>
+
+                <div>
+
+                    <small>
+                        Screening Risk
+                    </small>
+
+                    <strong>
+                        @Model.ActiveModel.ScreeningWeightPercent%
+                    </strong>
+
+                </div>
+
+            </article>
+
+
+            <article>
+
+                <span>
+                    <i class="bi bi-calculator"></i>
+                </span>
+
+                <div>
+
+                    <small>
+                        Total Weight
+                    </small>
+
+                    <strong>
+                        @(
+                            Model.ActiveModel.CustomerWeightPercent
+                            +
+                            Model.ActiveModel.TransactionWeightPercent
+                            +
+                            Model.ActiveModel.ScreeningWeightPercent
+                        )%
+                    </strong>
+
+                </div>
+
+            </article>
+
+        </div>
+    }
+
+
+    <!-- ============================================= -->
+    <!-- PENDING MODEL -->
+    <!-- ============================================= -->
+    @if (Model.HasModelDraft &&
+             Model.PendingModel != null)
+    {
+        <div class="risk-pending-model">
+
+            <div class="risk-pending-header">
+
+                <div>
+
+                    <span class="risk-status-badge pending">
+
+                        <i class="bi bi-hourglass-split"></i>
+
+                        PENDING
+
+                    </span>
+
+                    <strong>
+                        Model
+                        v@Model.PendingModel.ModelVersion
+                    </strong>
+
+                </div>
+
+
+                <a class="risk-review-button"
+                   asp-controller="RiskScoreSetup"
+                   asp-action="ReviewModel">
+
+                    <i class="bi bi-eye"></i>
+
+                    Review Model
+
+                </a>
+
+            </div>
+
+
+            <div class="risk-pending-values">
+
+                <span>
+                    Customer
+                    <strong>
+                        @Model.PendingModel.CustomerWeightPercent%
+                    </strong>
+                </span>
+
+                <span>
+                    Transaction
+                    <strong>
+                        @Model.PendingModel.TransactionWeightPercent%
+                    </strong>
+                </span>
+
+                <span>
+                    Screening
+                    <strong>
+                        @Model.PendingModel.ScreeningWeightPercent%
+                    </strong>
+                </span>
+
+            </div>
+
+
+            <div class="risk-pending-info">
+
+                <i class="bi bi-info-circle"></i>
+
+                <span>
+                    Active scoring remains unchanged
+                    until a different authorized checker
+                    approves this model.
+                </span>
+
+            </div>
+
+        </div>
+    }
+
+</section>
+
+
+<!-- ================================================= -->
+<!-- RISK BANDS -->
+<!-- ================================================= -->
+
+<section class="workflow-heading risk-band-heading">
+
+    <div>
+
+        <h2>Risk Ranges</h2>
+
+        <p>
+            Final risk ranges use the 0–100 scale.
+        </p>
+
+    </div>
+
+
+    @if (canManageBands)
+    {
+        <a class="workflow-primary"
+           asp-controller="RiskScoreSetup"
+           asp-action="Edit">
+
+            <i class="bi bi-pencil-square"></i>
+
+            @(
+                Model.Bands.Count == 0
+                    ? "Create Ranges"
+                    : Model.HasBandDraft
+                        ? "Edit Pending Ranges"
+                        : "Create New Version"
+            )
+
+        </a>
+    }
+
+</section>
+
+
+<!-- ================================================= -->
+<!-- PENDING BAND NOTICE -->
+<!-- ================================================= -->
 @if (Model.HasBandDraft)
 {
     <div class="risk-review-notice">
-        <strong>Pending approval.</strong> Active ranges remain unchanged until another administrator approves.
-        <a class="risk-edit-link" asp-action="Review">Review changes</a>
+
+        <strong>
+            Pending approval.
+        </strong>
+
+        Active ranges remain unchanged until
+        a different authorized checker approves them.
+
+        <a class="risk-edit-link"
+           asp-controller="RiskScoreSetup"
+           asp-action="Review">
+
+            Review changes
+
+        </a>
+
     </div>
 }
+
+
+<!-- ================================================= -->
+<!-- BAND TABLE -->
+<!-- ================================================= -->
+
 <section class="workflow-panel">
+
     <div class="table-responsive">
+
         <table class="workflow-table risk-simple-table">
+
             <thead>
-                <tr><th rowspan="2">S.N.</th><th rowspan="2">Risk type</th><th colspan="3">Range</th><th rowspan="2">Status</th><th rowspan="2">Created by</th><th rowspan="2">Created date (Nepal)</th><th rowspan="2">Updated by</th><th rowspan="2">Updated date (Nepal)</th></tr>
-                <tr><th>From</th><th>To</th><th>Remarks</th></tr>
-            </thead>
-            <tbody>
-            @if (Model.Bands.Count == 0)
-            {
-                <tr><td colspan="10" class="workflow-empty">No risk ranges configured. An administrator with Manage permission can create the initial set.</td></tr>
-            }
-            @for (var i = 0; i < Model.Bands.Count; i++)
-            {
-                var band = Model.Bands[i];
+
                 <tr>
-                    <td>@(i + 1)</td><td>@band.RiskLevel</td><td>@band.MinimumScore</td><td>@(band.MaximumScore ?? 100)</td>
-                    <td>@(band.Remarks ?? "—")</td>
-                    <td><span class="risk-status @(band.ApprovalStatus == "APPROVED" ? "approved" : "pending")">@(band.ApprovalStatus == "APPROVED" ? "Approved" : "Pending")</span></td><td>@(band.CreatedBy ?? "—")</td><td>@LocalTime(band.CreatedDate)</td>
-                    <td>@(band.UpdatedBy ?? "—")</td><td>@LocalTime(band.UpdatedDate)</td>
+
+                    <th rowspan="2">
+                        S.N.
+                    </th>
+
+                    <th rowspan="2">
+                        Risk type
+                    </th>
+
+                    <th colspan="3">
+                        Range
+                    </th>
+
+                    <th rowspan="2">
+                        Status
+                    </th>
+
+                    <th rowspan="2">
+                        Created by
+                    </th>
+
+                    <th rowspan="2">
+                        Created date (Nepal)
+                    </th>
+
+                    <th rowspan="2">
+                        Updated by
+                    </th>
+
+                    <th rowspan="2">
+                        Updated date (Nepal)
+                    </th>
+
                 </tr>
-            }
+
+
+                <tr>
+
+                    <th>
+                        From
+                    </th>
+
+                    <th>
+                        To
+                    </th>
+
+                    <th>
+                        Remarks
+                    </th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+                @if (Model.Bands.Count == 0)
+                {
+                    <tr>
+
+                        <td colspan="10"
+                            class="workflow-empty">
+
+                            No risk ranges are configured.
+
+                            A user with
+                            Risk Scoring Manage permission
+                            can create the initial set.
+
+                        </td>
+
+                    </tr>
+                }
+
+
+                @for (
+                    var i = 0;
+                    i < Model.Bands.Count;
+                    i++)
+                {
+                    var band =
+                        Model.Bands[i];
+
+                    <tr>
+
+                        <td>
+                            @(i + 1)
+                        </td>
+
+
+                        <td>
+                            @band.RiskLevel
+                        </td>
+
+
+                        <td>
+                            @band.MinimumScore
+                        </td>
+
+
+                        <td>
+                            @(band.MaximumScore ?? 100)
+                        </td>
+
+
+                        <td>
+                            @(band.Remarks ?? "—")
+                        </td>
+
+
+                        <td>
+
+                            <span class="
+                                risk-status
+                                @(band.ApprovalStatus == "APPROVED"
+                                      ? "approved"
+                                      : "pending")">
+
+                                @(
+                                    band.ApprovalStatus == "APPROVED"
+                                        ? "Approved"
+                                        : "Pending"
+                                )
+
+                            </span>
+
+                        </td>
+
+
+                        <td>
+                            @(band.CreatedBy ?? "—")
+                        </td>
+
+
+                        <td>
+                            @LocalTime(
+                                band.CreatedDate)
+                        </td>
+
+
+                        <td>
+                            @(band.UpdatedBy ?? "—")
+                        </td>
+
+
+                        <td>
+                            @LocalTime(
+                                band.UpdatedDate)
+                        </td>
+
+                    </tr>
+                }
+
             </tbody>
+
         </table>
+
     </div>
+
 </section>

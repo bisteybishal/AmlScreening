@@ -66,9 +66,13 @@ public sealed partial class RiskScoringService
                 var blocked = ApprovalBlock([row.MakerUserId]);
                 review = new RiskApprovalReview
                 {
-                    Kind = kind, RuleId = row.Id, FactorCode = factor.FactorCode,
+                    Kind = kind,
+                    RuleId = row.Id,
+                    FactorCode = factor.FactorCode,
                     Title = $"Review {factor.FactorName} score",
-                    MakerName = row.CreatedBy, CanApprove = blocked == null, ApprovalMessage = blocked,
+                    MakerName = row.CreatedBy,
+                    CanApprove = blocked == null,
+                    ApprovalMessage = blocked,
                     ReviewToken = ReviewToken(kind, factor.FactorCode, [row]),
                     ActiveRows = history.Where(x => x.Id == row.ReplacesRuleId)
                         .Select(RuleReviewRow).ToList(),
@@ -85,14 +89,88 @@ public sealed partial class RiskScoringService
                 var blocked = ApprovalBlock(pending.Select(x => x.MakerUserId));
                 review = new RiskApprovalReview
                 {
-                    Kind = kind, Title = "Review risk score ranges", MakerName = pending[0].CreatedBy,
-                    CanApprove = blocked == null, ApprovalMessage = blocked, ReviewToken = ReviewToken(kind, null, pending),
+                    Kind = kind,
+                    Title = "Review risk score ranges",
+                    MakerName = pending[0].CreatedBy,
+                    CanApprove = blocked == null,
+                    ApprovalMessage = blocked,
+                    ReviewToken = ReviewToken(kind, null, pending),
                     ActiveRows = history.Where(x => x.ApprovalStatus == "APPROVED" && x.IsActive && x.DeleteFg == "N")
                         .OrderBy(x => x.MinimumScore).Select(BandReviewRow).ToList(),
                     PendingRows = pending.OrderBy(x => x.MinimumScore).Select(BandReviewRow).ToList()
                 };
             }
-            else throw new RiskConfigurationException("Unknown review type.");
+            else if (kind == "Model")
+            {
+                var history =
+                    await ModelHistory()
+                        .AsNoTracking()
+                        .OrderByDescending(
+                            x => x.ModelVersion)
+                        .ToListAsync(
+                            cancellationToken);
+
+                var pending =
+                    history.FirstOrDefault(
+                        x =>
+                            IsPending(
+                                x.ApprovalStatus) &&
+                            x.DeleteFg == "N")
+                    ?? throw new RiskConfigurationException(
+                        "There is no pending risk model to review.");
+
+                var active =
+                    history.FirstOrDefault(
+                        x =>
+                            x.ApprovalStatus ==
+                                "APPROVED" &&
+                            x.IsActive &&
+                            x.DeleteFg == "N");
+
+                var blocked =
+                    ApprovalBlock(
+                        [pending.MakerUserId]);
+
+                review =
+                    new RiskApprovalReview
+                    {
+                        Kind = "Model",
+
+                        Title =
+                            $"Review risk model v{pending.ModelVersion}",
+
+                        MakerName =
+                            pending.CreatedBy,
+
+                        CanApprove =
+                            blocked == null,
+
+                        ApprovalMessage =
+                            blocked,
+
+                        ReviewToken =
+                            ReviewToken(
+                                "Model",
+                                null,
+                                [pending]),
+
+                        ActiveRows =
+                            active == null
+                                ? []
+                                : ModelReviewRows(
+                                    active),
+
+                        PendingRows =
+                            ModelReviewRows(
+                                pending)
+                    };
+            }
+            else
+            {
+                throw new RiskConfigurationException(
+                    "Unknown review type.");
+            }
+           
         }, cancellationToken, AppPermissions.RiskScoringView);
         return review!;
     }
@@ -174,4 +252,122 @@ public sealed partial class RiskScoringService
             AddAudit("Approve", "RiskBand", 0,
                 $"Approved ranges v{version}; maker {pending[0].MakerUserId}, checker {_currentUser.UserId}.");
         }, cancellationToken, AppPermissions.RiskScoringApprove);
+
+    public Task ActivateModelAsync(
+    string reviewToken,
+    CancellationToken cancellationToken = default) =>
+    ChangeConfigurationAsync(
+        async () =>
+        {
+            var history =
+                await ModelHistory()
+                    .ToListAsync(
+                        cancellationToken);
+
+            var pendingModels =
+                history
+                    .Where(x =>
+                        IsPending(
+                            x.ApprovalStatus) &&
+                        x.DeleteFg == "N")
+                    .ToList();
+
+            if (pendingModels.Count != 1)
+            {
+                throw new RiskConfigurationException(
+                    "Exactly one pending risk model is required for approval.");
+            }
+
+            var pending =
+                pendingModels[0];
+
+            EnsureApproval(
+                [pending.MakerUserId],
+                reviewToken,
+                ReviewToken(
+                    "Model",
+                    null,
+                    [pending]));
+
+            ValidateModel(
+                pending.CustomerWeightPercent,
+                pending.TransactionWeightPercent,
+                pending.ScreeningWeightPercent);
+
+            var now =
+                DateTime.UtcNow;
+
+            // Retire existing approved model.
+            foreach (var active in
+                history.Where(x =>
+                    x.Id != pending.Id &&
+                    x.ApprovalStatus ==
+                        "APPROVED" &&
+                    x.IsActive &&
+                    x.DeleteFg == "N"))
+            {
+                active.IsActive = false;
+
+                active.EffectiveTo =
+                    now;
+
+                Stamp(active);
+            }
+
+            // Publish pending model.
+            pending.ApprovalStatus =
+                "APPROVED";
+
+            pending.ApprovedByUserId =
+                _currentUser.UserId;
+
+            pending.ApprovedBy =
+                _currentUser.Username;
+
+            pending.ApprovedDate =
+                now;
+
+            pending.EffectiveFrom =
+                now;
+
+            pending.EffectiveTo =
+                null;
+
+            pending.IsActive =
+                true;
+
+            Stamp(pending);
+
+            AddAudit(
+                "Approve",
+                "RiskModel",
+                pending.Id,
+                $"Approved risk model v{pending.ModelVersion}; " +
+                $"maker {pending.MakerUserId}, " +
+                $"checker {_currentUser.UserId}.");
+        },
+        cancellationToken,
+        AppPermissions.RiskScoringApprove);
+
+    private static IReadOnlyList<RiskReviewRow>
+    ModelReviewRows(RiskModel model) =>
+[
+    new(
+        "Customer risk weight",
+        $"{model.CustomerWeightPercent:0.##}%",
+        $"Model v{model.ModelVersion}",
+        false),
+
+    new(
+        "Transaction risk weight",
+        $"{model.TransactionWeightPercent:0.##}%",
+        $"Model v{model.ModelVersion}",
+        false),
+
+    new(
+        "Screening risk weight",
+        $"{model.ScreeningWeightPercent:0.##}%",
+        $"Model v{model.ModelVersion}",
+        false)
+];
 }

@@ -1,226 +1,879 @@
-﻿using AmlScreening.Application.Interface.Repositories;
+﻿using System.Security.Claims;
+using AmlScreening.Application.Interface.Repositories;
 using AmlScreening.Application.Security;
 using AmlScreening.Domain.Entities.Compliance;
 using AmlScreening.Portal.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
-using AmlScreening.Application.Interface;
-using AmlScreening.Application.Models;
 
-namespace AmlScreening.Portal.Controllers
+namespace AmlScreening.Portal.Controllers;
+
+[Authorize(
+    Policy = AppPermissions.ComplianceRulesView)]
+public sealed class ComplianceRulesController
+    : Controller
 {
-    [Authorize(Policy = AppPermissions.ComplianceRulesView)]
-    public class ComplianceRulesController : Controller
+    private readonly IComplianceRuleRepository
+        _repository;
+
+
+    public ComplianceRulesController(
+        IComplianceRuleRepository repository)
     {
-        private readonly IComplianceRuleRepository _complianceRuleRepository;
+        _repository =
+            repository;
+    }
 
-        public ComplianceRulesController(
-            IComplianceRuleRepository complianceRuleRepository)
-        {
-            _complianceRuleRepository = complianceRuleRepository;
-        }
-        [HttpGet]
-        public async Task<IActionResult> Index()
-        {
-            var rules = await _complianceRuleRepository.GetAllAsync();
-            var model = rules.Select(rule => new ComplianceRuleViewModel
+
+    // =========================================
+    // INDEX
+    // =========================================
+
+    [HttpGet]
+    public async Task<IActionResult> Index()
+    {
+        var userId =
+            GetCurrentUserId();
+
+
+        var rules =
+            await _repository
+                .GetAllAsync();
+
+
+        var canEdit =
+            User.HasClaim(
+                AppPermissions.ClaimType,
+                AppPermissions.ComplianceRulesEdit);
+
+
+        var canDelete =
+            User.HasClaim(
+                AppPermissions.ClaimType,
+                AppPermissions.ComplianceRulesDelete);
+
+
+        var canApprove =
+            User.HasClaim(
+                AppPermissions.ClaimType,
+                AppPermissions.ComplianceRulesApprove);
+
+
+        var model =
+            rules.Select(
+                rule =>
+                    new ComplianceRuleViewModel
+                    {
+                        Id =
+                            rule.Id,
+
+                        ClientId =
+                            rule.ClientId,
+
+                        RuleCode =
+                            rule.RuleCode,
+
+                        RuleName =
+                            rule.RuleName,
+
+                        RuleType =
+                            rule.RuleType,
+
+                        ThresholdAmount =
+                            rule.ThresholdAmount,
+
+                        Currency =
+                            rule.Currency,
+
+                        LookbackMinutes =
+                            rule.LookbackMinutes,
+
+                        TransactionCount =
+                            rule.TransactionCount,
+
+                        RiskScore =
+                            rule.RiskScore,
+
+                        Action =
+                            rule.Action,
+
+                        RuleVersion =
+                            rule.RuleVersion,
+
+                        Priority =
+                            rule.Priority,
+
+                        ApprovalStatus =
+                            rule.ApprovalStatus,
+
+                        EffectiveFrom =
+                            rule.EffectiveFrom,
+
+                        EffectiveTo =
+                            rule.EffectiveTo,
+
+                        IsActive =
+                            rule.IsActive,
+
+                        MakerUserId =
+                            rule.MakerUserId,
+
+                        ApprovedByUserId =
+                            rule.ApprovedByUserId,
+
+                        ApprovedBy =
+                            rule.ApprovedBy,
+
+                        ApprovedDate =
+                            rule.ApprovedDate,
+
+                        RowVersion =
+                            rule.RowVersion,
+
+
+                        // Pending version:
+                        // only maker can edit/delete.
+                        CanEdit =
+                            canEdit &&
+                            rule.ApprovalStatus ==
+                                "PENDING"
+                                &&
+                            rule.MakerUserId ==
+                                userId,
+
+                        CanDelete =
+                            canDelete &&
+                            rule.ApprovalStatus ==
+                                "PENDING"
+                                &&
+                            rule.MakerUserId ==
+                                userId,
+
+
+                        // Checker:
+                        // same user cannot approve.
+                        CanApprove =
+                            canApprove &&
+                            rule.ApprovalStatus ==
+                                "PENDING"
+                                &&
+                            rule.MakerUserId !=
+                                userId
+                    })
+                .ToList();
+
+
+        return View(model);
+    }
+
+
+    // =========================================
+    // ADD
+    // =========================================
+
+    [HttpGet]
+    [Authorize(
+        Policy =
+            AppPermissions.ComplianceRulesCreate)]
+    public IActionResult Add()
+    {
+        return View(
+            new ComplianceRuleViewModel
             {
-                Id = rule.Id,
-                RuleCode = rule.RuleCode,
-                RuleName = rule.RuleName,
-                RuleType = rule.RuleType,
-                ThresholdAmount = rule.ThresholdAmount,
-                Currency = rule.Currency,
-                LookbackMinutes = rule.LookbackMinutes,
-                TransactionCount = rule.TransactionCount,
-                RiskScore = rule.RiskScore,
-                Action = rule.Action,
-                RuleVersion = rule.RuleVersion,
-                Priority = rule.Priority,
-                ApprovalStatus = rule.ApprovalStatus,
-                EffectiveFrom = rule.EffectiveFrom,
-                EffectiveTo = rule.EffectiveTo,
-                IsActive = rule.IsActive
-            }).ToList();
+                RuleType =
+                    "AmountThreshold",
 
+                Currency =
+                    "NPR",
+
+                RiskScore =
+                    30,
+
+                Action =
+                    "REVIEW",
+
+                Priority =
+                    100
+            });
+    }
+
+
+    [HttpPost]
+    [Authorize(
+        Policy =
+            AppPermissions.ComplianceRulesCreate)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Add(
+        ComplianceRuleViewModel model)
+    {
+        ValidateRule(model);
+
+
+        if (!ModelState.IsValid)
+        {
             return View(model);
         }
 
-        [HttpGet]
-        [Authorize(Policy = AppPermissions.ComplianceRulesCreate)]
-        public IActionResult Add()
-        {
-            return View(new ComplianceRuleViewModel
+
+        var rule =
+            new ComplianceRule
             {
-                RuleType = "AmountThreshold",
-                Currency = "NPR",
-                RiskScore = 30,
-                Action = "Review",
-                RuleVersion = 1,
-                Priority = 100,
-                ApprovalStatus = "Active",
-                EffectiveFrom = DateTime.UtcNow,
-                IsActive = true
-            });
-        }
+                RuleCode =
+                    model.RuleCode.Trim(),
 
-        [HttpPost]
-        [Authorize(Policy = AppPermissions.ComplianceRulesCreate)]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Add(ComplianceRuleViewModel complianceModel)
-        {
-            ValidateRule(complianceModel);
-            if (!ModelState.IsValid)
-                return View(complianceModel);
+                RuleName =
+                    model.RuleName.Trim(),
 
-            var username = User.FindFirstValue(ClaimTypes.Name)
-                ?? User.Identity?.Name
-                ?? "Unknown";
+                RuleType =
+                    model.RuleType.Trim(),
 
-            var rule = new ComplianceRule
-            {
-                RuleCode = complianceModel.RuleCode.Trim(),
-                RuleName = complianceModel.RuleName.Trim(),
-                RuleType = complianceModel.RuleType.Trim(),
-                ThresholdAmount = complianceModel.ThresholdAmount,
-                Currency = complianceModel.Currency?.Trim().ToUpperInvariant(),
-                LookbackMinutes = complianceModel.LookbackMinutes,
-                TransactionCount = complianceModel.TransactionCount,
-                RiskScore = complianceModel.RiskScore,
-                Action = complianceModel.Action.Trim(),
-                RuleVersion = complianceModel.RuleVersion,
-                Priority = complianceModel.Priority,
-                ApprovalStatus = complianceModel.ApprovalStatus.Trim(),
-                EffectiveFrom = complianceModel.EffectiveFrom,
-                EffectiveTo = complianceModel.EffectiveTo,
-                IsActive = complianceModel.IsActive,
-                CreatedDate = DateTime.UtcNow,
-                CreatedBy = username
+                ThresholdAmount =
+                    model.ThresholdAmount,
+
+                Currency =
+                    model.Currency?
+                        .Trim()
+                        .ToUpperInvariant(),
+
+                LookbackMinutes =
+                    model.LookbackMinutes,
+
+                TransactionCount =
+                    model.TransactionCount,
+
+                RiskScore =
+                    model.RiskScore,
+
+                Action =
+                    model.Action
+                        .Trim()
+                        .ToUpperInvariant(),
+
+                Priority =
+                    model.Priority
             };
 
-            await _complianceRuleRepository.CreateAsync(rule);
-            TempData["SuccessMessage"] = "Compliance rule added successfully.";
-            return RedirectToAction(nameof(Index));
+
+        await _repository
+            .CreatePendingAsync(
+                rule,
+                GetCurrentUserId(),
+                GetCurrentUsername());
+
+
+        TempData["SuccessMessage"] =
+            "Compliance rule saved as Pending. A different authorized user from the same client must approve it.";
+
+
+        return RedirectToAction(
+            nameof(Index));
+    }
+
+
+    // =========================================
+    // EDIT GET
+    // =========================================
+
+    [HttpGet]
+    [Authorize(
+        Policy =
+            AppPermissions.ComplianceRulesEdit)]
+    public async Task<IActionResult> Edit(
+        int id)
+    {
+        var rule =
+            await _repository
+                .GetByIdAsync(id);
+
+
+        if (rule == null)
+        {
+            return NotFound();
         }
 
-        [HttpGet]
-        [Authorize(Policy = AppPermissions.ComplianceRulesEdit)]
-        public async Task<IActionResult> Edit(int id)
-        {
-            var rule = await _complianceRuleRepository.GetByIdAsync(id);
-            if (rule is null)
-                return NotFound();
 
-            return View(new ComplianceRuleViewModel
+        return View(
+            new ComplianceRuleViewModel
             {
-                Id = rule.Id,
-                RowVersion = rule.RowVersion,
-                RuleCode = rule.RuleCode,
-                RuleName = rule.RuleName,
-                RuleType = rule.RuleType,
-                ThresholdAmount = rule.ThresholdAmount,
-                Currency = rule.Currency,
-                LookbackMinutes = rule.LookbackMinutes,
-                TransactionCount = rule.TransactionCount,
-                RiskScore = rule.RiskScore,
-                Action = rule.Action,
-                RuleVersion = rule.RuleVersion,
-                Priority = rule.Priority,
-                ApprovalStatus = rule.ApprovalStatus,
-                EffectiveFrom = rule.EffectiveFrom,
-                EffectiveTo = rule.EffectiveTo,
-                IsActive = rule.IsActive
+                Id =
+                    rule.Id,
+
+                ClientId =
+                    rule.ClientId,
+
+                RowVersion =
+                    rule.RowVersion,
+
+                RuleCode =
+                    rule.RuleCode,
+
+                RuleName =
+                    rule.RuleName,
+
+                RuleType =
+                    rule.RuleType,
+
+                ThresholdAmount =
+                    rule.ThresholdAmount,
+
+                Currency =
+                    rule.Currency,
+
+                LookbackMinutes =
+                    rule.LookbackMinutes,
+
+                TransactionCount =
+                    rule.TransactionCount,
+
+                RiskScore =
+                    rule.RiskScore,
+
+                Action =
+                    rule.Action,
+
+                RuleVersion =
+                    rule.RuleVersion,
+
+                Priority =
+                    rule.Priority,
+
+                ApprovalStatus =
+                    rule.ApprovalStatus,
+
+                EffectiveFrom =
+                    rule.EffectiveFrom,
+
+                EffectiveTo =
+                    rule.EffectiveTo,
+
+                IsActive =
+                    rule.IsActive,
+
+                MakerUserId =
+                    rule.MakerUserId
             });
+    }
+
+
+    // =========================================
+    // EDIT POST
+    // =========================================
+
+    [HttpPost]
+    [Authorize(
+        Policy =
+            AppPermissions.ComplianceRulesEdit)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(
+        ComplianceRuleViewModel model)
+    {
+        ValidateRule(model);
+
+
+        if (!ModelState.IsValid)
+        {
+            return View(model);
         }
 
-        [HttpPost]
-        [Authorize(Policy = AppPermissions.ComplianceRulesEdit)]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(ComplianceRuleViewModel complianceModel)
+
+        var source =
+            await _repository
+                .GetByIdAsync(
+                    model.Id);
+
+
+        if (source == null)
         {
-            ValidateRule(complianceModel);
-            if (!ModelState.IsValid)
-                return View(complianceModel);
+            return NotFound();
+        }
 
-            var rule = await _complianceRuleRepository.GetByIdAsync(complianceModel.Id);
-            if (rule is null)
-                return NotFound();
 
-            rule.RuleCode = (complianceModel.RuleCode ?? string.Empty).Trim();
-            rule.RuleName = (complianceModel.RuleName ?? string.Empty).Trim();
-            rule.RuleType = complianceModel.RuleType.Trim();
-            rule.ThresholdAmount = complianceModel.ThresholdAmount;
-            rule.Currency = complianceModel.Currency?.Trim().ToUpperInvariant();
-            rule.LookbackMinutes = complianceModel.LookbackMinutes;
-            rule.TransactionCount = complianceModel.TransactionCount;
-            rule.RiskScore = complianceModel.RiskScore;
-            rule.Action = complianceModel.Action.Trim();
-            rule.RuleVersion = complianceModel.RuleVersion;
-            rule.Priority = complianceModel.Priority;
-            rule.ApprovalStatus = complianceModel.ApprovalStatus.Trim();
-            rule.EffectiveFrom = complianceModel.EffectiveFrom;
-            rule.EffectiveTo = complianceModel.EffectiveTo;
-            rule.IsActive = complianceModel.IsActive;
-            rule.RowVersion = complianceModel.RowVersion;
+        var userId =
+            GetCurrentUserId();
 
-            var username = User.FindFirstValue(ClaimTypes.Name)
-                ?? User.Identity?.Name
-                ?? "Unknown";
+        var username =
+            GetCurrentUsername();
 
-            if (!await _complianceRuleRepository.UpdateAsync(rule, username))
+
+        var changedRule =
+            new ComplianceRule
             {
-                ModelState.AddModelError(string.Empty,
-                    "This rule was changed by another user. Reload it and try again.");
-                return View(complianceModel);
+                Id =
+                    source.Id,
+
+                RowVersion =
+                    model.RowVersion,
+
+                RuleCode =
+                    source.RuleCode,
+
+                RuleName =
+                    model.RuleName.Trim(),
+
+                RuleType =
+                    model.RuleType.Trim(),
+
+                ThresholdAmount =
+                    model.ThresholdAmount,
+
+                Currency =
+                    model.Currency?
+                        .Trim()
+                        .ToUpperInvariant(),
+
+                LookbackMinutes =
+                    model.LookbackMinutes,
+
+                TransactionCount =
+                    model.TransactionCount,
+
+                RiskScore =
+                    model.RiskScore,
+
+                Action =
+                    model.Action
+                        .Trim()
+                        .ToUpperInvariant(),
+
+                Priority =
+                    model.Priority
+            };
+
+
+        if (source.ApprovalStatus ==
+            "PENDING")
+        {
+            if (source.MakerUserId !=
+                userId)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "Only the original maker can edit this pending rule.");
+
+                return View(model);
             }
 
-            TempData["SuccessMessage"] = "Compliance rule updated successfully.";
-            return RedirectToAction(nameof(Index));
-        }
 
-        private void ValidateRule(ComplianceRuleViewModel model)
+            var updated =
+                await _repository
+                    .UpdatePendingAsync(
+                        changedRule,
+                        userId,
+                        username);
+
+
+            if (!updated)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "This rule changed after you opened it. Reload it and try again.");
+
+                return View(model);
+            }
+
+
+            TempData["SuccessMessage"] =
+                "Pending compliance rule updated successfully.";
+        }
+        else if (
+            source.ApprovalStatus ==
+            "APPROVED")
         {
-            if (string.IsNullOrWhiteSpace(model.RuleCode))
-                ModelState.AddModelError(nameof(model.RuleCode), "Rule code is required.");
-            if (string.IsNullOrWhiteSpace(model.RuleName))
-                ModelState.AddModelError(nameof(model.RuleName), "Rule name is required.");
-            if (string.IsNullOrWhiteSpace(model.RuleType))
-                ModelState.AddModelError(nameof(model.RuleType), "Rule type is required.");
-            if (string.IsNullOrWhiteSpace(model.Action))
-                ModelState.AddModelError(nameof(model.Action), "Action is required.");
-            if (model.RiskScore is < 0 or > 100)
-                ModelState.AddModelError(nameof(model.RiskScore), "Risk score must be between 0 and 100.");
-            if (model.RuleVersion <= 0)
-                ModelState.AddModelError(nameof(model.RuleVersion), "Rule version must be greater than zero.");
-            if (model.Priority <= 0)
-                ModelState.AddModelError(nameof(model.Priority), "Priority must be greater than zero.");
-            if (model.ThresholdAmount < 0)
-                ModelState.AddModelError(nameof(model.ThresholdAmount), "Threshold amount cannot be negative.");
-            if (model.LookbackMinutes <= 0 && model.LookbackMinutes.HasValue)
-                ModelState.AddModelError(nameof(model.LookbackMinutes), "Lookback minutes must be greater than zero.");
-            if (model.TransactionCount <= 0 && model.TransactionCount.HasValue)
-                ModelState.AddModelError(nameof(model.TransactionCount), "Transaction count must be greater than zero.");
-            if (model.EffectiveFrom == default)
-                ModelState.AddModelError(nameof(model.EffectiveFrom), "Effective-from date is required.");
-            if (model.EffectiveTo.HasValue && model.EffectiveTo < model.EffectiveFrom)
-                ModelState.AddModelError(nameof(model.EffectiveTo), "Effective-to date must be after effective-from date.");
+            await _repository
+                .CreatePendingVersionAsync(
+                    source,
+                    changedRule,
+                    userId,
+                    username);
+
+
+            TempData["SuccessMessage"] =
+                "A new Pending version was created. The currently approved version remains active until the new version is approved.";
         }
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [Authorize(Policy = AppPermissions.ComplianceRulesDelete)]
-        public async Task<IActionResult> Delete(int id)
+        else
         {
-            var deletedBy = User.FindFirstValue(ClaimTypes.Name)
-                ?? User.Identity?.Name
-                ?? "Unknown";
-
-            var deleted = await _complianceRuleRepository.DeleteAsync(id, deletedBy);
-            if (!deleted)
-                return NotFound();
-
-            TempData["SuccessMessage"] = "Compliance rule deleted successfully.";
-            return RedirectToAction(nameof(Index));
+            TempData["ErrorMessage"] =
+                "This compliance rule cannot currently be edited.";
         }
+
+
+        return RedirectToAction(
+            nameof(Index));
+    }
+
+
+    // =========================================
+    // REVIEW
+    // =========================================
+
+    [HttpGet]
+    public async Task<IActionResult> Review(
+        int id)
+    {
+        var pending =
+            await _repository
+                .GetPendingForReviewAsync(id);
+
+
+        if (pending == null)
+        {
+            return NotFound();
+        }
+
+
+        var currentUserId =
+            GetCurrentUserId();
+
+
+        var active =
+            await _repository
+                .GetActiveVersionAsync(
+                    pending.RuleCode,
+                    pending.ClientId);
+
+
+        var hasApprovePermission =
+            User.HasClaim(
+                AppPermissions.ClaimType,
+                AppPermissions.ComplianceRulesApprove);
+
+
+        var isMaker =
+            pending.MakerUserId ==
+            currentUserId;
+
+
+        var model =
+            new ComplianceRuleReviewViewModel
+            {
+                ActiveRule =
+                    active,
+
+                PendingRule =
+                    pending,
+
+                CanApprove =
+                    hasApprovePermission &&
+                    !isMaker,
+
+                ApprovalMessage =
+                    isMaker
+                        ? "You created this rule. A different authorized user from the same client must approve it."
+                        : !hasApprovePermission
+                            ? "You do not have Compliance Rules Approve permission."
+                            : null
+            };
+
+
+        return View(model);
+    }
+
+
+    // =========================================
+    // APPROVE
+    // =========================================
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(
+        Policy =
+            AppPermissions.ComplianceRulesApprove)]
+    public async Task<IActionResult> Approve(
+        int id,
+        string rowVersion)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(
+                    rowVersion))
+            {
+                TempData["ErrorMessage"] =
+                    "Invalid rule version.";
+
+                return RedirectToAction(
+                    nameof(Index));
+            }
+
+
+            var bytes =
+                Convert.FromBase64String(
+                    rowVersion);
+
+
+            var approved =
+                await _repository
+                    .ApproveAsync(
+                        id,
+                        GetCurrentUserId(),
+                        GetCurrentUsername(),
+                        bytes);
+
+
+            TempData[
+                approved
+                    ? "SuccessMessage"
+                    : "ErrorMessage"] =
+                approved
+                    ? "Compliance rule approved successfully."
+                    : "Pending compliance rule was not found or changed before approval.";
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] =
+                ex.Message;
+        }
+
+
+        return RedirectToAction(
+            nameof(Index));
+    }
+
+
+    // =========================================
+    // DELETE PENDING
+    // =========================================
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(
+        Policy =
+            AppPermissions.ComplianceRulesDelete)]
+    public async Task<IActionResult> Delete(
+        int id)
+    {
+        var deleted =
+            await _repository
+                .DeletePendingAsync(
+                    id,
+                    GetCurrentUserId(),
+                    GetCurrentUsername());
+
+
+        TempData[
+            deleted
+                ? "SuccessMessage"
+                : "ErrorMessage"] =
+            deleted
+                ? "Pending compliance rule deleted successfully."
+                : "Only your own pending compliance rule can be deleted.";
+
+
+        return RedirectToAction(
+            nameof(Index));
+    }
+
+
+    // =========================================
+    // VALIDATION
+    // =========================================
+
+    private void ValidateRule(
+     ComplianceRuleViewModel model)
+    {
+        // ==================================
+        // BASIC REQUIRED FIELDS
+        // ==================================
+
+        if (string.IsNullOrWhiteSpace(
+                model.RuleCode))
+        {
+            ModelState.AddModelError(
+                nameof(model.RuleCode),
+                "Rule code is required.");
+        }
+
+
+        if (string.IsNullOrWhiteSpace(
+                model.RuleName))
+        {
+            ModelState.AddModelError(
+                nameof(model.RuleName),
+                "Rule name is required.");
+        }
+
+
+        // ==================================
+        // RULE TYPE
+        // ==================================
+
+        var ruleType =
+            model.RuleType?
+                .Trim();
+
+
+        var allowedRuleTypes =
+            new[]
+            {
+            "AmountThreshold",
+            "Velocity"
+            };
+
+
+        if (string.IsNullOrWhiteSpace(
+                ruleType)
+            ||
+            !allowedRuleTypes.Contains(
+                ruleType,
+                StringComparer.OrdinalIgnoreCase))
+        {
+            ModelState.AddModelError(
+                nameof(model.RuleType),
+                "Select a valid rule type.");
+        }
+
+
+        // ==================================
+        // ACTION
+        // ==================================
+
+        var action =
+            model.Action?
+                .Trim()
+                .ToUpperInvariant();
+        model.Action = action ?? string.Empty;
+        model.Currency = model.Currency?.Trim().ToUpperInvariant();
+        if (!string.IsNullOrEmpty(model.Currency) &&
+            !System.Text.RegularExpressions.Regex.IsMatch(model.Currency, "^[A-Z]{3}$"))
+            ModelState.AddModelError(nameof(model.Currency), "Use a three-letter currency code.");
+
+
+        var allowedActions =
+            new[]
+            {
+            "ALLOW",
+            "REVIEW",
+            "BLOCK"
+            };
+
+
+        if (string.IsNullOrWhiteSpace(
+                action)
+            ||
+            !allowedActions.Contains(
+                action,
+                StringComparer.OrdinalIgnoreCase))
+        {
+            ModelState.AddModelError(
+                nameof(model.Action),
+                "Select a valid action.");
+        }
+
+
+        // ==================================
+        // RISK SCORE
+        // ==================================
+
+        if (model.RiskScore < 0
+            ||
+            model.RiskScore > 100)
+        {
+            ModelState.AddModelError(
+                nameof(model.RiskScore),
+                "Risk score must be between 0 and 100.");
+        }
+
+
+        // ==================================
+        // PRIORITY
+        // ==================================
+
+        if (model.Priority <= 0)
+        {
+            ModelState.AddModelError(
+                nameof(model.Priority),
+                "Priority must be greater than zero.");
+        }
+
+
+        // ==================================
+        // AMOUNT THRESHOLD
+        // ==================================
+
+        if (string.Equals(
+                ruleType,
+                "AmountThreshold",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            if (!model.ThresholdAmount.HasValue
+                ||
+                model.ThresholdAmount.Value <= 0)
+            {
+                ModelState.AddModelError(
+                    nameof(model.ThresholdAmount),
+                    "Threshold amount must be greater than zero.");
+            }
+
+
+            if (string.IsNullOrWhiteSpace(
+                    model.Currency))
+            {
+                ModelState.AddModelError(
+                    nameof(model.Currency),
+                    "Currency is required for an amount threshold rule.");
+            }
+        }
+
+
+        // ==================================
+        // VELOCITY
+        // ==================================
+
+        if (string.Equals(
+                ruleType,
+                "Velocity",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            if (!model.LookbackMinutes.HasValue
+                ||
+                model.LookbackMinutes.Value <= 0)
+            {
+                ModelState.AddModelError(
+                    nameof(model.LookbackMinutes),
+                    "Lookback minutes must be greater than zero.");
+            }
+
+
+            if (!model.TransactionCount.HasValue
+                ||
+                model.TransactionCount.Value <= 0)
+            {
+                ModelState.AddModelError(
+                    nameof(model.TransactionCount),
+                    "Transaction count must be greater than zero.");
+            }
+        }
+    }
+    // =========================================
+    // CURRENT USER
+    // =========================================
+
+    private long GetCurrentUserId()
+    {
+        var value =
+            User.FindFirstValue(
+                ClaimTypes.NameIdentifier);
+
+
+        if (!long.TryParse(
+                value,
+                out var userId))
+        {
+            throw new UnauthorizedAccessException(
+                "Current user id is invalid.");
+        }
+
+
+        return userId;
+    }
+
+
+    private string GetCurrentUsername()
+    {
+        return User.FindFirstValue(
+                   ClaimTypes.Name)
+               ??
+               User.Identity?.Name
+               ??
+               "Unknown";
     }
 }

@@ -4,38 +4,85 @@ using System.Security.Claims;
 
 namespace AmlScreening.Portal.Services;
 
-public sealed class CurrentUserContext : ICurrentUserContext
+public sealed class CurrentUserContext
+    : ICurrentUserContext
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IHttpContextAccessor
+        _httpContextAccessor;
 
-    public CurrentUserContext(IHttpContextAccessor httpContextAccessor)
+    public CurrentUserContext(
+        IHttpContextAccessor httpContextAccessor)
     {
-        _httpContextAccessor = httpContextAccessor;
+        _httpContextAccessor =
+            httpContextAccessor;
     }
 
-    private ClaimsPrincipal? Principal => _httpContextAccessor.HttpContext?.User;
+    private ClaimsPrincipal? User =>
+        _httpContextAccessor
+            .HttpContext?
+            .User;
 
-    public bool IsAuthenticated => Principal?.Identity?.IsAuthenticated == true;
-    public bool IsAdministrator => Principal?.IsInRole("Admin") == true;
+    public bool IsAuthenticated =>
+        User?.Identity?.IsAuthenticated == true;
 
-    public long UserId => ParseRequiredLongClaim(ClaimTypes.NameIdentifier);
-
-    public int ClientId => ParseRequiredClaim(AppClaimTypes.ClientId);
-
-    public string Username => Principal?.Identity?.Name ?? "Unknown";
-
-    public bool HasPermission(string permissionCode) =>
-        Principal?.HasClaim(AppPermissions.ClaimType, permissionCode) == true;
-
-    private int ParseRequiredClaim(string claimType)
+    public long UserId
     {
-        var value = Principal?.FindFirstValue(claimType);
-        return int.TryParse(value, out var parsed) ? parsed : 0;
+        get
+        {
+            var value =
+                User?.FindFirstValue(
+                    ClaimTypes.NameIdentifier);
+
+            return long.TryParse(
+                value,
+                out var id)
+                ? id
+                : 0;
+        }
     }
 
-    private long ParseRequiredLongClaim(string claimType)
+    public int PartnerId
     {
-        var value = Principal?.FindFirstValue(claimType);
-        return long.TryParse(value, out var parsed) ? parsed : 0;
+        get
+        {
+            var value =
+                User?.FindFirstValue(
+                    AppClaimTypes.PartnerId);
+
+            return int.TryParse(
+                value,
+                out var id)
+                ? id
+                : 0;
+        }
     }
+
+    public int BranchId
+    {
+        get
+        {
+            var value =
+                User?.FindFirstValue(
+                    AppClaimTypes.BranchId);
+
+            return int.TryParse(
+                value,
+                out var id)
+                ? id
+                : 0;
+        }
+    }
+
+    public string Username =>
+        User?.Identity?.Name
+        ?? string.Empty;
+
+    public bool HasPermission(
+        string permissionCode)
+    {
+        return User?.HasClaim(
+            AppPermissions.ClaimType,
+            permissionCode) == true;
+    }
+
 }

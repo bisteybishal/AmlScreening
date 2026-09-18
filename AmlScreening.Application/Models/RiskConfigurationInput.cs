@@ -24,5 +24,17 @@ public sealed class RiskBandInput
     public string? Remarks { get; set; }
     public byte[] RowVersion { get; set; } = [];
 }
+public sealed class RiskModelInput
+{
+    public int Id { get; set; }
 
+    public decimal CustomerWeightPercent { get; set; }
+
+    public decimal TransactionWeightPercent { get; set; }
+
+    public decimal ScreeningWeightPercent { get; set; }
+
+    public byte[] RowVersion { get; set; }
+        = Array.Empty<byte>();
+}
 public sealed class RiskConfigurationException(string message) : Exception(message);

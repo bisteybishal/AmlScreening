@@ -12,16 +12,16 @@ public interface IAmlRecordRepository
         string? recordType,
         bool? isActive,
         int pageNumber,
-        int pageSize);
+        int pageSize,CancellationToken cancellationToken=default);
     Task<AmlRecordSummary> GetSummaryAsync(CancellationToken cancellationToken=default);
-    Task<IReadOnlyList<AmlRecord>> GetRecentAsync(int maximumRecords);
-    Task<bool> ReferenceExistsAsync(string referenceNo, string sourceName, int? excludedId = null);
-    Task<AmlRecord?> GetByIdAsync(int id);
-    Task<int> CreateAsync(AmlRecord record);
-    Task<bool> UpdateAsync(AmlRecord record, string updateby);
-    Task<bool> DeleteAsync(int id, string deletedBy);
+    Task<IReadOnlyList<AmlRecord>> GetRecentAsync(int maximumRecords,CancellationToken cancellationToken=default);
+    Task<bool> ReferenceExistsAsync(string referenceNo, string sourceName, int? excludedId = null, CancellationToken cancellationToken = default);
+    Task<AmlRecord?> GetByIdAsync(int id,CancellationToken cancellationToken=default);
+    Task<int> CreateAsync(AmlRecord record, CancellationToken cancellationToken = default);
+    Task<bool> UpdateAsync(AmlRecord record, CancellationToken cancellationToken = default);
+    Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
 
-    Task<AmlRecord?> GetPhotoAsync(
-    int id,
-    CancellationToken cancellationToken = default);
+    Task<AmlRecord?> GetPhotoAsync(int id, CancellationToken cancellationToken = default);
+
+    
 }

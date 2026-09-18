@@ -6,65 +6,105 @@ using System.Security.Claims;
 
 namespace AmlScreening.Portal.Services;
 
-public sealed class PortalCookieEvents : CookieAuthenticationEvents
+public sealed class PortalCookieEvents
+    : CookieAuthenticationEvents
 {
-    private readonly IUserSessionRepository _userSessionRepository;
+    private readonly IUserSessionRepository
+        _sessionRepository;
 
-    public const string SessionClaim = "PortalSessionId";
 
     public PortalCookieEvents(
-        IUserSessionRepository userSessionRepository)
+        IUserSessionRepository sessionRepository)
     {
-        _userSessionRepository = userSessionRepository;
+        _sessionRepository =
+            sessionRepository;
     }
+
 
     public override async Task ValidatePrincipal(
         CookieValidatePrincipalContext context)
     {
-        var user = context.Principal;
+        var userIdValue =
+            context.Principal?
+                .FindFirstValue(
+                    ClaimTypes.NameIdentifier);
 
-        var validuserId =
-            long.TryParse(
-                user?.FindFirstValue(
-                    ClaimTypes.NameIdentifier),
-                out var userId);
-        var validclientId =
-        int.TryParse(
-            user?.FindFirstValue(
-                AppClaimTypes.ClientId),
-            out var clientId);
-           var validsessionId=
-            Guid.TryParse(
-                user?.FindFirstValue(
-                    SessionClaim),
-                out var sessionId);
+        var partnerValue =
+            context.Principal?
+                .FindFirstValue(
+                    AppClaimTypes.PartnerId);
 
-        if (!validuserId||!validclientId||!validsessionId)
+        var branchValue =
+            context.Principal?
+                .FindFirstValue(
+                    AppClaimTypes.BranchId);
+
+        var sessionValue =
+            context.Principal?
+                .FindFirstValue(
+                    AppClaimTypes.SessionId);
+
+
+        if (!long.TryParse(
+                userIdValue,
+                out var userId)
+
+            ||
+
+            !int.TryParse(
+                partnerValue,
+                out var partnerId)
+
+            ||
+
+            !int.TryParse(
+                branchValue,
+                out var branchId)
+
+            ||
+
+            !Guid.TryParse(
+                sessionValue,
+                out var sessionId))
         {
-            await RejectSessionAsync(context);
+            await RejectAsync(context);
             return;
         }
 
-        var result =
-            await _userSessionRepository.ValidateAsync(
-                userId,
-                clientId,
-                sessionId);
 
-        if (!result.Success)
+        var ipAddress =
+            context.HttpContext
+                .Connection
+                .RemoteIpAddress?
+                .ToString()
+            ?? "unknown";
+
+
+        var valid =
+            await _sessionRepository
+                .ValidateAsync(
+                    sessionId,
+                    userId,
+                    partnerId,
+                    branchId,
+                    ipAddress);
+
+
+        if (!valid)
         {
-            await RejectSessionAsync(context);
-            return;
+            await RejectAsync(context);
         }
     }
 
-    private static async Task RejectSessionAsync(
+
+    private static async Task RejectAsync(
         CookieValidatePrincipalContext context)
     {
         context.RejectPrincipal();
 
-        await context.HttpContext.SignOutAsync(
-            CookieAuthenticationDefaults
-                .AuthenticationScheme);
+        await context.HttpContext
+            .SignOutAsync(
+                CookieAuthenticationDefaults
+                    .AuthenticationScheme);
     }
 }

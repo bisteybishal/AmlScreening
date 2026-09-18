@@ -1,3 +1,5 @@
+using AmlScreening.Domain.Entities.Compliance;
+
 namespace AmlScreening.Portal.ViewModels;
 
 public sealed class ComplianceRuleViewModel
@@ -15,8 +17,37 @@ public sealed class ComplianceRuleViewModel
     public string Action { get; set; } = string.Empty;
     public int RuleVersion { get; set; } = 1;
     public int Priority { get; set; } = 100;
-    public string ApprovalStatus { get; set; } = "Active";
+    public string ApprovalStatus { get; set; } = "PENDING";
     public DateTime EffectiveFrom { get; set; }
     public DateTime? EffectiveTo { get; set; }
     public bool IsActive { get; set; }
+
+    public int ClientId { get; set; }
+
+    public long? MakerUserId { get; set; }
+
+    public long? ApprovedByUserId { get; set; }
+
+    public string? ApprovedBy { get; set; }
+
+    public DateTime? ApprovedDate { get; set; }
+
+    public bool CanEdit { get; set; }
+
+    public bool CanApprove { get; set; }
+
+    public bool CanDelete { get; set; }
+
+   
+}
+public sealed class ComplianceRuleReviewViewModel
+{
+    public ComplianceRule? ActiveRule { get; set; }
+
+    public ComplianceRule PendingRule { get; set; }
+        = default!;
+
+    public bool CanApprove { get; set; }
+
+    public string? ApprovalMessage { get; set; }
 }

@@ -6,14 +6,13 @@ using System.Text;
 
 namespace AmlScreening.Domain.Entities
 {
-    public class AmlRecord : BaseEntity, IUserOwnedEntity
+    public class AmlRecord : BaseEntity
     {
-        public int ClientId { get; set; }
+        public int PartnerId { get; set; }
 
-        public long OwnerUserId { get; set; }
+        public int BranchId { get; set; }
 
-        public bool IsShared { get; set; }
-
+        public long CreatedByUserId { get; set; }
         public string RecordType { get; set; } = string.Empty;
 
         public string FullName { get; set; } = string.Empty;
@@ -34,6 +33,13 @@ namespace AmlScreening.Domain.Entities
         public string? PhotoContentType { get; set; }
         [NotMapped]
         public bool HasPhoto { get; set; }
+        public string? NormalizedName { get; set; }
+
+        public string? NamePrefix { get; set; }
+
+        public DateTime? LastSyncDate { get; set; }
+
+        public DateTime? SourceUpdatedDate { get; set; }
 
         public void Activate()
         {
@@ -44,15 +50,7 @@ namespace AmlScreening.Domain.Entities
         {
             IsActive = false;
         }
-    }
-    public class PagedResult<T>
-    {
-        public IReadOnlyList<T> Items { get; set; } = [];
-        public int TotalCount { get; set; }
-        public int PageNumber { get; set; }
-        public int PageSize { get; set; }
 
-        public int TotalPages =>
-            (int)Math.Ceiling(TotalCount / (double)PageSize);
     }
+   
 }

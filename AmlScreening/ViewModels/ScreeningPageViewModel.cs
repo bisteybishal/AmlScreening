@@ -1,16 +1,18 @@
 using System.ComponentModel.DataAnnotations;
-using AmlScreening.Domain.Entities;
-using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace AmlScreening.Portal.ViewModels;
 
 public sealed class ScreeningPageViewModel
 {
-    [Required, StringLength(200, MinimumLength = 2)]
-    public string Name { get; set; } = "";
-    public int Page { get; set; } = 1;
-    [BindNever]
-    public bool HasSearched { get; set; }
-    [BindNever]
-    public PagedResult<AmlRecord> Results { get; set; } = new() { PageNumber = 1, PageSize = 10 };
+    [Required(
+        ErrorMessage = "Enter a name to search.")]
+
+    [StringLength(
+        200,
+        MinimumLength = 2,
+        ErrorMessage =
+            "Enter between 2 and 200 characters.")]
+
+    public string Name { get; set; }
+        = string.Empty;
 }

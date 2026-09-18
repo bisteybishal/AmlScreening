@@ -2,9 +2,8 @@
 
 namespace AmlScreening.Application.Interface.Repositories;
 
-public interface IErrorRepository
+public interface IErrorLogRepository
 {
-    Task<int> LogErrorAsync(
-         ErrorLogModel error,
-         CancellationToken cancellationToken = default);
+    Task<long> LogAsync(
+         ErrorLogRequest request);
 }

@@ -1,47 +1,113 @@
 ﻿using AmlScreening.Application.Interface.Repositories;
-using AmlScreening.Application.Models;
 using AmlScreening.Infrastructure.Persistence;
 using Dapper;
 using System.Data;
+using System.Data.Entity.Infrastructure;
 
-namespace AmlScreening.Infrastructure.Repositories
+namespace AmlScreening.Infrastructure.Repositories;
+
+public sealed class UserSessionRepository
+    : IUserSessionRepository
 {
-    public class UserSessionRepository:IUserSessionRepository
+    private readonly IDBConnectionFactory
+        _connectionFactory;
+
+    public UserSessionRepository(
+        IDBConnectionFactory connectionFactory)
     {
-        private readonly IDBConnectionFactory _dBConnectionFactory;
+        _connectionFactory =
+            connectionFactory;
+    }
 
-        public UserSessionRepository(IDBConnectionFactory dBConnectionFactory)
-        {
-            _dBConnectionFactory = dBConnectionFactory;
-        }
-        public Task<UserSessionResult> StartAsync(long UserId, int clientId, Guid sessionId)
-        {
-            return ExecuteAsync(
-           "START", UserId, clientId, sessionId);
-        }
-        public Task<UserSessionResult> ValidateAsync(long UserId, int clientId, Guid sessionId)
-        {
-            return ExecuteAsync(
-           "VALIDATE", UserId, clientId, sessionId);
-        }
-        public Task<UserSessionResult> EndAsync(long UserId, int clientId, Guid sessionId)
-        {
-            return ExecuteAsync(
-           "END", UserId, clientId, sessionId);
-        }
-        private async Task<UserSessionResult> ExecuteAsync(string action, long UserId, int clientId, Guid sessionId)
-        {
-            using var connection = _dBConnectionFactory.CreateConnection();
-             var results=await connection.QuerySingleAsync<UserSessionResult>("dbo.spa_UserSession", new
+
+    public async Task<int> StartAsync(
+        Guid sessionId,
+        long userId,
+        int partnerId,
+        int branchId,
+        string ipAddress,
+        string? userAgent)
+    {
+        using var connection =
+            _connectionFactory.CreateConnection();
+
+        return await connection
+            .QuerySingleAsync<int>(
+                "dbo.spa_UserSession",
+                new
+                {
+                    Action = "START",
+
+                    SessionId = sessionId,
+
+                    UserId = userId,
+
+                    PartnerId = partnerId,
+
+                    BranchId = branchId,
+
+                    IpAddress = ipAddress,
+
+                    UserAgent = userAgent
+                },
+                commandType:
+                    CommandType.StoredProcedure);
+    }
+
+
+    public async Task<bool> ValidateAsync(
+        Guid sessionId,
+        long userId,
+        int partnerId,
+        int branchId,
+        string ipAddress)
+    {
+        using var connection =
+            _connectionFactory.CreateConnection();
+
+        var result =
+            await connection
+                .QuerySingleAsync<int>(
+                    "dbo.spa_UserSession",
+                    new
+                    {
+                        Action = "VALIDATE",
+
+                        SessionId = sessionId,
+
+                        UserId = userId,
+
+                        PartnerId = partnerId,
+
+                        BranchId = branchId,
+
+                        IpAddress = ipAddress
+                    },
+                    commandType:
+                        CommandType.StoredProcedure);
+
+        return result == 1;
+    }
+
+
+    public async Task EndAsync(
+        Guid sessionId,
+        long userId)
+    {
+        using var connection =
+            _connectionFactory.CreateConnection();
+
+        await connection.ExecuteAsync(
+            "dbo.spa_UserSession",
+            new
             {
-                Action = action,
-                UserId=UserId,
-                clientId=clientId,
-                SessionId=sessionId
+                Action = "END",
 
+                SessionId = sessionId,
+
+                UserId = userId
             },
-            commandType:CommandType.StoredProcedure);    
-            return results;
-        }
+            commandType:
+                CommandType.StoredProcedure);
     }
 }

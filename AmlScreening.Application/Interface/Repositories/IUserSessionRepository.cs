@@ -4,8 +4,23 @@ namespace AmlScreening.Application.Interface.Repositories;
 
 public  interface IUserSessionRepository
 {
-    Task<UserSessionResult> StartAsync(long UserId, int clientId, Guid sessionId);
-    Task<UserSessionResult> ValidateAsync(long UserId, int clientId, Guid sessionId);
-    Task<UserSessionResult> EndAsync(long UserId, int clientId, Guid sessionId);
+    Task<int> StartAsync(
+        Guid sessionId,
+        long userId,
+        int partnerId,
+        int branchId,
+        string ipAddress,
+        string? userAgent);
+
+    Task<bool> ValidateAsync(
+        Guid sessionId,
+        long userId,
+        int partnerId,
+        int branchId,
+        string ipAddress);
+
+    Task EndAsync(
+        Guid sessionId,
+        long userId);
 }
 

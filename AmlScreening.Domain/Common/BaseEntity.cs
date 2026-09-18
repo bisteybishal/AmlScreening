@@ -21,4 +21,5 @@ public abstract class BaseEntity
     public string? DeleteBy { get; set; }
 
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+
 }

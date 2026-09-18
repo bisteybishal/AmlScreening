@@ -3,6 +3,7 @@ using AmlScreening.Application.Security;
 using AmlScreening.Domain.Common;
 using AmlScreening.Domain.Entities.Compliance;
 using Microsoft.EntityFrameworkCore;
+using System.Runtime.CompilerServices;
 
 namespace AmlScreening.Infrastructure.Services;
 
@@ -18,11 +19,15 @@ public sealed partial class RiskScoringService
                     throw new RiskConfigurationException("Reload the initial range form.");
                 var initial = ranges.Select(x => new RiskBand
                 {
-                    ClientId = _currentUser.ClientId, BandVersion = 1,
+                    ClientId = _currentUser.ClientId,
+                    BandVersion = 1,
                     RiskLevel = x.RiskLevel.Trim().ToUpperInvariant(),
-                    MinimumScore = x.MinimumScore, MaximumScore = x.MaximumScore,
-                    Decision = x.Decision.Trim().ToUpperInvariant(), Remarks = x.Remarks?.Trim(),
-                    MakerUserId = _currentUser.UserId, CreatedBy = _currentUser.Username,
+                    MinimumScore = x.MinimumScore,
+                    MaximumScore = x.MaximumScore,
+                    Decision = x.Decision.Trim().ToUpperInvariant(),
+                    Remarks = x.Remarks?.Trim(),
+                    MakerUserId = _currentUser.UserId,
+                    CreatedBy = _currentUser.Username,
                     ApprovalStatus = "PENDING"
                 }).ToList();
                 if (initial.Any(x => string.IsNullOrWhiteSpace(x.RiskLevel) || x.RiskLevel.Length > 20 || x.Remarks?.Length > 1000) ||
@@ -52,8 +57,10 @@ public sealed partial class RiskScoringService
                     throw new RiskConfigurationException("Enter ranges within 0–100 and remarks of at most 1,000 characters.");
                 checkedRanges.Add(new RiskBand
                 {
-                    RiskLevel = row.RiskLevel, Decision = row.Decision,
-                    MinimumScore = input.MinimumScore, MaximumScore = input.MaximumScore,
+                    RiskLevel = row.RiskLevel,
+                    Decision = row.Decision,
+                    MinimumScore = input.MinimumScore,
+                    MaximumScore = input.MaximumScore,
                     Remarks = input.Remarks?.Trim()
                 });
             }
@@ -104,10 +111,12 @@ public sealed partial class RiskScoringService
     // This guard also protects callers that do not go through an MVC controller.
     private void EnsureConfigurationAccess(string permission)
     {
-        if (!_currentUser.IsAuthenticated || !_currentUser.IsAdministrator ||
-            _currentUser.ClientId <= 0 || _currentUser.UserId <= 0 ||
+        if (!_currentUser.IsAuthenticated ||
+            _currentUser.ClientId <= 0 ||
+            _currentUser.UserId <= 0 ||
             !_currentUser.HasPermission(permission))
-            throw new RiskConfigurationException("Only an authorized administrator for this client can access risk configuration.");
+            throw new RiskConfigurationException(
+                "Only an authorized administrator for this client can access risk configuration.");
     }
 
     private IQueryable<RiskFactorRule> RuleHistory() => _db.RiskFactorRules
@@ -116,6 +125,9 @@ public sealed partial class RiskScoringService
 
     private IQueryable<RiskBand> BandHistory() => _db.RiskBands
         .IgnoreQueryFilters(["SoftDeleteFilter"])
+        .Where(x => x.ClientId == _currentUser.ClientId);
+
+    private IQueryable<RiskModel> ModelHistory() => _db.RiskModels.IgnoreQueryFilters(["SoftDeleteFilter"])
         .Where(x => x.ClientId == _currentUser.ClientId);
 
     private static void CheckToken(BaseEntity entity, byte[] token)
@@ -164,11 +176,18 @@ public sealed partial class RiskScoringService
 
         var copy = new RiskFactorRule
         {
-            ClientId = _currentUser.ClientId, RiskFactorId = factorId, ReplacesRuleId = target.Id,
-            ValueCode = target.ValueCode, ValueName = target.ValueName,
-            MinimumValue = target.MinimumValue, MaximumValue = target.MaximumValue,
-            Score = target.Score, Remarks = target.Remarks, RuleVersion = version,
-            CreatedBy = _currentUser.Username, MakerUserId = _currentUser.UserId,
+            ClientId = _currentUser.ClientId,
+            RiskFactorId = factorId,
+            ReplacesRuleId = target.Id,
+            ValueCode = target.ValueCode,
+            ValueName = target.ValueName,
+            MinimumValue = target.MinimumValue,
+            MaximumValue = target.MaximumValue,
+            Score = target.Score,
+            Remarks = target.Remarks,
+            RuleVersion = version,
+            CreatedBy = _currentUser.Username,
+            MakerUserId = _currentUser.UserId,
             ApprovalStatus = "PENDING"
         };
         _db.RiskFactorRules.Add(copy);
@@ -206,9 +225,12 @@ public sealed partial class RiskScoringService
                 throw new RiskConfigurationException("This value code already exists in the draft.");
             var row = draft.Target ?? new RiskFactorRule
             {
-                ClientId = _currentUser.ClientId, RiskFactorId = factor.Id,
-                RuleVersion = draft.Version, CreatedBy = _currentUser.Username,
-                MakerUserId = _currentUser.UserId, ApprovalStatus = "PENDING"
+                ClientId = _currentUser.ClientId,
+                RiskFactorId = factor.Id,
+                RuleVersion = draft.Version,
+                CreatedBy = _currentUser.Username,
+                MakerUserId = _currentUser.UserId,
+                ApprovalStatus = "PENDING"
             };
             if (draft.Target is null) _db.RiskFactorRules.Add(row);
             row.ValueCode = code;
@@ -287,10 +309,15 @@ public sealed partial class RiskScoringService
         {
             var copy = new RiskBand
             {
-                ClientId = _currentUser.ClientId, RiskLevel = row.RiskLevel,
-                MinimumScore = row.MinimumScore, MaximumScore = row.MaximumScore,
-                Decision = row.Decision, Remarks = row.Remarks, BandVersion = version + 1,
-                CreatedBy = _currentUser.Username, ApprovalStatus = "PENDING",
+                ClientId = _currentUser.ClientId,
+                RiskLevel = row.RiskLevel,
+                MinimumScore = row.MinimumScore,
+                MaximumScore = row.MaximumScore,
+                Decision = row.Decision,
+                Remarks = row.Remarks,
+                BandVersion = version + 1,
+                CreatedBy = _currentUser.Username,
+                ApprovalStatus = "PENDING",
                 MakerUserId = _currentUser.UserId
             };
             _db.RiskBands.Add(copy);
@@ -314,8 +341,11 @@ public sealed partial class RiskScoringService
                 throw new RiskConfigurationException("This risk level already exists in the draft.");
             var row = draft.Target ?? new RiskBand
             {
-                ClientId = _currentUser.ClientId, BandVersion = draft.Version, CreatedBy = _currentUser.Username,
-                MakerUserId = _currentUser.UserId, ApprovalStatus = "PENDING"
+                ClientId = _currentUser.ClientId,
+                BandVersion = draft.Version,
+                CreatedBy = _currentUser.Username,
+                MakerUserId = _currentUser.UserId,
+                ApprovalStatus = "PENDING"
             };
             if (draft.Target is null) _db.RiskBands.Add(row);
             row.ApprovalStatus = "PENDING";
@@ -338,5 +368,181 @@ public sealed partial class RiskScoringService
             SoftDelete(draft.Target);
             AddAudit("Delete", "RiskBand", id, $"Soft-deleted in draft v{draft.Version}; active configuration unchanged.");
         }, cancellationToken);
+
+    private static void ValidateModel(decimal customerWeight, decimal transactionWeight, decimal screeningWeight)
+    {
+        if (customerWeight < 0 || customerWeight > 100 ||
+            transactionWeight < 0 || transactionWeight > 100 ||
+            screeningWeight < 0 || screeningWeight > 100)
+        {
+            throw new RiskConfigurationException(
+                "Every model weight must be between 0 and 100.");
+        }
+        var total=customerWeight+transactionWeight+screeningWeight;
+        if (total != 100m)
+        {
+            throw new RiskConfigurationException(
+           "Customer, Transaction and Screening weights must total exactly 100%.");
+        }
+        if(decimal.Round(customerWeight,2)!=customerWeight||
+            decimal.Round(transactionWeight,2)!=transactionWeight||
+           decimal.Round(screeningWeight,2)!=screeningWeight)
+        {
+            throw new RiskConfigurationException(
+                "Risk model weights can contain at most two decimal places.");
+        }
+    }
+    public Task SaveModelAsync(
+    RiskModelInput input,
+    CancellationToken cancellationToken = default) =>
+    ChangeConfigurationAsync(
+        async () =>
+        {
+            ValidateModel(
+                input.CustomerWeightPercent,
+                input.TransactionWeightPercent,
+                input.ScreeningWeightPercent);
+
+            var history =
+                await ModelHistory()
+                    .ToListAsync(
+                        cancellationToken);
+
+            var pendingModels =
+                history
+                    .Where(x =>
+                        IsPending(
+                            x.ApprovalStatus) &&
+                        x.DeleteFg == "N")
+                    .OrderByDescending(
+                        x => x.ModelVersion)
+                    .ToList();
+
+            if (pendingModels.Count > 1)
+            {
+                throw new RiskConfigurationException(
+                    "More than one pending risk model exists. Resolve the configuration before editing.");
+            }
+
+            RiskModel model;
+
+            if (pendingModels.Count == 1)
+            {
+                // Existing pending version:
+                // only its original maker may continue editing it.
+                model = pendingModels[0];
+
+                EnsureDraftMaker(
+                    [model.MakerUserId]);
+
+                if (input.Id != model.Id)
+                {
+                    throw new RiskConfigurationException(
+                        "A pending risk model already exists. Reload the page and edit that version.");
+                }
+
+                CheckToken(
+                    model,
+                    input.RowVersion);
+            }
+            else
+            {
+                // Editing an approved model creates a new version.
+                if (input.Id > 0)
+                {
+                    var source =
+                        history.SingleOrDefault(
+                            x =>
+                                x.Id == input.Id &&
+                                x.DeleteFg == "N");
+
+                    if (source == null)
+                    {
+                        throw new RiskConfigurationException(
+                            "The risk model changed. Reload the page.");
+                    }
+
+                    CheckToken(
+                        source,
+                        input.RowVersion);
+
+                    if (source.ApprovalStatus !=
+                            "APPROVED")
+                    {
+                        throw new RiskConfigurationException(
+                            "Only an approved model can be used to create a new model version.");
+                    }
+                }
+
+                var nextVersion =
+                    (history.Max(
+                        x => (int?)x.ModelVersion)
+                        ?? 0) + 1;
+
+                model = new RiskModel
+                {
+                    ClientId =
+                        _currentUser.ClientId,
+
+                    ModelCode =
+                        "AML-RISK",
+
+                    ModelVersion =
+                        nextVersion,
+
+                    ApprovalStatus =
+                        "PENDING",
+
+                    MakerUserId =
+                        _currentUser.UserId,
+
+                    CreatedBy =
+                        _currentUser.Username,
+
+                    // Pending model is not active.
+                    IsActive = false,
+
+                    EffectiveFrom =
+                        DateTime.UtcNow
+                };
+
+                _db.RiskModels.Add(model);
+            }
+
+            model.CustomerWeightPercent =
+                input.CustomerWeightPercent;
+
+            model.TransactionWeightPercent =
+                input.TransactionWeightPercent;
+
+            model.ScreeningWeightPercent =
+                input.ScreeningWeightPercent;
+
+            model.ApprovalStatus =
+                "PENDING";
+
+            model.ApprovedBy = null;
+            model.ApprovedByUserId = null;
+            model.ApprovedDate = null;
+
+            model.IsActive = false;
+
+            Stamp(model);
+
+            await _db.SaveChangesAsync(
+                cancellationToken);
+
+            AddAudit(
+                input.Id == 0
+                    ? "Create"
+                    : "Update",
+                "RiskModel",
+                model.Id,
+                $"Saved pending risk model v{model.ModelVersion}: " +
+                $"Customer={model.CustomerWeightPercent}%, " +
+                $"Transaction={model.TransactionWeightPercent}%, " +
+                $"Screening={model.ScreeningWeightPercent}%.");
+        },
+        cancellationToken);
 
 }

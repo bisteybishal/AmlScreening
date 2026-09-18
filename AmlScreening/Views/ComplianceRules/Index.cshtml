@@ -1,113 +1,295 @@
 @model IReadOnlyList<AmlScreening.Portal.ViewModels.ComplianceRuleViewModel>
 
+@using AmlScreening.Application.Security
+
 @{
     ViewData["Title"] = "Compliance Rules";
+
+    var canCreate =
+        User.HasClaim(
+            AppPermissions.ClaimType,
+            AppPermissions.ComplianceRulesCreate);
+
+    var canViewAllClients =
+        User.HasClaim(
+            AppPermissions.ClaimType,
+            AppPermissions.PlatformCrossClientAccess);
+
 }
+
 @section Styles {
-    <link rel="stylesheet" href="~/css/aml-records.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/Subscription.css" asp-append-version="true" />
+    <link rel="stylesheet"
+          href="~/css/workflow.css"
+          asp-append-version="true" />
 }
-<section class="subscription-heading">
+
+<partial name="_WorkflowMessages" />
+
+
+<section class="workflow-heading">
+
     <div>
-        <h1>Compliance Rules</h1>
+
+        <h1>
+            Compliance Rules
+        </h1>
+
+        <p>
+            Manage client compliance rules using
+            maker-checker approval.
+        </p>
 
     </div>
 
-    @if (User.HasClaim(AmlScreening.Application.Security.AppPermissions.ClaimType, AmlScreening.Application.Security.AppPermissions.ComplianceRulesCreate))
+
+    @if (canCreate)
     {
-        <a class="records-primary-button" asp-controller="ComplianceRules" asp-action="Add"><i class="bi bi-plus-lg"></i> Add Rule</a>
+        <a class="workflow-primary"
+           asp-action="Add">
+
+            <i class="bi bi-plus-lg"></i>
+
+            Add Rule
+
+        </a>
     }
+
 </section>
 
-@if (TempData["SuccessMessage"] is string successMessage)
-{
-    <div class="records-alert">
-        <i class="bi bi-check-circle"></i>
-        <span>@successMessage</span>
-    </div>
-}
 
-<table class="table">
-  
-    <thead>
-        <tr>
-            <th>Code</th>
-            <th>Rule</th>
-            <th>Type</th>
-            <th>Threshold</th>
-            <th>Score</th>
-            <th>Action</th>
-            <th>Version</th>
-            <th>Approval</th>
-            <th>Status</th>
-            <th class="actions-column">Manage</th>
-        </tr>
-    </thead>
-    <tbody>
-        @if (Model.Count == 0)
-        {
-            <tr>
-                <td colspan="10" class="text-center">No compliance rules found.</td>
-            </tr>
-        }
-        else
-        {
-            @foreach (var rule in Model)
-            {
+<section class="workflow-panel">
+
+    <div class="table-responsive">
+
+        <table class="workflow-table">
+
+            <thead>
+
                 <tr>
-                    <td>@rule.RuleCode</td>
-                    <td>@rule.RuleName</td>
-                    <td>@rule.RuleType</td>
-                    <td>
-                        @if (rule.ThresholdAmount.HasValue)
-                        {
-                            <span>@rule.ThresholdAmount.Value.ToString("N2") @rule.Currency</span>
-                        }
-                        else
-                        {
-                            <span>Not applicable</span>
-                        }
-                    </td>
-                    <td>@rule.RiskScore</td>
-                    <td>@rule.Action</td>
-                    <td>v@rule.RuleVersion / P@rule.Priority</td>
-                    <td>@rule.ApprovalStatus</td>
-                    <td>@(rule.IsActive ? "Active" : "Inactive")</td>
-                    <td class="actions-column">
-                        <div class="record-actions">
-                            @if (User.HasClaim(AmlScreening.Application.Security.AppPermissions.ClaimType, AmlScreening.Application.Security.AppPermissions.ComplianceRulesEdit))
-                            {
-                                <a class="action-button edit"
-                                   title="Edit rule"
-                                   asp-controller="ComplianceRules"
-                                   asp-action="Edit"
-                                   asp-route-id="@rule.Id">
-                                    <i class="bi bi-pencil-square"></i>
-                                    <span>Edit</span>
-                                </a>
-                            }
-                      
-                            @if (User.HasClaim(AmlScreening.Application.Security.AppPermissions.ClaimType, AmlScreening.Application.Security.AppPermissions.ComplianceRulesDelete))
-                            {
-                            <form asp-controller="ComplianceRules"
-                                  asp-action="Delete"
-                                  method="post"
-                                  onsubmit="return confirm('Delete rule @rule.RuleCode?');">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="id" value="@rule.Id" />
-                                <button type="submit"
-                                        class="action-button delete"
-                                        title="Delete rule">
-                                    <i class="bi bi-trash3"></i>
-                                    <span>Delete</span>
-                                </button>
-                            </form>
-                            }
-                        </div>
-                    </td>
-                </tr>
-            }
-        }
-    </tbody>
 
-</table>
+                    <th>
+                        S.N.
+                    </th>
+
+                    @if (canViewAllClients)
+                    {
+                        <th>
+                            Client
+                        </th>
+                    }
+
+                    <th>
+                        Rule
+                    </th>
+
+                    <th>
+                        Type
+                    </th>
+
+                    <th>
+                        Version
+                    </th>
+
+                    <th>
+                        Score
+                    </th>
+
+                    <th>
+                        Action
+                    </th>
+
+                    <th>
+                        Status
+                    </th>
+
+                    <th>
+                        Active
+                    </th>
+
+                    <th>
+                        Actions
+                    </th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+                @if (Model.Count == 0)
+                {
+                    <tr>
+
+                        <td colspan="10"
+                            class="workflow-empty">
+
+                            No compliance rules found.
+
+                        </td>
+
+                    </tr>
+                }
+
+
+                @for (var i = 0;
+                      i < Model.Count;
+                      i++)
+                {
+                    var rule =
+                        Model[i];
+
+                    <tr>
+
+                        <td>
+                            @(i + 1)
+                        </td>
+
+
+                        @if (canViewAllClients)
+                        {
+                            <td>
+                                @rule.ClientId
+                            </td>
+                        }
+
+
+                        <td>
+
+                            <strong>
+                                @rule.RuleCode
+                            </strong>
+
+                            <div>
+                                @rule.RuleName
+                            </div>
+
+                        </td>
+
+
+                        <td>
+                            @rule.RuleType
+                        </td>
+
+
+                        <td>
+                            v@rule.RuleVersion
+                        </td>
+
+
+                        <td>
+                            @rule.RiskScore
+                        </td>
+
+
+                        <td>
+                            @rule.Action
+                        </td>
+
+
+                        <td>
+
+                            @if (rule.ApprovalStatus ==
+                                 "APPROVED")
+                            {
+                                <span class="risk-status approved">
+                                    Approved
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="risk-status pending">
+                                    Pending
+                                </span>
+                            }
+
+                        </td>
+
+
+                        <td>
+
+                            @(rule.IsActive
+                                ? "Yes"
+                                : "No")
+
+                        </td>
+
+
+                        <td>
+
+                            <div class="workflow-actions">
+
+
+                                @if (rule.CanEdit)
+                                {
+                                    <a asp-action="Edit"
+                                       asp-route-id="@rule.Id">
+
+                                        Edit Pending
+
+                                    </a>
+                                }
+
+
+                                @if (rule.CanApprove)
+                                {
+                                    <a asp-action="Review"
+                                       asp-route-id="@rule.Id">
+
+                                        Review
+
+                                    </a>
+                                }
+
+
+                                @if (rule.ApprovalStatus ==
+                                     "APPROVED" &&
+                                     User.HasClaim(
+                                         AppPermissions.ClaimType,
+                                         AppPermissions.ComplianceRulesEdit))
+                                {
+                                    <a asp-action="Edit"
+                                       asp-route-id="@rule.Id">
+
+                                        New Version
+
+                                    </a>
+                                }
+
+
+                                @if (rule.CanDelete)
+                                {
+                                    <form asp-action="Delete"
+                                          method="post"
+                                          class="d-inline">
+
+                                        @Html.AntiForgeryToken()
+
+                                        <input type="hidden"
+                                               name="id"
+                                               value="@rule.Id" />
+
+                                        <button type="submit"
+                                                class="btn btn-link p-0">
+
+                                            Delete Pending
+
+                                        </button>
+
+                                    </form>
+                                }
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+                }
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>

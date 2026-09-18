@@ -7,316 +7,733 @@ using Microsoft.AspNetCore.Mvc;
 using AmlScreening.Application.Security;
 using System.Security.Claims;
 using AmlScreening.Application.Models;
+using AmlScreening.Application.Interface.Services;
 
 namespace AmlScreening.Portal.Controllers;
 
-[Authorize(Policy = AppPermissions.UsersView)]
+[Authorize(Policy = AppPermissions.Users.Manage)]
 public sealed class UsersController : Controller
 {
     private readonly IUserRepository _userRepository;
     private readonly IPasswordService _passwordService;
-    private readonly ICurrentUserContext _currentUser;
-    private readonly ILogger<UsersController> _logger;
+    private readonly IErrorLogService _errorLogService;
 
     public UsersController(
         IUserRepository userRepository,
         IPasswordService passwordService,
-        ICurrentUserContext currentUser,
-        ILogger<UsersController> logger)
+        IErrorLogService errorLogService)
     {
         _userRepository = userRepository;
         _passwordService = passwordService;
-        _currentUser = currentUser;
-        _logger = logger;
+        _errorLogService = errorLogService;
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index(int page = 1)
+    public async Task<IActionResult> Index(int? partnerId, int? branchId, int page = 1)
     {
         try
         {
             const int pageSize = 10;
-            var requestedPage = Math.Max(1, page);
-            var result = await _userRepository.GetPageAsync(requestedPage, pageSize);
-            var totalPages = Math.Max(1, result.TotalPages);
-            var currentPage = Math.Clamp(requestedPage, 1, totalPages);
-            if (currentPage != requestedPage)
-                result = await _userRepository.GetPageAsync(currentPage, pageSize);
+            var result = await _userRepository.GetPageAsync(partnerId, branchId, page, pageSize);
+            var partners = await _userRepository.GetActivePartnersAsync();
+            var branches =
+                partnerId.HasValue
 
-            return View(new UsersPageViewModel
+                    ? await _userRepository
+                        .GetActiveBranchesAsync(
+                            partnerId.Value)
+
+                    : Array.Empty<BranchOption>();
+
+            var model = new UsersPageViewModel
             {
                 Users = result.Items,
+                Partners = partners,
+                Branches = branches,
+                PartnerId = partnerId,
+                BranchId = branchId,
                 TotalUsers = result.TotalUsers,
                 ActiveUsers = result.ActiveUsers,
                 InactiveUsers = result.InactiveUsers,
-                Administrators = result.Administrators,
-                Page = currentPage,
-                PageSize = pageSize,
-                TotalPages = totalPages
-            });
+                Page = result.PageNumber,
+                PageSize = result.PageSize,
+                TotalPages = Math.Max(1, result.TotalPages)
+            };
+            return View(model);
         }
-        catch (Exception exception)
+
+        catch (Exception ex)
         {
-            _logger.LogError(exception, "Unable to load the users page.");
-            return View(new UsersPageViewModel
-            {
-                ErrorMessage = "Users could not be loaded. Please refresh the page or try again later."
-            });
+            var errorId =
+               await LogErrorAsync(
+                   ex,
+                   nameof(Index));
+
+
+            return View(
+                new UsersPageViewModel
+                {
+                    ErrorMessage = $"Users could not be loaded.Error reference: {errorId}"
+                });
+
         }
     }
 
     [HttpGet]
-    [Authorize(Policy = AppPermissions.UsersCreate)]
-    public async Task<IActionResult> Create()
+    [Authorize(Policy = AppPermissions.Users.Manage)]
+    public async Task<IActionResult> CreatePartner(CreateUserViewModel model)
     {
-        try
-        {
-            var model = new CreateUserViewModel();
-
-            await LoadCreateOptionsAsync(model);
-
-            return View(model);
-
-            // return View(await LoadRolesAsync(new CreateUserViewModel()));
-        }
-        catch (Exception exception)
-        {
-            _logger.LogError(exception, "Unable to load roles for the create-user page.");
-            TempData["ErrorMessage"] = "The create-user page could not be loaded. Please try again.";
-            return RedirectToAction(nameof(Index));
-        }
+        return View(
+             new CreatePartnerViewModel());
     }
 
     [HttpPost]
-    //[Authorize(Roles = "Admin")]
-    [Authorize(Policy = AppPermissions.UsersCreate)]
-    //[Authorize(Policy = AppPermissions.RolesManage)]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(CreateUserViewModel model)
+    public async Task<IActionResult>
+         CreatePartner(
+             CreatePartnerViewModel model)
     {
-        model.Username =
-            model.Username?.Trim() ?? string.Empty;
-
-        model.FullName =
-            model.FullName?.Trim() ?? string.Empty;
-
-        model.CompanyName =
-            model.CompanyName?.Trim() ?? string.Empty;
-
-        model.Email =
-            model.Email?.Trim() ?? string.Empty;
-
-        model.Address =
-            model.Address?.Trim() ?? string.Empty;
-
-        model.PhoneNumber =
-            model.PhoneNumber?.Trim() ?? string.Empty;
-
-        // Never trust ClientId from browser.
-        model.ClientId = _currentUser.ClientId;
-
         try
         {
-            await LoadCreateOptionsAsync(model);
+            model.PartnerCode =
+                model.PartnerCode?
+                    .Trim()
+                    .ToUpperInvariant()
+                ?? string.Empty;
 
-            if (model.SelectedRoleIds.Count == 0)
+
+            model.PartnerName =
+                model.PartnerName?
+                    .Trim()
+                ?? string.Empty;
+
+
+            model.Address =
+                NullIfWhiteSpace(
+                    model.Address);
+
+            model.Email =
+                NullIfWhiteSpace(
+                    model.Email);
+
+            model.PhoneNumber =
+                NullIfWhiteSpace(
+                    model.PhoneNumber);
+
+
+            if (!string.IsNullOrWhiteSpace(
+                    model.PartnerCode))
             {
-                ModelState.AddModelError(nameof(model.SelectedRoleIds), "Select at least one role.");
+                var exists =
+                    await _userRepository
+                        .PartnerCodeExistsAsync(
+                            model.PartnerCode);
+
+
+                if (exists)
+                {
+                    ModelState.AddModelError(
+                        nameof(
+                            model.PartnerCode),
+                        "Partner code already exists.");
+                }
             }
 
-            var validRoleIds = model.Roles
-                    .Select(x => x.RoleId)
-                    .ToHashSet();
-
-            var invalidRoleSelected =
-                model.SelectedRoleIds
-                    .Distinct()
-                    .Any(roleId =>
-                        !validRoleIds.Contains(roleId));
-
-            if (invalidRoleSelected)
-            {
-                ModelState.AddModelError(
-                    nameof(model.SelectedRoleIds),
-                    "One or more selected roles are invalid.");
-            }
-
-            if (!string.IsNullOrWhiteSpace(model.Username) &&
-                await _userRepository.UsernameExistsAsync(
-                    model.Username))
-            {
-                ModelState.AddModelError(
-                    nameof(model.Username),
-                    "This username already exists.");
-            }
 
             if (!ModelState.IsValid)
             {
                 return View(model);
             }
 
-            var user = new User
-            {
-                ClientId = _currentUser.ClientId,
 
-                Username = model.Username,
+            var partner =
+                new Partner
+                {
+                    PartnerCode =
+                        model.PartnerCode,
 
-                FullName = model.FullName,
+                    PartnerName =
+                        model.PartnerName,
 
-                CompanyName = model.CompanyName,
+                    Address =
+                        model.Address,
 
-                Email = model.Email,
+                    Email =
+                        model.Email,
 
-                Address = model.Address,
+                    PhoneNumber =
+                        model.PhoneNumber,
 
-                PhoneNumber = model.PhoneNumber,
+                    IsActive =
+                        model.IsActive
+                };
 
-                PasswordHash = _passwordService.Hash(model.Password),
 
-                IsActive = model.IsActive,
+            var partnerId =
+                await _userRepository
+                    .CreatePartnerAsync(
+                        partner);
 
-                CreatedDate = DateTime.UtcNow
-            };
-
-            await _userRepository.CreateAsync(
-                user,
-                model.SelectedRoleIds);
 
             TempData["SuccessMessage"] =
-                $"User {model.Username} created successfully.";
+                "Partner created successfully.";
 
-            return RedirectToAction(nameof(Index));
+
+            /*
+             * After Partner creation,
+             * go directly to Branch creation.
+             */
+
+            return RedirectToAction(
+                nameof(CreateBranch),
+                new
+                {
+                    partnerId
+                });
         }
-        catch (Exception exception)
+        catch (Exception ex)
         {
-            _logger.LogError(
-                exception,
-                "Unable to create user {Username} for client {ClientId}.",
-                model.Username,
-                model.ClientId);
+            var errorId =
+                await LogErrorAsync(
+                    ex,
+                    nameof(CreatePartner));
+
 
             ModelState.AddModelError(
                 string.Empty,
-                "The user could not be created. Please try again.");
+                errorId.HasValue
+                    ? $"Unable to create partner. Error reference: {errorId}"
+                    : "Unable to create partner.");
 
-            await LoadCreateOptionsAsync(model);
 
             return View(model);
         }
     }
-
+    // CREATE BRANCH - GET
 
     [HttpGet]
-    [Authorize(Policy = AppPermissions.RolesManage)]
-    public async Task<IActionResult> Access(long id)
+    public async Task<IActionResult>
+        CreateBranch(
+            int? partnerId)
     {
         try
         {
-            var user = await _userRepository.GetByIdAsync(id);
-            if (user is null) return NotFound();
+            var model =
+                new CreateBranchViewModel
+                {
+                    PartnerId =
+                        partnerId
+                        ?? 0
+                };
 
-            return View(await BuildAccessModelAsync(user));
+
+            await LoadPartnerOptionsAsync(
+                model);
+
+
+            return View(model);
         }
-        catch (Exception exception)
+        catch (Exception ex)
         {
-            _logger.LogError(exception, "Unable to load access settings for user {UserId}.", id);
-            TempData["ErrorMessage"] = "User permissions could not be loaded. Please try again.";
-            return RedirectToAction(nameof(Index));
+            var errorId =
+                await LogErrorAsync(
+                    ex,
+                    nameof(CreateBranch));
+
+
+            TempData["ErrorMessage"] =
+                errorId.HasValue
+                    ? $"Unable to load branch form. Error reference: {errorId}"
+                    : "Unable to load branch form.";
+
+
+            return RedirectToAction(
+                nameof(Index));
         }
     }
+    // CREATE BRANCH - POST
 
     [HttpPost]
-    [Authorize(Policy = AppPermissions.RolesManage)]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Access(UserAccessViewModel model)
+    public async Task<IActionResult>
+        CreateBranch(
+            CreateBranchViewModel model)
     {
         try
         {
-            var user = await _userRepository.GetByIdAsync(model.UserId);
-            if (user is null) return NotFound();
+            model.BranchName =
+                model.BranchName?
+                    .Trim()
+                ?? string.Empty;
 
-            if (long.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var loggedInUserId) &&
-                loggedInUserId == model.UserId)
-            {
-                ModelState.AddModelError(string.Empty, "You cannot change your own permissions while signed in.");
-            }
-            var existingRoles = await _userRepository.GetUserRolesAsync(model.UserId);
-            var isplatformAdmin = existingRoles.Any(x => x.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase));
 
-            if (isplatformAdmin)
-            {
-                ModelState.AddModelError(string.Empty, "PlatForm Administrator access is protected.");
-            }
+            model.Address =
+                NullIfWhiteSpace(
+                    model.Address);
 
-            if (model.SelectedRoleIds.Count == 0)
+            model.Email =
+                NullIfWhiteSpace(
+                    model.Email);
+
+            model.PhoneNumber =
+                NullIfWhiteSpace(
+                    model.PhoneNumber);
+
+
+            await LoadPartnerOptionsAsync(
+                model);
+
+
+            if (model.PartnerId > 0
+                &&
+                !string.IsNullOrWhiteSpace(
+                    model.BranchName))
             {
-                ModelState.AddModelError(nameof(model.SelectedRoleIds), "Select at least one role.");
+                var exists =
+                    await _userRepository
+                        .BranchNameExistsAsync(
+                            model.PartnerId,
+                            model.BranchName);
+
+
+                if (exists)
+                {
+                    ModelState.AddModelError(
+                        nameof(
+                            model.BranchName),
+                        "This branch already exists for the selected partner.");
+                }
             }
 
 
             if (!ModelState.IsValid)
             {
-                var invalidModel = await BuildAccessModelAsync(user);
-                invalidModel.SelectedRoleIds = model.SelectedRoleIds;
-                invalidModel.SelectedPermissionIds = model.SelectedPermissionIds;
-                return View(invalidModel);
+                return View(model);
             }
 
-            if (!await _userRepository.UpdateRolesAsync(model.UserId, model.SelectedRoleIds))
-                return NotFound();
 
-            if (!await _userRepository.UpdatePermissionsAsync(model.UserId, model.SelectedPermissionIds))
-                return NotFound();
+            var branch =
+                new PartnerBranch
+                {
+                    PartnerId =
+                        model.PartnerId,
 
-            TempData["SuccessMessage"] = $"Permissions for {user.Username} updated. The user must sign in again.";
-            return RedirectToAction(nameof(Index));
+                    BranchName =
+                        model.BranchName,
+
+                    Address =
+                        model.Address,
+
+                    Email =
+                        model.Email,
+
+                    PhoneNumber =
+                        model.PhoneNumber,
+
+                    IsActive =
+                        model.IsActive
+                };
+
+
+            var branchId =
+                await _userRepository
+                    .CreateBranchAsync(
+                        branch);
+
+
+            TempData["SuccessMessage"] =
+                "Branch created successfully.";
+
+
+            /*
+             * After Branch creation,
+             * go directly to User creation.
+             */
+
+            return RedirectToAction(
+                nameof(Create),
+                new
+                {
+                    partnerId =
+                        model.PartnerId,
+
+                    branchId
+                });
         }
-        catch (Exception exception)
+        catch (Exception ex)
         {
-            _logger.LogError(exception, "Unable to update permissions for user {UserId}.", model.UserId);
-            TempData["ErrorMessage"] = "User permissions could not be updated. Please try again.";
-            return RedirectToAction(nameof(Index));
+            var errorId =
+                await LogErrorAsync(
+                    ex,
+                    nameof(CreateBranch));
+
+
+            ModelState.AddModelError(
+                string.Empty,
+                errorId.HasValue
+                    ? $"Unable to create branch. Error reference: {errorId}"
+                    : "Unable to create branch.");
+
+
+            await LoadPartnerOptionsAsync(
+                model);
+
+
+            return View(model);
         }
     }
+    // CREATE USER - GET
 
-    private async Task LoadCreateOptionsAsync(CreateUserViewModel model)
+    [HttpGet]
+    public async Task<IActionResult> Create(
+        int? partnerId,
+        int? branchId)
     {
-        //model.ClientId = await _userRepository.GetActiveClientsAsync();
-        model.ClientId = _currentUser.ClientId;
-        model.Roles = await _userRepository.GetActiveRolesAsync();
-    }
-
-    private async Task<UserAccessViewModel> BuildAccessModelAsync(UserListItem user)
-    {
-        var permissions = await _userRepository.GetPermissionOptionsAsync(user.UserId);
-        var availableRoles = await _userRepository.GetActiveRolesAsync();
-        var userRoles = await _userRepository.GetUserRolesAsync(user.UserId);
-
-        var selectedRolesIds = userRoles.Select(x => x.RoleId).ToHashSet();
-        var roleAccess = new List<RoleAccessViewModel>();
-        foreach (var role in availableRoles)
+        try
         {
-            var rolePermissions = await _userRepository.GetRolePermissionAsync(role.RoleId);
-            roleAccess.Add(new RoleAccessViewModel
+            var model =
+                new CreateUserViewModel
+                {
+                    PartnerId =
+                        partnerId
+                        ?? 0,
+
+                    BranchId =
+                        branchId
+                        ?? 0
+                };
+
+
+            await LoadUserOptionsAsync(
+                model);
+
+
+            return View(model);
+        }
+        catch (Exception ex)
+        {
+            var errorId =
+                await LogErrorAsync(
+                    ex,
+                    nameof(Create));
+
+
+            TempData["ErrorMessage"] =
+                errorId.HasValue
+                    ? $"Unable to load user form. Error reference: {errorId}"
+                    : "Unable to load user form.";
+
+
+            return RedirectToAction(
+                nameof(Index));
+        }
+    }
+    // CREATE USER - POST
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(
+        CreateUserViewModel model)
+    {
+        try
+        {
+            model.Username =
+                model.Username?
+                    .Trim()
+                ?? string.Empty;
+
+
+            model.Email =
+                NullIfWhiteSpace(
+                    model.Email);
+
+            model.Address =
+                NullIfWhiteSpace(
+                    model.Address);
+
+            model.PhoneNumber =
+                NullIfWhiteSpace(
+                    model.PhoneNumber);
+
+
+            model.SelectedRoleIds ??=
+                [];
+
+
+            await LoadUserOptionsAsync(
+                model);
+
+            // Username
+
+            if (!string.IsNullOrWhiteSpace(
+                    model.Username))
             {
-                RoleId = role.RoleId,
-                RoleName = role.RoleName,
-                IsSelected = selectedRolesIds.Contains(role.RoleId),
-                Permissions = rolePermissions
-            });
+                var usernameExists =
+                    await _userRepository
+                        .UsernameExistsAsync(
+                            model.Username);
+
+
+                if (usernameExists)
+                {
+                    ModelState.AddModelError(
+                        nameof(
+                            model.Username),
+                        "Username already exists.");
+                }
+            }
+            // Role
+
+            if (model.SelectedRoleIds.Count == 0)
+            {
+                ModelState.AddModelError(
+                    nameof(
+                        model.SelectedRoleIds),
+                    "Select at least one role.");
+            }
+            else
+            {
+                var validRoleIds =
+                    model.Roles
+                        .Select(
+                            x =>
+                                x.RoleId)
+                        .ToHashSet();
+
+
+                var invalidRole =
+                    model.SelectedRoleIds
+                        .Distinct()
+                        .Any(
+                            x =>
+                                !validRoleIds
+                                    .Contains(x));
+
+
+                if (invalidRole)
+                {
+                    ModelState.AddModelError(
+                        nameof(
+                            model.SelectedRoleIds),
+                        "One or more selected roles are invalid.");
+                }
+            }
+
+            // Branch belongs to selected Partner
+
+            if (model.PartnerId > 0
+                &&
+                model.BranchId > 0)
+            {
+                var validBranch =
+                    model.Branches.Any(
+                        x =>
+                            x.BranchId ==
+                                model.BranchId
+
+                            &&
+
+                            x.PartnerId ==
+                                model.PartnerId);
+
+
+                if (!validBranch)
+                {
+                    ModelState.AddModelError(
+                        nameof(
+                            model.BranchId),
+                        "Select a valid branch for the selected partner.");
+                }
+            }
+
+
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+
+            var user =
+                new User
+                {
+                    PartnerId =
+                        model.PartnerId,
+
+                    BranchId =
+                        model.BranchId,
+
+                    Username =
+                        model.Username,
+
+                    PasswordHash =
+                        _passwordService
+                            .Hash(
+                                model.Password),
+
+                    Address =
+                        model.Address,
+
+                    Email =
+                        model.Email,
+
+                    PhoneNumber =
+                        model.PhoneNumber,
+
+                    IsActive =
+                        model.IsActive
+                };
+
+
+            await _userRepository
+                .CreateAsync(
+                    user,
+                    model.SelectedRoleIds);
+
+
+            TempData["SuccessMessage"] =
+                $"User {model.Username} created successfully.";
+
+
+            return RedirectToAction(
+                nameof(Index),
+                new
+                {
+                    partnerId =
+                        model.PartnerId,
+
+                    branchId =
+                        model.BranchId
+                });
+        }
+        catch (Exception ex)
+        {
+            var errorId =
+                await LogErrorAsync(
+                    ex,
+                    nameof(Create));
+
+
+            ModelState.AddModelError(
+                string.Empty,
+                errorId.HasValue
+                    ? $"Unable to create user. Error reference: {errorId}"
+                    : "Unable to create user.");
+
+
+            await LoadUserOptionsAsync(
+                model);
+
+
+            return View(model);
+        }
+    }
+    // AJAX - BRANCHES BY PARTNER
+
+    [HttpGet]
+    public async Task<IActionResult>
+        GetBranches(
+            int partnerId)
+    {
+        if (partnerId <= 0)
+        {
+            return Json(
+                Array.Empty<object>());
         }
 
-        return new UserAccessViewModel
+
+        try
         {
-            UserId = user.UserId,
-            Username = user.Username,
-            FullName = user.FullName,
-            Roles = availableRoles,
-            SelectedRoleIds = selectedRolesIds.ToList(),
-            RoleNames = string.Join(",", userRoles.Select(x => x.RoleName)),
-            Permissions = permissions,
-            SelectedPermissionIds = permissions.Where(x => x.IsSelected).Select(x => x.PermissionId).ToList(),
-            RoleAccess=roleAccess
-        };
+            var branches =
+                await _userRepository
+                    .GetActiveBranchesAsync(
+                        partnerId);
+
+
+            return Json(
+                branches.Select(
+                    x =>
+                        new
+                        {
+                            x.BranchId,
+                            x.BranchName
+                        }));
+        }
+        catch (Exception ex)
+        {
+            await LogErrorAsync(
+                ex,
+                nameof(GetBranches));
+
+
+            return Json(
+                Array.Empty<object>());
+        }
+    }
+    // LOAD PARTNER OPTIONS
+
+    private async Task
+        LoadPartnerOptionsAsync(
+            CreateBranchViewModel model)
+    {
+        model.Partners =
+            await _userRepository
+                .GetActivePartnersAsync();
+    }
+    // LOAD USER OPTIONS
+
+    private async Task
+        LoadUserOptionsAsync(
+            CreateUserViewModel model)
+    {
+        model.Partners =
+            await _userRepository
+                .GetActivePartnersAsync();
+
+
+        model.Roles =
+            await _userRepository
+                .GetActiveRolesAsync();
+
+
+        if (model.PartnerId > 0)
+        {
+            model.Branches =
+                await _userRepository
+                    .GetActiveBranchesAsync(
+                        model.PartnerId);
+        }
+        else
+        {
+            model.Branches =
+                Array.Empty<
+                    AmlScreening.Application.Models
+                        .BranchOption>();
+        }
+    }
+    // EMPTY STRING -> NULL
+
+    private static string?
+        NullIfWhiteSpace(
+            string? value)
+    {
+        return string.IsNullOrWhiteSpace(
+                value)
+            ? null
+            : value.Trim();
+    }
+    // ERROR LOGGING
+    private Task<long?>
+        LogErrorAsync(
+            Exception exception,
+            string action)
+    {
+        return _errorLogService
+            .LogAsync(
+                exception,
+                nameof(UsersController),
+                action,
+                User.FindFirstValue(
+                    AppClaimTypes
+                        .PartnerCode));
     }
 }

@@ -2,9 +2,10 @@ using AmlScreening.Domain.Common;
 
 namespace AmlScreening.Domain.Entities.Compliance;
 
-public sealed class Customer : BaseEntity, IClientOwnedEntity
+public sealed class Customer : BaseEntity, IPartnerOwnedEntity
 {
     public int ClientId { get; set; }
+    public int PartnerId { get; set; }
     public string CustomerReference { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
     public DateTime? DateOfBirth { get; set; }
@@ -17,9 +18,9 @@ public sealed class Customer : BaseEntity, IClientOwnedEntity
     public string RiskLevel { get; set; } = "LOW";
 }
 
-public sealed class AmlTransaction : BaseEntity, IClientOwnedEntity
+public sealed class AmlTransaction : BaseEntity, IPartnerOwnedEntity
 {
-    public int ClientId { get; set; }
+    public int PartnerId { get; set; }
     public string TransactionReference { get; set; } = string.Empty;
     public int CustomerId { get; set; }
     public string SenderName { get; set; } = string.Empty;
@@ -44,9 +45,9 @@ public sealed class AmlTransaction : BaseEntity, IClientOwnedEntity
     public string RelationshipCode { get; set; } = string.Empty;
 }
 
-public sealed class ScreeningMatch : BaseEntity, IClientOwnedEntity
+public sealed class ScreeningMatch : BaseEntity, IPartnerOwnedEntity
 {
-    public int ClientId { get; set; }
+    public int PartnerId { get; set; }
     public int TransactionId { get; set; }
     public int AmlRecordId { get; set; }
     public string SubjectName { get; set; } = string.Empty;
@@ -58,9 +59,9 @@ public sealed class ScreeningMatch : BaseEntity, IClientOwnedEntity
     public string ComparedFields { get; set; } = "Name";
 }
 
-public sealed class RiskAssessment : BaseEntity, IClientOwnedEntity
+public sealed class RiskAssessment : BaseEntity, IPartnerOwnedEntity
 {
-    public int ClientId { get; set; }
+    public int PartnerId { get; set; }
     public int TransactionId { get; set; }
     public int CustomerRiskScore { get; set; }
     public int TransactionRiskScore { get; set; }
@@ -72,9 +73,9 @@ public sealed class RiskAssessment : BaseEntity, IClientOwnedEntity
     public DateTime CalculatedAt { get; set; } = DateTime.UtcNow;
 }
 
-public sealed class AmlDecision : BaseEntity, IClientOwnedEntity
+public sealed class AmlDecision : BaseEntity, IPartnerOwnedEntity
 {
-    public int ClientId { get; set; }
+    public int PartnerId { get; set; }
     public int TransactionId { get; set; }
     public int RiskAssessmentId { get; set; }
     public string CorrelationId { get; set; } = string.Empty;
@@ -85,9 +86,9 @@ public sealed class AmlDecision : BaseEntity, IClientOwnedEntity
     public string ListVersions { get; set; } = "manual-v1";
 }
 
-public sealed class ComplianceAlert : BaseEntity, IClientOwnedEntity
+public sealed class ComplianceAlert : BaseEntity, IPartnerOwnedEntity
 {
-    public int ClientId { get; set; }
+    public int PartnerId { get; set; }
     public string AlertReference { get; set; } = string.Empty;
     public int TransactionId { get; set; }
     public int RiskAssessmentId { get; set; }
@@ -99,9 +100,9 @@ public sealed class ComplianceAlert : BaseEntity, IClientOwnedEntity
     public string? Resolution { get; set; }
 }
 
-public sealed class ComplianceCase : BaseEntity, IClientOwnedEntity
+public sealed class ComplianceCase : BaseEntity, IPartnerOwnedEntity
 {
-    public int ClientId { get; set; }
+    public int PartnerId { get; set; }
     public string CaseReference { get; set; } = string.Empty;
     public int AlertId { get; set; }
     public int TransactionId { get; set; }

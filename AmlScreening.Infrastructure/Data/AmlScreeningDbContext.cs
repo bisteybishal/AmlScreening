@@ -19,10 +19,9 @@ namespace AmlScreening.Infrastructure.Data
         {
             _currentUser = currentUser;
         }
-        public int CurrentClientId => _currentUser.ClientId;
-        public bool CanAccessAllClients =>
-            _currentUser.HasPermission(AppPermissions.PlatformCrossClientAccess);
-        public DbSet<Client> Clients => Set<Client>();
+        public int CurrentPartnerId => _currentUser.IsAuthenticated && _currentUser.UserId > 0 &&
+                                         _currentUser.PartnerId > 0 ? _currentUser.PartnerId : -1;
+
         public DbSet<AmlRecord> AmlRecords { get; set; }
         public DbSet<ComplianceRule> ComplianceRules => Set<ComplianceRule>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
@@ -42,32 +41,179 @@ namespace AmlScreening.Infrastructure.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<AmlRecord>(entity =>
-            {
-                entity.ToTable("AmlRecords", "dbo");
-                entity.HasIndex(x => new { x.ClientId, x.SourceName, x.ReferenceNo }).IsUnique();
-                entity.Property(x => x.IsShared).HasDefaultValue(false);
-                entity.Property(x => x.Country)
-                    .HasMaxLength(100)
-                    .IsRequired(false);
-                entity.Property(x => x.Nationality)
-                    .HasMaxLength(100)
-                    .IsRequired(false);
-                entity.Property(x => x.Remarks)
-                    .IsRequired(false);
-                entity.Property(x => x.DeleteFg)
-                    .HasMaxLength(1)
-                    .IsFixedLength()
-                    .HasDefaultValue("N");
+            modelBuilder.Entity<AmlRecord>(
+      entity =>
+      {
+          entity.ToTable("AmlRecords","dbo");
 
-                entity.Property(x => x.DeleteBy)
-                    .HasMaxLength(50);
 
-                entity.Property(x => x.RowVersion).IsRowVersion();
+          entity.HasKey(
+              x => x.Id);
 
-                entity.HasQueryFilter("SoftDeleteFilter", x => x.DeleteFg == "N");
-                entity.HasQueryFilter("ClientFilter", x => CanAccessAllClients || x.ClientId == CurrentClientId);
-            });
+
+          entity.Property(
+                  x => x.RecordType)
+
+              .HasMaxLength(50)
+
+              .IsRequired();
+
+
+          entity.Property(
+                  x => x.FullName)
+
+              .HasMaxLength(200)
+
+              .IsRequired();
+
+
+          entity.Property(
+                  x => x.Country)
+
+              .HasMaxLength(300);
+
+
+          entity.Property(
+                  x => x.Nationality)
+
+              .HasMaxLength(100);
+
+
+          entity.Property(
+                  x => x.ReferenceNo)
+
+              .HasMaxLength(100)
+
+              .IsRequired();
+
+
+          entity.Property(
+                  x => x.SourceName)
+
+              .HasMaxLength(150)
+
+              .IsRequired();
+
+
+          entity.Property(
+                  x => x.NormalizedName)
+
+              .HasMaxLength(250);
+
+
+          entity.Property(
+                  x => x.NamePrefix)
+
+              .HasMaxLength(10);
+
+
+          entity.Property(
+                  x => x.PhotoContentType)
+
+              .HasMaxLength(100);
+
+
+          entity.Property(
+                  x => x.CreatedBy)
+
+              .HasMaxLength(100);
+
+
+          entity.Property(
+                  x => x.UpdatedBy)
+
+              .HasMaxLength(100);
+
+
+          entity.Property(
+                  x => x.DeleteFg)
+
+              .HasMaxLength(1)
+
+              .IsFixedLength()
+
+              .HasDefaultValue("N");
+
+
+          entity.Property(
+                  x => x.DeleteBy)
+
+              .HasMaxLength(100);
+
+
+          entity.Property(
+                  x => x.RowVersion)
+
+              .IsRowVersion();
+
+
+          /*
+           * Same Partner + Source + Reference
+           * cannot have duplicate active record.
+           */
+
+          entity.HasIndex(
+                  x => new
+                  {
+                      x.PartnerId,
+                      x.SourceName,
+                      x.ReferenceNo
+                  })
+
+              .IsUnique()
+
+              .HasDatabaseName(
+                  "UX_AmlRecords_Partner_Source_Reference")
+
+              .HasFilter(
+                  "[DeleteFg] = 'N'");
+
+
+          entity.HasIndex(
+                  x => new
+                  {
+                      x.PartnerId,
+                      x.CreatedDate
+                  })
+
+              .HasDatabaseName(
+                  "IX_AmlRecords_Partner_CreatedDate");
+
+
+          entity.HasIndex(
+                  x => new
+                  {
+                      x.PartnerId,
+                      x.NormalizedName
+                  })
+
+              .HasDatabaseName(
+                  "IX_AmlRecords_Partner_NormalizedName");
+
+
+          /*
+           * Soft delete +
+           * Partner isolation.
+           *
+           * User A and User B in Partner 1
+           * see the same AML records.
+           *
+           * Partner 2 cannot see Partner 1.
+           */
+
+          entity.HasQueryFilter(
+              x =>
+                  x.DeleteFg == "N"
+
+                  &&
+
+                  CurrentPartnerId > 0
+
+                  &&
+
+                  x.PartnerId ==
+                  CurrentPartnerId);
+      }); 
             modelBuilder.Entity<ComplianceRule>(entity =>
             {
                 entity.ToTable("ComplianceRules", "dbo");
@@ -110,8 +256,18 @@ namespace AmlScreening.Infrastructure.Data
                 entity.Property(x => x.RowVersion).IsRowVersion();
 
                 entity.HasQueryFilter("SoftDeleteFilter", x => x.DeleteFg == "N");
-                entity.HasQueryFilter("ClientFilter", x => CanAccessAllClients || x.ClientId == CurrentClientId);
-            });
+                entity.HasQueryFilter(
+           "ClientFilter",
+           x =>
+               CurrentClientId > 0
+               &&
+               (
+                   CanAccessAllClients
+                   ||
+                   x.Id ==
+                   CurrentClientId
+               ));
+            
 
             modelBuilder.Entity<Customer>(entity =>
             {
@@ -133,7 +289,6 @@ namespace AmlScreening.Infrastructure.Data
             modelBuilder.Entity<AmlTransaction>(entity =>
             {
                 entity.ToTable("AmlTransactions", "dbo");
-                entity.HasIndex(x => new { x.ClientId, x.TransactionReference }).IsUnique();
                 entity.Property(x => x.TransactionReference).HasMaxLength(100).IsRequired();
                 entity.Property(x => x.SenderName).HasMaxLength(200).IsRequired();
                 entity.Property(x => x.ReceiverName).HasMaxLength(200).IsRequired();
@@ -174,7 +329,7 @@ namespace AmlScreening.Infrastructure.Data
                 entity.Property(x => x.DeleteFg).HasMaxLength(1).IsFixedLength().HasDefaultValue("N");
                 entity.Property(x => x.RowVersion).IsRowVersion();
                 entity.HasQueryFilter("SoftDeleteFilter", x => x.DeleteFg == "N");
-                entity.HasQueryFilter("ClientFilter", x => CanAccessAllClients || x.ClientId == CurrentClientId);
+                entity.HasQueryFilter("PartnerFilter", x => CurrentPartnerId > 0 && x.PartnerId == CurrentPartnerId);
             });
 
             modelBuilder.Entity<RiskAssessment>(entity =>
@@ -242,6 +397,10 @@ namespace AmlScreening.Infrastructure.Data
                 entity.Property(x => x.ClientCode).HasMaxLength(50).IsRequired();
                 entity.Property(x => x.ClientName).HasMaxLength(200).IsRequired();
                 entity.HasIndex(x => x.ClientCode).IsUnique();
+                entity.Ignore(x => x.RowVersion); // Clients has no rowversion column.
+                entity.HasQueryFilter("SoftDeleteFilter", x => x.DeleteFg == "N");
+                entity.HasQueryFilter("ClientFilter", x => CurrentClientId > 0 &&
+                    (CanAccessAllClients || x.Id == CurrentClientId));
             });
 
             modelBuilder.Entity<AuditLog>(entity =>
@@ -253,6 +412,8 @@ namespace AmlScreening.Infrastructure.Data
                 entity.Property(x => x.EntityType).HasMaxLength(100).IsRequired();
                 entity.Property(x => x.EntityId).HasMaxLength(100);
                 entity.Property(x => x.Details).HasMaxLength(2000);
+                entity.HasQueryFilter("ClientFilter", x => CurrentClientId > 0 &&
+                    (CanAccessAllClients || x.ClientId == CurrentClientId));
             });
             modelBuilder.Entity<RiskFactor>(entity =>
             {

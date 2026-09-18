@@ -1,157 +1,899 @@
 @model AmlScreening.Portal.ViewModels.AmlRecordsPageViewModel
-@using System.Security.Claims
+@using AmlScreening.Application.Security
+
 @{
     ViewData["Title"] = "AML Records";
-    var currentUserId = long.TryParse(
-        User.FindFirstValue(ClaimTypes.NameIdentifier),
-        out var parsedUserId) ? parsedUserId : 0;
-    var canManageAllRecords = User.HasClaim(
-        AppPermissions.ClaimType,
-        AppPermissions.AmlRecordsViewAll);
+
+    var canManage =
+        User.HasClaim(
+            AppPermissions.ClaimType,
+            AppPermissions.Aml.Manage);
 }
 
-@section Styles {
-    <link rel="stylesheet" href="~/css/aml-records.css" asp-append-version="true" />
+@section Styles
+{
+    <link rel="stylesheet"
+          href="~/css/aml-records.css"
+          asp-append-version="true" />
 }
+
 
 <section class="records-heading">
-    <div><h1>AML Records</h1><p>Add, review, update, and manage watchlist records.</p></div>
-    <div class="records-heading-actions">
-        <button class="records-secondary-button" type="button" onclick="window.print()"><i class="bi bi-printer"></i> Print Report</button>
-        @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlRecordsCreate))
-        {
-            <a class="records-primary-button" asp-controller="AmlRecords" asp-action="Add"><i class="bi bi-plus-lg"></i> Add AML Record</a>
-        }
+
+    <div>
+        <h1>AML Records</h1>
+
+        <p>
+            Add, review, update, and manage watchlist records.
+        </p>
     </div>
+
+
+    <div class="records-heading-actions">
+
+        <button class="records-secondary-button"
+                type="button"
+                onclick="window.print()">
+
+            <i class="bi bi-printer"></i>
+
+            Print Report
+
+        </button>
+
+
+        @if (canManage)
+        {
+            <a class="records-primary-button"
+               asp-controller="AmlRecords"
+               asp-action="Add">
+
+                <i class="bi bi-plus-lg"></i>
+
+                Add AML Record
+
+            </a>
+        }
+
+    </div>
+
 </section>
 
-<section class="records-guide" aria-label="How to manage AML records">
-    <div><span>1</span><p><strong>Add a record</strong><small>Enter the person or entity details.</small></p></div>
+
+<section class="records-guide"
+         aria-label="How to manage AML records">
+
+    <div>
+        <span>1</span>
+
+        <p>
+            <strong>Add a record</strong>
+
+            <small>
+                Enter the person or entity details.
+            </small>
+        </p>
+    </div>
+
+
     <i class="bi bi-chevron-right"></i>
-    <div><span>2</span><p><strong>Review the information</strong><small>Check its source, country, and status.</small></p></div>
+
+
+    <div>
+        <span>2</span>
+
+        <p>
+            <strong>Review the information</strong>
+
+            <small>
+                Check its source, country, and status.
+            </small>
+        </p>
+    </div>
+
+
     <i class="bi bi-chevron-right"></i>
-    <div><span>3</span><p><strong>Keep it updated</strong><small>Use Edit or Delete from the record list.</small></p></div>
+
+
+    <div>
+        <span>3</span>
+
+        <p>
+            <strong>Keep it updated</strong>
+
+            <small>
+                Use Edit or Delete from the record list.
+            </small>
+        </p>
+    </div>
+
 </section>
 
-@if (TempData["SuccessMessage"] is string message)
+
+@if (TempData["SuccessMessage"] is string successMessage)
 {
-    <div class="records-alert"><i class="bi bi-check-circle-fill"></i><span>@message</span><button type="button" aria-label="Dismiss"><i class="bi bi-x"></i></button></div>
+    <div class="records-alert success-alert">
+
+        <i class="bi bi-check-circle-fill"></i>
+
+        <span>
+            @successMessage
+        </span>
+
+        <button type="button"
+                aria-label="Dismiss">
+
+            <i class="bi bi-x"></i>
+
+        </button>
+
+    </div>
 }
 
-<section id="recordsReport" class="records-report-grid" aria-label="AML report summary">
-    <article><span class="report-icon teal"><i class="bi bi-database"></i></span><div><small>Total Records</small><strong>@Model.TotalRecords</strong><em>All AML entries</em></div></article>
-    <article><span class="report-icon green"><i class="bi bi-shield-check"></i></span><div><small>Active Records</small><strong>@Model.ActiveRecords</strong><em>Currently monitored</em></div></article>
-    <article><span class="report-icon blue"><i class="bi bi-person"></i></span><div><small>Individuals</small><strong>@Model.IndividualRecords</strong><em>Person records</em></div></article>
-    <article><span class="report-icon amber"><i class="bi bi-building"></i></span><div><small>Entities</small><strong>@Model.EntityRecords</strong><em>Organization records</em></div></article>
-    <article><span class="report-icon violet"><i class="bi bi-globe2"></i></span><div><small>Countries</small><strong>@Model.CountriesCovered</strong><em>Geographic coverage</em></div></article>
+
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="records-alert error-alert">
+
+        <i class="bi bi-exclamation-circle-fill"></i>
+
+        <span>
+            @errorMessage
+        </span>
+
+        <button type="button"
+                aria-label="Dismiss">
+
+            <i class="bi bi-x"></i>
+
+        </button>
+
+    </div>
+}
+
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="records-alert error-alert">
+
+        <i class="bi bi-exclamation-circle-fill"></i>
+
+        <span>
+            @Model.ErrorMessage
+        </span>
+
+        <button type="button"
+                aria-label="Dismiss">
+
+            <i class="bi bi-x"></i>
+
+        </button>
+
+    </div>
+}
+
+
+<section id="recordsReport"
+         class="records-report-grid"
+         aria-label="AML report summary">
+
+    <article>
+
+        <span class="report-icon teal">
+            <i class="bi bi-database"></i>
+        </span>
+
+        <div>
+            <small>Total Records</small>
+
+            <strong>
+                @Model.TotalRecords
+            </strong>
+
+            <em>All AML entries</em>
+        </div>
+
+    </article>
+
+
+    <article>
+
+        <span class="report-icon green">
+            <i class="bi bi-shield-check"></i>
+        </span>
+
+        <div>
+            <small>Active Records</small>
+
+            <strong>
+                @Model.ActiveRecords
+            </strong>
+
+            <em>Currently monitored</em>
+        </div>
+
+    </article>
+
+
+    <article>
+
+        <span class="report-icon blue">
+            <i class="bi bi-person"></i>
+        </span>
+
+        <div>
+            <small>Individuals</small>
+
+            <strong>
+                @Model.IndividualRecords
+            </strong>
+
+            <em>Person records</em>
+        </div>
+
+    </article>
+
+
+    <article>
+
+        <span class="report-icon amber">
+            <i class="bi bi-building"></i>
+        </span>
+
+        <div>
+            <small>Entities</small>
+
+            <strong>
+                @Model.EntityRecords
+            </strong>
+
+            <em>Organization records</em>
+        </div>
+
+    </article>
+
+
+    <article>
+
+        <span class="report-icon violet">
+            <i class="bi bi-globe2"></i>
+        </span>
+
+        <div>
+            <small>Countries</small>
+
+            <strong>
+                @Model.CountriesCovered
+            </strong>
+
+            <em>Geographic coverage</em>
+        </div>
+
+    </article>
+
 </section>
 
+
 <section class="records-panel">
+
     <div class="records-panel-title">
-        <div><h2>Record List</h2><p>Search, filter, edit, or remove AML records.</p></div>
-        <span>@Model.FilteredRecords found</span>
-    </div>
-    <div class="records-toolbar">
-        <form method="get" asp-action="Index" class="records-filter-form">
-            <div class="records-search"><i class="bi bi-search"></i><input name="search" value="@Model.Search" placeholder="Search name, reference, or source..." /></div>
-            <select name="recordType" aria-label="Filter by record type">
-                <option value="">All record types</option>
-                @foreach (var item in Model.RecordTypes)
-                {
-                    <option value="@item" selected="@(Model.RecordType == item)">@item</option>
-                }
-            </select>
-            <select name="status" aria-label="Filter by status"><option value="">All statuses</option><option value="active" selected="@(Model.Status == "active")">Active</option><option value="inactive" selected="@(Model.Status == "inactive")">Inactive</option></select>
-            <button class="filter-button" type="submit"><i class="bi bi-funnel"></i> Apply Filters</button>
-            @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.RecordType) || !string.IsNullOrEmpty(Model.Status))
-            { <a class="clear-filter" asp-action="Index">Clear</a> }
-        </form>
-        <span class="record-count">Showing @Model.FirstRecordNumber–@Model.LastRecordNumber of @Model.FilteredRecords</span>
+
+        <div>
+            <h2>Record List</h2>
+
+            <p>
+                Search, filter, edit, or remove AML records.
+            </p>
+        </div>
+
+        <span>
+            @Model.FilteredRecords found
+        </span>
+
     </div>
 
+
+    <div class="records-toolbar">
+
+        <form method="get"
+              asp-controller="AmlRecords"
+              asp-action="Index"
+              class="records-filter-form">
+
+            <div class="records-search">
+
+                <i class="bi bi-search"></i>
+
+                <input name="search"
+                       value="@Model.Search"
+                       placeholder="Search name, reference, or source..." />
+
+            </div>
+
+
+            <select name="recordType"
+                    aria-label="Filter by record type">
+
+                <option value="">
+                    All record types
+                </option>
+
+                @foreach (var item in Model.RecordTypes)
+                {
+                    if (Model.RecordType == item)
+                    {
+                        <option value="@item"
+                                selected>
+                            @item
+                        </option>
+                    }
+                    else
+                    {
+                        <option value="@item">
+                            @item
+                        </option>
+                    }
+                }
+
+            </select>
+
+
+            <select name="status"
+                    aria-label="Filter by status">
+
+                <option value="">
+                    All statuses
+                </option>
+
+                @if (Model.Status == "active")
+                {
+                    <option value="active"
+                            selected>
+                        Active
+                    </option>
+                }
+                else
+                {
+                    <option value="active">
+                        Active
+                    </option>
+                }
+
+
+                @if (Model.Status == "inactive")
+                {
+                    <option value="inactive"
+                            selected>
+                        Inactive
+                    </option>
+                }
+                else
+                {
+                    <option value="inactive">
+                        Inactive
+                    </option>
+                }
+
+            </select>
+
+
+            <button class="filter-button"
+                    type="submit">
+
+                <i class="bi bi-funnel"></i>
+
+                Apply Filters
+
+            </button>
+
+
+            @if (
+                !string.IsNullOrWhiteSpace(Model.Search)
+                ||
+                !string.IsNullOrWhiteSpace(Model.RecordType)
+                ||
+                !string.IsNullOrWhiteSpace(Model.Status))
+            {
+                <a class="clear-filter"
+                   asp-controller="AmlRecords"
+                   asp-action="Index">
+
+                    Clear
+
+                </a>
+            }
+
+        </form>
+
+
+        <span class="record-count">
+
+            Showing
+            @Model.FirstRecordNumber–@Model.LastRecordNumber
+            of
+            @Model.FilteredRecords
+
+        </span>
+
+    </div>
+
+
     <div class="table-responsive">
+
         <table class="records-table">
-            <thead><tr><th>Reference</th><th>Name</th><th>Type</th><th>Country / Nationality</th><th>Source</th><th>Status</th><th>Created</th><th class="actions-column">Actions</th></tr></thead>
+
+            <thead>
+
+                <tr>
+
+                    <th>Reference</th>
+
+                    <th>Name</th>
+
+                    <th>Type</th>
+
+                    <th>
+                        Country / Nationality
+                    </th>
+
+                    <th>Source</th>
+
+                    <th>Status</th>
+
+                    <th>Created</th>
+
+                    <th class="actions-column">
+                        Actions
+                    </th>
+
+                </tr>
+
+            </thead>
+
+
             <tbody>
+
                 @if (Model.Records.Count == 0)
                 {
-                    <tr><td colspan="8"><div class="records-empty"><i class="bi bi-inbox"></i><strong>No AML records found</strong><span>Add a new record or change your filters.</span></div></td></tr>
+                    <tr>
+
+                        <td colspan="8">
+
+                            <div class="records-empty">
+
+                                <i class="bi bi-inbox"></i>
+
+                                <strong>
+                                    No AML records found
+                                </strong>
+
+                                <span>
+                                    Add a new record or change your filters.
+                                </span>
+
+                            </div>
+
+                        </td>
+
+                    </tr>
                 }
                 else
                 {
                     @foreach (var record in Model.Records)
                     {
-                        var canManageRecord = canManageAllRecords || record.OwnerUserId == currentUserId;
                         <tr>
-                            <td><strong class="record-reference">@record.ReferenceNo</strong></td>
-                            <td><div class="record-name"><span class="record-avatar">@(record.FullName.Length > 0 ? record.FullName[0].ToString().ToUpperInvariant() : "?")</span><span><strong>@record.FullName</strong><small>@(record.DateOfBirth?.ToString("dd MMM yyyy") ?? "Date not provided")</small></span></div></td>
-                            <td><span class="record-type">@record.RecordType</span></td>
-                            <td><strong>@(record.Country ?? "Not provided")</strong><small class="table-subtext">@(record.Nationality ?? "Not provided")</small></td>
-                            <td>@record.SourceName</td>
-                            <td><span class="record-status @(record.IsActive ? "active" : "inactive")"><i></i>@(record.IsActive ? "Active" : "Inactive")</span></td>
-                            <td>@record.CreatedDate.ToString("dd MMM yyyy")</td>
+
                             <td>
-                                <div class="record-actions">
-                                    @if (canManageRecord && User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlRecordsEdit))
-                                    {
-                                        <a class="action-button edit" title="Edit record" asp-controller="AmlRecords" asp-action="Edit" asp-route-id="@record.Id"><i class="bi bi-pencil-square"></i><span>Edit</span></a>
-                                    }
-                                    @if (canManageRecord && User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlRecordsDelete))
-                                    {
-                                        <button type="button" class="action-button delete" title="Delete record" data-bs-toggle="modal" data-bs-target="#deleteModal" data-id="@record.Id" data-name="@record.FullName"><i class="bi bi-trash3"></i><span>Delete</span></button>
-                                    }
-                                </div>
+
+                                <strong class="record-reference">
+                                    @record.ReferenceNo
+                                </strong>
+
                             </td>
+
+
+                            <td>
+
+                                <div class="record-name">
+
+                                    <span class="record-avatar">
+
+                                        @(record.FullName.Length > 0
+                                            ? record.FullName[0]
+                                                .ToString()
+                                                .ToUpperInvariant()
+                                            : "?")
+
+                                    </span>
+
+
+                                    <span>
+
+                                        <strong>
+                                            @record.FullName
+                                        </strong>
+
+                                        <small>
+
+                                            @(record.DateOfBirth?
+                                                .ToString("dd MMM yyyy")
+                                                ?? "Date not provided")
+
+                                        </small>
+
+                                    </span>
+
+                                </div>
+
+                            </td>
+
+
+                            <td>
+
+                                <span class="record-type">
+                                    @record.RecordType
+                                </span>
+
+                            </td>
+
+
+                            <td>
+
+                                <strong>
+
+                                    @(string.IsNullOrWhiteSpace(record.Country)
+                                        ? "Not provided"
+                                        : record.Country)
+
+                                </strong>
+
+
+                                <small class="table-subtext">
+
+                                    @(string.IsNullOrWhiteSpace(record.Nationality)
+                                        ? "Not provided"
+                                        : record.Nationality)
+
+                                </small>
+
+                            </td>
+
+
+                            <td>
+                                @record.SourceName
+                            </td>
+
+
+                            <td>
+
+                                <span class="record-status @(record.IsActive ? "active" : "inactive")">
+
+                                    <i></i>
+
+                                    @(record.IsActive
+                                        ? "Active"
+                                        : "Inactive")
+
+                                </span>
+
+                            </td>
+
+
+                            <td>
+
+                                @record.CreatedDate
+                                .ToString("dd MMM yyyy")
+
+                            </td>
+
+
+                            <td>
+
+                                <div class="record-actions">
+
+                                    @if (canManage)
+                                    {
+                                        <a class="action-button edit"
+                                           title="Edit record"
+                                           asp-controller="AmlRecords"
+                                           asp-action="Edit"
+                                           asp-route-id="@record.Id">
+
+                                            <i class="bi bi-pencil-square"></i>
+
+                                            <span>
+                                                Edit
+                                            </span>
+
+                                        </a>
+
+
+                                        <button type="button"
+                                                class="action-button delete"
+                                                title="Delete record"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#deleteModal"
+                                                data-id="@record.Id"
+                                                data-name="@record.FullName">
+
+                                            <i class="bi bi-trash3"></i>
+
+                                            <span>
+                                                Delete
+                                            </span>
+
+                                        </button>
+                                    }
+
+                                </div>
+
+                            </td>
+
                         </tr>
                     }
                 }
+
             </tbody>
+
         </table>
+
     </div>
-    <nav class="records-pagination" aria-label="AML records pagination">
-        <span>Page @Model.Page of @Model.TotalPages</span>
+
+
+    <nav class="records-pagination"
+         aria-label="AML records pagination">
+
+        <span>
+            Page @Model.Page of @Model.TotalPages
+        </span>
+
+
         <div>
-            <a class="page-button @(Model.HasPreviousPage ? "" : "disabled")"
-               asp-action="Index" asp-route-page="@(Model.Page - 1)"
-               asp-route-search="@Model.Search" asp-route-recordType="@Model.RecordType" asp-route-status="@Model.Status"
-               aria-disabled="@(!Model.HasPreviousPage)"><i class="bi bi-chevron-left"></i> Previous</a>
-            @{
-                var firstPage = Math.Max(1, Model.Page - 2);
-                var lastPage = Math.Min(Model.TotalPages, firstPage + 4);
-                firstPage = Math.Max(1, lastPage - 4);
+
+            @if (Model.HasPreviousPage)
+            {
+                <a class="page-button"
+                   asp-controller="AmlRecords"
+                   asp-action="Index"
+                   asp-route-page="@(Model.Page - 1)"
+                   asp-route-search="@Model.Search"
+                   asp-route-recordType="@Model.RecordType"
+                   asp-route-status="@Model.Status">
+
+                    <i class="bi bi-chevron-left"></i>
+
+                    Previous
+
+                </a>
             }
-            @for (var pageNumber = firstPage; pageNumber <= lastPage; pageNumber++)
+            else
+            {
+                <span class="page-button disabled"
+                      aria-disabled="true">
+
+                    <i class="bi bi-chevron-left"></i>
+
+                    Previous
+
+                </span>
+            }
+
+
+            @{
+                var firstPage =
+                    Math.Max(
+                        1,
+                        Model.Page - 2);
+
+                var lastPage =
+                    Math.Min(
+                        Model.TotalPages,
+                        firstPage + 4);
+
+                firstPage =
+                    Math.Max(
+                        1,
+                        lastPage - 4);
+            }
+
+
+            @for (
+                var pageNumber = firstPage;
+                pageNumber <= lastPage;
+                pageNumber++)
             {
                 <a class="page-number @(pageNumber == Model.Page ? "active" : "")"
-                   asp-action="Index" asp-route-page="@pageNumber"
-                   asp-route-search="@Model.Search" asp-route-recordType="@Model.RecordType" asp-route-status="@Model.Status"
-                   aria-current="@(pageNumber == Model.Page ? "page" : null)">@pageNumber</a>
+                   asp-controller="AmlRecords"
+                   asp-action="Index"
+                   asp-route-page="@pageNumber"
+                   asp-route-search="@Model.Search"
+                   asp-route-recordType="@Model.RecordType"
+                   asp-route-status="@Model.Status"
+                   aria-current="@(pageNumber == Model.Page ? "page" : null)">
+
+                    @pageNumber
+
+                </a>
             }
-            <a class="page-button @(Model.HasNextPage ? "" : "disabled")"
-               asp-action="Index" asp-route-page="@(Model.Page + 1)"
-               asp-route-search="@Model.Search" asp-route-recordType="@Model.RecordType" asp-route-status="@Model.Status"
-               aria-disabled="@(!Model.HasNextPage)">Next <i class="bi bi-chevron-right"></i></a>
+
+
+            @if (Model.HasNextPage)
+            {
+                <a class="page-button"
+                   asp-controller="AmlRecords"
+                   asp-action="Index"
+                   asp-route-page="@(Model.Page + 1)"
+                   asp-route-search="@Model.Search"
+                   asp-route-recordType="@Model.RecordType"
+                   asp-route-status="@Model.Status">
+
+                    Next
+
+                    <i class="bi bi-chevron-right"></i>
+
+                </a>
+            }
+            else
+            {
+                <span class="page-button disabled"
+                      aria-disabled="true">
+
+                    Next
+
+                    <i class="bi bi-chevron-right"></i>
+
+                </span>
+            }
+
         </div>
+
     </nav>
+
 </section>
 
-<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalTitle" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content delete-modal-content">
-        <form asp-action="Delete" method="post">@Html.AntiForgeryToken()<input id="deleteRecordId" name="id" type="hidden" />
-            <div class="delete-modal-icon"><i class="bi bi-trash3"></i></div><h2 id="deleteModalTitle">Delete AML record?</h2><p><strong id="deleteRecordName"></strong> will be marked as deleted and removed from the active record list.</p>
-            <div class="delete-actions"><button type="button" class="records-secondary-button" data-bs-dismiss="modal">Cancel</button><button type="submit" class="delete-confirm-button">Delete</button></div>
-        </form>
-    </div></div>
-</div>
 
-@section Scripts {
+@if (canManage)
+{
+    <div class="modal fade"
+         id="deleteModal"
+         tabindex="-1"
+         aria-labelledby="deleteModalTitle"
+         aria-hidden="true">
+
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+
+            <div class="modal-content delete-modal-content">
+
+                <form asp-controller="AmlRecords"
+                      asp-action="Delete"
+                      method="post">
+
+                    @Html.AntiForgeryToken()
+
+
+                    <input id="deleteRecordId"
+                           name="id"
+                           type="hidden" />
+
+
+                    <div class="delete-modal-icon">
+
+                        <i class="bi bi-trash3"></i>
+
+                    </div>
+
+
+                    <h2 id="deleteModalTitle">
+                        Delete AML record?
+                    </h2>
+
+
+                    <p>
+
+                        <strong id="deleteRecordName"></strong>
+
+                        will be marked as deleted and removed
+                        from the active record list.
+
+                    </p>
+
+
+                    <div class="delete-actions">
+
+                        <button type="button"
+                                class="records-secondary-button"
+                                data-bs-dismiss="modal">
+
+                            Cancel
+
+                        </button>
+
+
+                        <button type="submit"
+                                class="delete-confirm-button">
+
+                            Delete
+
+                        </button>
+
+                    </div>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+
+@section Scripts
+{
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            document.getElementById("deleteModal").addEventListener("show.bs.modal", function (event) {
-                document.getElementById("deleteRecordId").value = event.relatedTarget.dataset.id;
-                document.getElementById("deleteRecordName").textContent = event.relatedTarget.dataset.name;
+        document.addEventListener(
+            "DOMContentLoaded",
+            function () {
+
+                const deleteModal =
+                    document.getElementById(
+                        "deleteModal");
+
+                deleteModal?.addEventListener(
+                    "show.bs.modal",
+                    function (event) {
+
+                        const trigger =
+                            event.relatedTarget;
+
+                        if (!trigger) {
+                            return;
+                        }
+
+                        const id =
+                            trigger.dataset.id;
+
+                        const name =
+                            trigger.dataset.name;
+
+
+                        const idInput =
+                            document.getElementById(
+                                "deleteRecordId");
+
+                        const nameLabel =
+                            document.getElementById(
+                                "deleteRecordName");
+
+
+                        if (idInput) {
+                            idInput.value =
+                                id ?? "";
+                        }
+
+                        if (nameLabel) {
+                            nameLabel.textContent =
+                                name ?? "";
+                        }
+                    });
+
+
+                document
+                    .querySelectorAll(
+                        ".records-alert button")
+                    .forEach(
+                        button => {
+
+                            button.addEventListener(
+                                "click",
+                                function () {
+
+                                    button
+                                        .closest(
+                                            ".records-alert")
+                                        ?.remove();
+                                });
+                        });
             });
-            document.querySelector(".records-alert button")?.addEventListener("click", e => e.currentTarget.closest(".records-alert").remove());
-        });
     </script>
 }

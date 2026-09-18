@@ -63,18 +63,27 @@ namespace AmlScreening.Portal.Controllers
             {
                 var errorLog = new ErrorLogModel
                 {
-                    ErrorDescription = ex.Message,
+                    ErrorDescription = $"{ex.GetType().Name}; TraceId: {HttpContext.TraceIdentifier}",
                     PartnerCode = normalizedSourceCode,
                     ErrorNumber = ex.HResult.ToString(),
                     Script = "AmlSourceController.Sync",
                     ErrorScript = ex.StackTrace ?? string.Empty,
-                    QueryString = Request.QueryString.ToString(),
+                    QueryString = null,
                     IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
                 };
-               await _errorRepository.LogErrorAsync(errorLog);
+                _logger.LogError(ex, "AML source synchronization failed. TraceId {TraceId}.", HttpContext.TraceIdentifier);
+                try
+                {
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                    await _errorRepository.LogErrorAsync(errorLog, timeout.Token);
+                }
+                catch (Exception loggingError)
+                {
+                    _logger.LogError(loggingError, "Database error logging failed. TraceId {TraceId}.", HttpContext.TraceIdentifier);
+                }
                 
                 TempData["ErrorMessage"] =
-                    $"{normalizedSourceCode} {ex.Message}";
+                    $"Synchronization could not be completed. Reference: {HttpContext.TraceIdentifier}.";
             }
 
             return RedirectToAction(nameof(Index));

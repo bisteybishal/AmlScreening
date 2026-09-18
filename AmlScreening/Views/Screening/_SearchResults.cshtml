@@ -1,5 +1,14 @@
 ﻿@model AmlScreening.Portal.ViewModels.ScreeningSearchResultsViewModel
 
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger" role="alert">
+        Search could not be completed. This is not a clear result.
+        <div asp-validation-summary="All"></div>
+    </div>
+    return;
+}
+
 @if (string.IsNullOrWhiteSpace(Model.SearchName))
 {
     return;
@@ -36,6 +45,10 @@ else
         }
     </div> *@
 
+    @if (Model.HasMore)
+    {
+        <p>Showing the first 50 matches. Type more characters to narrow the results.</p>
+    }
     <div class="screening-card-list">
         @foreach (var record in Model.Results)
         {

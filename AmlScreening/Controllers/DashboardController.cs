@@ -32,7 +32,7 @@ public sealed class DashboardController : Controller
         {
             FullName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "User",
             Username = User.FindFirst("Username")?.Value ?? User.Identity?.Name ?? "User",
-            RoleName = User.FindFirst(ClaimTypes.Role)?.Value ?? "User",
+            RoleName=string.Join(",",User.FindAll(ClaimTypes.Role).Select(x=>x.Value).Distinct(StringComparer.OrdinalIgnoreCase)),
             CanViewAmlRecords = User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlRecordsView),
             CanViewTransactions = User.HasClaim(AppPermissions.ClaimType, AppPermissions.TransactionsView),
             CanViewAlerts = User.HasClaim(AppPermissions.ClaimType, AppPermissions.AlertsView),

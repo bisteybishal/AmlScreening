@@ -4,7 +4,13 @@
 @inject AmlScreening.Application.Interface.IMenuService MenuService
 @{
     var fullName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Admin User";
-    var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "Administrator";
+
+    var roles = User.FindAll(ClaimTypes.Role).Select(x => x.Value).Where(x => !string.IsNullOrWhiteSpace(x))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+
+    var role = roles.Length > 0 ? string.Join(", ", roles) : "User";
+
     var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
     var initials = string.Join("", fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant();
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString();

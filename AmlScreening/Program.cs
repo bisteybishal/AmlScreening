@@ -2,6 +2,7 @@ using AmlScreening.Application;
 using AmlScreening.Application.Security;
 using AmlScreening.Infrastructure;
 using AmlScreening.Portal.Extension;
+using AmlScreening.Portal.Middleware;
 using AmlScreening.Portal.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -9,16 +10,25 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+if (!builder.Environment.IsDevelopment())
+    ValidateHostedConfiguration(builder.Configuration, builder.Environment);
 
 
 //MVC
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews(options =>
+{
+    options.Filters.Add(
+        new Microsoft.AspNetCore.Mvc.Authorization.AuthorizeFilter(
+            AppPermissions.Portal.Access));
+});
+
 builder.Services.AddCurrentUserAuthorization();
 builder.Services.AddCustomDataProtection(builder.Configuration, builder.Environment);
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
+
 builder.Services.AddScoped<PortalCookieEvents>();
 
 
@@ -38,13 +48,18 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 builder.Services.AddAuthorization(options =>
 {
-    options.FallbackPolicy = new AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .Build();
     foreach (var permission in AppPermissions.All)
     {
-        options.AddPolicy(permission, policy =>
-            policy.RequireClaim(AppPermissions.ClaimType, permission));
+        options.AddPolicy(
+            permission,
+            policy =>
+            {
+                policy.RequireAuthenticatedUser();
+
+                policy.RequireClaim(
+                    AppPermissions.ClaimType,
+                    permission);
+            });
     }
 });
 
@@ -63,7 +78,7 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("login", httpContext =>
     {
         var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown-ip";
-        var username = httpContext.Items["LoginUsername"]?.ToString() ?? "unknown-user";
+        var username = httpContext.Items["loginusername"]?.ToString() ?? "unknown-user";
         var partitionKey = $"{ipAddress}|{username}";
 
         return RateLimitPartition.GetFixedWindowLimiter(
@@ -85,7 +100,6 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
-
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
@@ -103,7 +117,7 @@ app.Use(async (context, next) =>
     if (isLoginPost)
     {
         var form = await context.Request.ReadFormAsync();
-        context.Items["LoginUsername"] = form["UserName"].ToString().Trim().ToUpperInvariant();
+        context.Items["loginusername"] = form["UserName"].ToString().Trim().ToUpperInvariant();
     }
 
     await next();

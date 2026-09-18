@@ -50,6 +50,9 @@ public sealed class RiskScoringSetupResult
     public bool HasRuleDraft { get; init; }
     public bool HasBandDraft { get; init; }
     public RiskModel? ActiveModel { get; init; }
+    public bool CanEditModel { get; init; }
+    public bool HasModelDraft { get; init; }
+    public RiskModel? PendingModel { get; init; }
     public IReadOnlyList<RiskFactor> Factors { get; init; } = Array.Empty<RiskFactor>();
     public RiskFactor? SelectedFactor { get; init; }
     public IReadOnlyList<RiskFactorRule> Rules { get; init; } = Array.Empty<RiskFactorRule>();

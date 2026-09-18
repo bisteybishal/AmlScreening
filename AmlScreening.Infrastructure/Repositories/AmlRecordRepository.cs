@@ -7,6 +7,7 @@ using AmlScreening.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Client;
 using Microsoft.AspNetCore.Mvc;
+using AmlScreening.Application.Common;
 
 namespace AmlScreening.Infrastructure.Repositories;
 
@@ -23,34 +24,75 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
     }
     public async Task<IReadOnlyList<AmlRecord>> FindMatchNameAsync(string name, CancellationToken cancellationToken = default)
     {
-        try
+        EnsureSignedIn();
+        if (string.IsNullOrWhiteSpace(name))
         {
-            var searchname = name.Trim();
-            if (searchname.Length == 0)
-            {
-                return Array.Empty<AmlRecord>();
-            }
-            var query = ApplyOwnershipScope(_dbContext.AmlRecords.AsNoTracking());
-            return await query.Where(x => x.IsActive && x.FullName.Contains(name)).OrderBy(x => x.FullName).ThenBy(x => x.Id).Take(51)
-                .Select(x => new AmlRecord
-                {
-                    Id = x.Id,
-                    FullName = x.FullName,
-                    RecordType = x.RecordType,
-                    SourceName = x.SourceName,
-                    DateOfBirth = x.DateOfBirth,
-                    Country = x.Country,
-                    Nationality = x.Nationality,
-                    Remarks = x.Remarks,
-                    ReferenceNo = x.ReferenceNo,
-                    HasPhoto=x.Photo!=null
+            return Array.Empty<AmlRecord>();
+        }
+        var normalizedName = AmlNameNormalizer.Normalize(name);
+        if (normalizedName.Length == 0)
+        {
+            return Array.Empty<AmlRecord>();
+        }
 
-                }).ToArrayAsync(cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            return null;
-        }
+        if (normalizedName.Length > 250)
+            throw new ArgumentException("Search names must not exceed 250 characters.", nameof(name));
+
+
+        var originalName = name.Trim();
+        var query = PartnerQuery(tracking: false);
+
+        return await query
+            .Where(
+                x =>
+                    x.IsActive
+                    &&
+                    ((x.NormalizedName != null && x.NormalizedName.Contains(normalizedName)) ||
+                     (x.NormalizedName == null && x.FullName.Contains(originalName))))
+            .OrderBy(
+                x => x.FullName)
+            .ThenBy(
+                x => x.Id)
+            .Take(50)
+            .Select(
+                x =>
+                    new AmlRecord
+                    {
+                        Id =
+                            x.Id,
+                        PartnerId = x.PartnerId,
+                        BranchId = x.BranchId,
+                        CreatedByUserId = x.CreatedByUserId,
+
+                        FullName =
+                            x.FullName,
+
+                        RecordType =
+                            x.RecordType,
+
+                        SourceName =
+                            x.SourceName,
+
+                        DateOfBirth =
+                            x.DateOfBirth,
+
+                        Country =
+                            x.Country,
+
+                        Nationality =
+                            x.Nationality,
+
+                        Remarks =
+                            x.Remarks,
+
+                        ReferenceNo =
+                            x.ReferenceNo,
+
+                        HasPhoto =
+                            x.Photo != null
+                    })
+            .ToArrayAsync(
+                cancellationToken);
     }
 
     public async Task<PagedResult<AmlRecord>> GetPageAsync(
@@ -58,37 +100,47 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
         string? recordType,
         bool? isActive,
         int pageNumber,
-        int pageSize)
+        int pageSize, CancellationToken cancellationToken = default)
     {
-        var query = ApplyOwnershipScope(_dbContext.AmlRecords.AsNoTracking());
 
-        if (!string.IsNullOrWhiteSpace(search))
+        pageNumber = Math.Max(pageNumber, 1);
+        pageSize = Math.Clamp(pageSize, 1, 50);
+
+        var query = PartnerQuery(tracking: false);
+        // Search
+        if (!string.IsNullOrWhiteSpace(
+                search))
         {
-            var term = search.Trim();
-            query = query.Where(record =>
-                record.FullName.Contains(term) ||
-                record.ReferenceNo.Contains(term) ||
-                record.SourceName.Contains(term));
-        }
+            var term =
+                search.Trim();
 
+            query =
+                query.Where(x =>
+                    x.FullName.Contains(term)
+                    ||
+                    x.ReferenceNo.Contains(term)
+                    ||
+                    x.SourceName.Contains(term));
+        }
+        // Record type
         if (!string.IsNullOrWhiteSpace(recordType))
         {
             var type = recordType.Trim();
-            query = query.Where(record => record.RecordType == type);
+            query = query.Where(x => x.RecordType == type);
         }
-
+        pageSize = Math.Clamp(pageSize, 1, 50);
+        // Active / inactive
         if (isActive.HasValue)
             query = query.Where(record => record.IsActive == isActive.Value);
 
-        var totalRecords = await query.CountAsync();
-        pageSize = Math.Clamp(pageSize, 1, 50);
+        var totalRecords = await query.CountAsync(cancellationToken);
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalRecords / (double)pageSize));
         pageNumber = Math.Clamp(pageNumber, 1, totalPages);
         var records = await query.OrderByDescending(r => r.CreatedDate)
             .ThenByDescending(r => r.Id)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         return new PagedResult<AmlRecord>
         {
@@ -102,9 +154,12 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
 
     public async Task<AmlRecordSummary> GetSummaryAsync(CancellationToken cancellationToken = default)
     {
-        var records = ApplyOwnershipScope(_dbContext.AmlRecords.AsNoTracking());
+        EnsureSignedIn();
+        var query =
+            PartnerQuery(
+                tracking: false);
 
-        var summary = await records.GroupBy(_ => 1).Select(g => new AmlRecordSummary
+        var summary = await query.GroupBy(x => 1).Select(g => new AmlRecordSummary
         {
             TotalRecords = g.Count(),
             ActiveRecords = g.Count(x => x.IsActive),
@@ -117,209 +172,324 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
 
     }
 
-    public async Task<IReadOnlyList<AmlRecord>> GetRecentAsync(int maximumRecords)
+    public async Task<IReadOnlyList<AmlRecord>> GetRecentAsync(int maximumRecords, CancellationToken cancellationToken = default)
     {
+        EnsureSignedIn();
         var take = Math.Clamp(maximumRecords, 1, 50);
-        return await ApplyOwnershipScope(_dbContext.AmlRecords.AsNoTracking())
+        return await PartnerQuery(tracking: false)
             .OrderByDescending(record => record.CreatedDate)
             .ThenByDescending(record => record.Id)
             .Take(take)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
     public Task<bool> ReferenceExistsAsync(
         string referenceNo,
         string sourceName,
-        int? excludedId = null)
+        int? excludedId = null, CancellationToken cancellationToken = default)
     {
-        var normalizedReference = referenceNo.Trim();
-        var normalizedSource = sourceName.Trim();
+        EnsureSignedIn();
+        var reference = referenceNo.Trim();
+        var source = sourceName.Trim();
         // The unique reference index also includes soft-deleted records.
-        return _dbContext.AmlRecords.IgnoreQueryFilters(["SoftDeleteFilter"]).AsNoTracking().AnyAsync(record =>
-            record.ClientId == _currentUser.ClientId &&
-            record.ReferenceNo == normalizedReference &&
-            record.SourceName == normalizedSource &&
-            (!excludedId.HasValue || record.Id != excludedId.Value));
-    }
-    public async Task<AmlRecord?> GetByIdAsync(int id)
-    {
-        return await ApplyOwnershipScope(_dbContext.AmlRecords.AsNoTracking())
-            .FirstOrDefaultAsync(r => r.Id == id);
-    }
+        return _dbContext.AmlRecords.AsNoTracking()
+            .AnyAsync(x => x.PartnerId == _currentUser.PartnerId
+            && x.ReferenceNo == reference && x.SourceName == source
+             &&
+                    (
+                        !excludedId.HasValue
 
-    public async Task<int> CreateAsync(AmlRecord record)
+                        ||
+
+                        x.Id !=
+                        excludedId.Value
+                    ),
+                cancellationToken);
+    }
+    public async Task<AmlRecord?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         EnsureSignedIn();
+        return await PartnerQuery(tracking: false).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+
+    }
+
+    public async Task<int> CreateAsync(AmlRecord record, CancellationToken cancellationToken = default)
+    {
+        EnsureSignedIn();
+
         if (record.Id != 0)
-            throw new ArgumentException("A new AML record must not have an existing ID.", nameof(record));
-        record.ClientId = _currentUser.ClientId;
-        record.OwnerUserId = _currentUser.UserId;
-        record.IsShared = _currentUser.HasPermission(AppPermissions.AmlRecordsViewAll);
-        record.CreatedDate = DateTime.UtcNow;
-        record.CreatedBy = _currentUser.Username;
-        record.UpdatedDate = null;
-        record.UpdatedBy = null;
-        record.DeleteFg = "N";
-        record.DeleteDate = null;
-        record.DeleteBy = null;
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
-        try
         {
-            _dbContext.AmlRecords.Add(record);
-            await _dbContext.SaveChangesAsync();
-            AddAudit("Create", record.Id, $"Created AML record {record.ReferenceNo}.");
-            await _dbContext.SaveChangesAsync();
-            await transaction.CommitAsync();
-            return record.Id;
+            throw new ArgumentException(
+                "A new AML record must not have an existing ID.",
+                nameof(record));
         }
-        catch
+        record.PartnerId =
+           _currentUser.PartnerId;
+
+        record.BranchId =
+            _currentUser.BranchId;
+
+        record.CreatedByUserId =
+            _currentUser.UserId;
+
+
+        record.CreatedBy =
+            _currentUser.Username;
+
+        record.CreatedDate =
+            DateTime.UtcNow;
+
+
+        record.UpdatedBy =
+            null;
+
+        record.UpdatedDate =
+            null;
+
+
+        record.DeleteFg =
+            "N";
+
+        record.DeleteBy =
+            null;
+
+        record.DeleteDate =
+            null;
+        // Prepare data for future screening.
+        record.NormalizedName =
+            AmlNameNormalizer
+                .Normalize(
+                    record.FullName);
+
+        record.NamePrefix =
+            AmlNameNormalizer
+                .GetPrefix(
+                    record.FullName);
+
+
+        if (string.IsNullOrWhiteSpace(
+                record.NormalizedName))
         {
-            await transaction.RollbackAsync();
-            throw;
+            throw new ArgumentException(
+                "AML record name is required.");
         }
+        _dbContext.AmlRecords
+           .Add(record);
+
+
+        await _dbContext
+            .SaveChangesAsync(
+                cancellationToken);
+
+
+        return record.Id;
+
+
     }
 
-    public async Task<bool> UpdateAsync(AmlRecord record, string updateby)
+    public async Task<bool> UpdateAsync(AmlRecord record, CancellationToken cancellationToken = default)
+    {
+        EnsureCanManage();
+
+        var existing = await _dbContext.AmlRecords.FirstOrDefaultAsync(x => x.Id == record.Id && x.PartnerId == _currentUser.PartnerId , cancellationToken);
+        if (existing == null)
+        {
+            return false;
+        }
+
+        if (record.RowVersion is
+            { Length: > 0 })
+        {                                                       
+            _dbContext
+                .Entry(existing)
+
+                .Property(
+                    x => x.RowVersion)
+
+                .OriginalValue =
+                    record.RowVersion;
+        }
+
+
+        existing.RecordType =
+            record.RecordType;
+
+        existing.FullName =
+            record.FullName;
+
+        existing.DateOfBirth =
+            record.DateOfBirth;
+
+        existing.Country =
+            record.Country;
+
+        existing.Nationality =
+            record.Nationality;
+
+        existing.ReferenceNo =
+            record.ReferenceNo;
+
+        existing.SourceName =
+            record.SourceName;
+
+        existing.Remarks =
+            record.Remarks;
+
+        existing.IsActive =
+            record.IsActive;
+
+
+        existing.NormalizedName =
+            AmlNameNormalizer
+                .Normalize(
+                    record.FullName);
+
+        existing.NamePrefix =
+            AmlNameNormalizer
+                .GetPrefix(
+                    record.FullName);
+
+
+        existing.UpdatedDate =
+            DateTime.UtcNow;
+
+        existing.UpdatedBy =
+            _currentUser.Username;
+
+
+        try
+        {
+            return await _dbContext
+                .SaveChangesAsync(
+                    cancellationToken) > 0;
+        }
+        catch (
+            DbUpdateConcurrencyException)
+        {
+            return false;
+        }
+
+    }
+    public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        EnsureCanManage();
+
+
+        var record =
+            await _dbContext
+                .AmlRecords
+
+                .FirstOrDefaultAsync(
+                    x =>
+                        x.Id == id
+
+                        &&
+
+                        x.PartnerId ==
+                        _currentUser.PartnerId
+
+                        &&
+
+                        x.DeleteFg != "Y",
+                    cancellationToken);
+
+
+        if (record == null)
+        {
+            return false;
+        }
+
+        record.DeleteFg =
+            "Y";
+
+        record.DeleteDate =
+            DateTime.UtcNow;
+
+        record.DeleteBy =
+            _currentUser.Username;
+
+        record.IsActive =
+            false;
+
+
+        return await _dbContext
+            .SaveChangesAsync(
+                cancellationToken) > 0;
+    }
+
+    public async Task<AmlRecord?> GetPhotoAsync(int id, CancellationToken cancellationToken = default)
     {
         EnsureSignedIn();
-        // Authorize the stored row, never ownership values supplied by a form.
-        var existing = await ApplyOwnershipScope(_dbContext.AmlRecords)
-            .FirstOrDefaultAsync(x => x.Id == record.Id);
-        if (existing == null || !CanAccessRecord(existing) || record.RowVersion is not { Length: 8 })
-            return false;
-
-        // Only business fields are editable. Ownership and creation details stay unchanged.
-        existing.RecordType = record.RecordType;
-        existing.FullName = record.FullName;
-        existing.DateOfBirth = record.DateOfBirth;
-        existing.Country = record.Country;
-        existing.Nationality = record.Nationality;
-        existing.ReferenceNo = record.ReferenceNo;
-        existing.SourceName = record.SourceName;
-        existing.Remarks = record.Remarks;
-        existing.IsActive = record.IsActive;
-        existing.UpdatedDate = DateTime.UtcNow;
-        existing.UpdatedBy = _currentUser.Username;
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
-        try
-        {
-            _dbContext.Entry(existing).Property(x => x.RowVersion).OriginalValue = record.RowVersion;
-            var updated = await _dbContext.SaveChangesAsync() > 0;
-            if (!updated)
-            {
-                await transaction.RollbackAsync();
-                return false;
-            }
-
-            AddAudit("Update", record.Id, $"Updated AML record {record.ReferenceNo}.");
-            await _dbContext.SaveChangesAsync();
-            await transaction.CommitAsync();
-            return true;
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            await transaction.RollbackAsync();
-            return false;
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
-
-
-    }
-    public async Task<bool> DeleteAsync(int id, string deletedBy)
-    {
-        EnsureSignedIn();
-        var record = await ApplyOwnershipScope(_dbContext.AmlRecords)
-            .FirstOrDefaultAsync(x => x.Id == id);
-        if (record == null || !CanAccessRecord(record)) return false;
-
-        record.DeleteFg = "Y";
-        record.DeleteDate = DateTime.UtcNow;
-        record.DeleteBy = _currentUser.Username;
-        record.IsActive = false;
-
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
-        try
-        {
-            var deleted = await _dbContext.SaveChangesAsync() > 0;
-            if (!deleted)
-            {
-                await transaction.RollbackAsync();
-                return false;
-            }
-
-            AddAudit("Delete", record.Id, $"Soft deleted AML record {record.ReferenceNo}.");
-            await _dbContext.SaveChangesAsync();
-            await transaction.CommitAsync();
-            return true;
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
-    }
-
-    public async Task<AmlRecord>GetPhotoAsync(int id ,CancellationToken cancellationToken = default)
-    {
-        var query = ApplyOwnershipScope(_dbContext.AmlRecords.AsNoTracking());
-        return await query.Where(x => x.Id==id && x.IsActive)
+        return await PartnerQuery(tracking: false).Where(x => x.Id == id && x.IsActive)
             .Select(x => new AmlRecord
             {
                 Id = x.Id,
                 Photo = x.Photo,
-                PhotoContentType = x.PhotoContentType
+                PhotoContentType = x.PhotoContentType,
+
             }).FirstOrDefaultAsync(cancellationToken);
     }
 
-
-    private IQueryable<AmlRecord> ApplyOwnershipScope(IQueryable<AmlRecord> query)
+    private IQueryable<AmlRecord> PartnerQuery(bool tracking)
     {
-        if (!_currentUser.IsAuthenticated || _currentUser.ClientId <= 0 || _currentUser.UserId <= 0)
-            return query.Where(record => false);
-        if (_currentUser.HasPermission(AppPermissions.AmlRecordsViewAll) ||
-            _currentUser.HasPermission(AppPermissions.AmlRecordsViewClient))
-        {
-            return query;
-        }
+        EnsureSignedIn();
 
-        return query.Where(record => record.OwnerUserId == _currentUser.UserId || record.IsShared);
+
+        IQueryable<AmlRecord> query =
+            tracking
+                ? _dbContext.AmlRecords
+                : _dbContext
+                    .AmlRecords
+                    .AsNoTracking();
+
+
+        /*
+         * THIS IS YOUR MAIN DATA RULE:
+         *
+         * All users belonging to the
+         * same PartnerId see the same AML records.
+         */
+
+        return query.Where(x =>
+            x.PartnerId ==
+            _currentUser.PartnerId
+
+            &&
+
+            x.DeleteFg != "Y");
     }
-
-    private bool CanAccessRecord(AmlRecord record) {
-        var canAccessAcrossClients =
-            _currentUser.HasPermission(
-                AppPermissions.PlatformCrossClientAccess) &&
-            _currentUser.HasPermission(
-                AppPermissions.AmlRecordsViewAll);
-        if (canAccessAcrossClients)
-            return true;
-
-        return record.ClientId == _currentUser.ClientId &&
-               record.OwnerUserId == _currentUser.UserId;
-    }
-
     private void EnsureSignedIn()
     {
-        if (!_currentUser.IsAuthenticated || _currentUser.ClientId <= 0 || _currentUser.UserId <= 0)
-            throw new UnauthorizedAccessException("A signed-in user with a client is required.");
+        if (!_currentUser.IsAuthenticated
+
+            ||
+
+            _currentUser.UserId <= 0
+
+            ||
+
+            _currentUser.PartnerId <= 0
+
+            ||
+
+            _currentUser.BranchId <= 0)
+        {
+            throw new UnauthorizedAccessException(
+                "A valid login is required.");
+        }
     }
 
-    private void AddAudit(string action, int entityId, string details)
+    private void EnsureCanManage()
     {
-        _dbContext.AuditLogs.Add(new AuditLog
+        EnsureSignedIn();
+
+
+        if (!_currentUser.HasPermission(
+                AppPermissions.Aml.Manage))
         {
-            ClientId = _currentUser.ClientId,
-            UserId = _currentUser.UserId,
-            Username = _currentUser.Username,
-            Action = action,
-            EntityType = "AmlRecord",
-            EntityId = entityId.ToString(),
-            Details = details,
-            CreatedDate = DateTime.UtcNow
-        });
+            throw new UnauthorizedAccessException(
+                "AML management permission is required.");
+        }
     }
 }

@@ -1,41 +1,38 @@
-﻿using AmlScreening.Domain.Common;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Text;
+﻿namespace AmlScreening.Domain.Entities;
 
-namespace AmlScreening.Domain.Entities
+public sealed class User
 {
-    public class User
-    {
-        public long Id { get; set; }
+    public long UserId { get; set; }
 
-        public int ClientId { get; set; }
+    public int PartnerId { get; set; }
 
-        public string Username { get; set; } = string.Empty;
+    public int BranchId { get; set; }
 
-        public string FullName { get; set; } = string.Empty;
+    public string Username { get; set; }
+        = string.Empty;
 
-        public string PasswordHash { get; set; } = string.Empty;
+    public string PasswordHash { get; set; }
+        = string.Empty;
 
-        public bool IsActive { get; set; } = true;
+    public string? Address { get; set; }
 
-        public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+    public string? Email { get; set; }
 
-      
-        public string CompanyName { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string Address { get; set; } = string.Empty;
-        public string PhoneNumber { get; set; } = string.Empty;
+    public string? PhoneNumber { get; set; }
 
-        public void Activate()
-        {
-            IsActive = true;
-        }
+    public bool IsActive { get; set; }
 
-        public void Deactivate()
-        {
-            IsActive = false;
-        }
-    }
+    public DateTime? LastLoginDate { get; set; }
+
+    public string? LastLoginIp { get; set; }
+
+    public int FailedLoginCount { get; set; }
+
+    public DateTime CreatedDate { get; set; }
+
+    public string? CreatedBy { get; set; }
+
+    public DateTime? UpdatedDate { get; set; }
+
+    public string? UpdatedBy { get; set; }
 }

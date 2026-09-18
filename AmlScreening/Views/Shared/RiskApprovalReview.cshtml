@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = Model.Title;
     var controller = Model.Kind == "Rules" ? "RiskScores" : "RiskScoreSetup";
+    var applyAction = Model.Kind == "Model" ? "ApplyModel" : "Apply";
 }
 @section Styles {
     <link rel="stylesheet" href="~/css/workflow.css" asp-append-version="true" />
@@ -37,7 +38,7 @@
 </div>
 @if (Model.CanApprove)
 {
-    <form asp-controller="@controller" asp-action="Apply" method="post"
+    <form asp-controller="@controller" asp-action="@applyAction" method="post"
           onsubmit="return confirm('Approve the displayed change(s)?');">
         @Html.AntiForgeryToken()
         <input type="hidden" name="ruleId" value="@Model.RuleId" />

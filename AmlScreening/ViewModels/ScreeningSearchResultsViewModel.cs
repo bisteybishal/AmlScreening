@@ -6,6 +6,6 @@ namespace AmlScreening.Portal.ViewModels
     {
         public string SearchName { get; set; } = "";
         public IReadOnlyList<AmlRecord> Results { get; set; } = Array.Empty<AmlRecord>();
-        public bool HasResults { get; set; }
+        public bool HasMore { get; set; }
     }
 }

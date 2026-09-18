@@ -3,12 +3,14 @@
 using AmlScreening.Application.Interface;
 using AmlScreening.Application.Interface.Provider;
 using AmlScreening.Application.Interface.Repositories;
+using AmlScreening.Application.Interface.Services;
 using AmlScreening.Application.Services;
 using AmlScreening.Infrastructure.Data;
 using AmlScreening.Infrastructure.Persistence;
 using AmlScreening.Infrastructure.Provider;
 using AmlScreening.Infrastructure.Repositories;
 using AmlScreening.Infrastructure.Services;
+using AmlScreening.Portal.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,7 +22,7 @@ namespace AmlScreening.Infrastructure
         public static IServiceCollection AddInfrastructure(this IServiceCollection services,IConfiguration configuration)
         {
             services.AddScoped<IDBConnectionFactory, DBConnectionFactory>();
-             services.AddDbContext<AmlScreeningDbContext>(options => options.UseSqlServer(configuration.GetConnectionString("AMLDatabase")));
+             services.AddDbContext<AmlScreeningDbContext>(options => options.UseSqlServer(configuration.GetConnectionString("Screening")));
 
             services.AddScoped<IUserRepository,UserRepository>();
             services.AddScoped<IRoleRepository, RoleRepository>();
@@ -34,10 +36,12 @@ namespace AmlScreening.Infrastructure
             services.AddScoped<IAmlWorkflowService, AmlWorkflowService>();
             services.AddScoped<IRiskScoringService, RiskScoringService>();
             services.AddScoped<IAmlImportRepository, AmlImportRepository>();
-            services.AddScoped<IErrorRepository, ErrorRepository>();
+            services.AddScoped<IErrorLogRepository, ErrorLogRepository>();
             services.AddScoped<IComplianceDashboardRepository, ComplianceDashboardRepository>();
             services.AddScoped<IUserSessionRepository, UserSessionRepository>();
-          
+            services.AddScoped<IAuthenticationRepository, AuthenticationRepository>();
+            services.AddScoped<IErrorLogService,ErrorLogService>();
+
 
 
             services.AddHttpClient("UnAmlClient", client =>
