@@ -1,0 +1,227 @@
+﻿@model AmlScreening.Portal.ViewModels.PartnerBranchesViewModel
+
+@{
+    ViewData["Title"] = "Partner Branches";
+}
+
+@section Styles {
+    <link rel="stylesheet"
+          href="~/css/users.css"
+          asp-append-version="true" />
+}
+
+
+<section class="users-heading">
+
+    <div>
+
+        <a asp-action="Index"
+           class="text-decoration-none">
+
+            <i class="bi bi-arrow-left"></i>
+            Back to Partners
+
+        </a>
+
+        <h1 class="mt-2">
+            @Model.PartnerName
+        </h1>
+
+        <p>
+            Branches registered under this partner.
+        </p>
+
+    </div>
+
+
+    <a asp-action="CreateBranch" 
+       asp-route-partnerId="@Model.PartnerId"
+       class="users-primary-button">
+
+        <i class="bi bi-plus-lg"></i>
+
+        Add Branch
+
+    </a>
+
+</section>
+
+
+@if (TempData["SuccessMessage"] is string success)
+{
+    <div class="alert alert-success">
+        @success
+    </div>
+}
+
+
+<section class="card">
+
+    <div class="card-header bg-white">
+
+        <div class="d-flex justify-content-between">
+
+            <div>
+                <h5 class="mb-1">
+                    Branches
+                </h5>
+
+                @* <small class="text-muted">
+                    @Model.PartnerCode
+                </small> *@
+            </div>
+
+            <span class="badge bg-light text-dark">
+                @Model.Branches.Count branch(es)
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <div class="table-responsive">
+
+        <table class="table table-hover align-middle mb-0">
+
+            <thead class="table-light">
+
+                <tr>
+                    <th>SNo</th>
+                    <th>Branch ID</th>
+                    <th>Branch Name</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Users</th>
+                    <th>Status</th>
+                    <th>User Detail</th>
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                @if (Model.Branches.Count == 0)
+                {
+                    <tr>
+                        <td colspan="8"
+                            class="text-center py-5">
+
+                            <i class="bi bi-diagram-3 fs-3"></i>
+
+                            <div class="mt-2">
+                                No branches found.
+                            </div>
+
+                         @*    <a asp-action="CreateBranch"
+                               asp-route-partnerId="@Model.PartnerId"
+                               class="btn btn-sm btn-primary mt-3">
+
+                                Add Branch
+
+                            </a> *@
+
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @for (var i = 0;
+                          i < Model.Branches.Count;
+                          i++)
+                    {
+                        var branch =
+                            Model.Branches[i];
+
+                        <tr>
+
+                            <td>
+                                @(i + 1)
+                            </td>
+
+
+                            <td>
+
+                                <a asp-action="EditBranch"
+                                   asp-route-branchId="@branch.BranchId"
+                                   class="fw-semibold text-decoration-none">
+
+                                    @branch.BranchId
+
+                                </a>
+
+                            </td>
+
+
+                            <td>
+
+                                <a asp-action="EditBranch"
+                                   asp-route-branchId="@branch.BranchId"
+                                   class="fw-semibold text-decoration-none">
+
+                                    @branch.BranchName
+
+                                </a>
+
+                            </td>
+
+
+                            <td>
+                                @(branch.PhoneNumber ?? "-")
+                            </td>
+
+
+                            <td>
+                                @(branch.Email ?? "-")
+                            </td>
+
+
+                            <td>
+                                @branch.UserCount
+                            </td>
+
+
+                            <td>
+
+                                @if (branch.IsActive)
+                                {
+                                    <span class="badge bg-success">
+                                        Active
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">
+                                        Inactive
+                                    </span>
+                                }
+
+                            </td>
+
+
+                            <td>
+
+                                <a asp-action="BranchUsers"
+                                   asp-route-partnerId="@Model.PartnerId"
+                                   asp-route-branchId="@branch.BranchId"
+                                   class="btn btn-sm btn-outline-primary">
+
+                                    <i class="bi bi-people"></i>
+
+                                    User Detail
+
+                                </a>
+
+                            </td>
+
+                        </tr>
+                    }
+                }
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>

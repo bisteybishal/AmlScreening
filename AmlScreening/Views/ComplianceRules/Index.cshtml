@@ -5,16 +5,15 @@
 @{
     ViewData["Title"] = "Compliance Rules";
 
-    var canCreate =
+    var canManage =
         User.HasClaim(
             AppPermissions.ClaimType,
-            AppPermissions.ComplianceRulesCreate);
+            AppPermissions.Compliance.Manage);
 
-    var canViewAllClients =
+    var canApprove =
         User.HasClaim(
             AppPermissions.ClaimType,
-            AppPermissions.PlatformCrossClientAccess);
-
+            AppPermissions.Compliance.Approve);
 }
 
 @section Styles {
@@ -35,14 +34,14 @@
         </h1>
 
         <p>
-            Manage client compliance rules using
+            Manage partner compliance rules using
             maker-checker approval.
         </p>
 
     </div>
 
 
-    @if (canCreate)
+    @if (canManage)
     {
         <a class="workflow-primary"
            asp-action="Add">
@@ -70,13 +69,6 @@
                     <th>
                         S.N.
                     </th>
-
-                    @if (canViewAllClients)
-                    {
-                        <th>
-                            Client
-                        </th>
-                    }
 
                     <th>
                         Rule
@@ -117,11 +109,12 @@
 
             <tbody>
 
-                @if (Model.Count == 0)
+                @if (Model == null ||
+                     Model.Count == 0)
                 {
                     <tr>
 
-                        <td colspan="10"
+                        <td colspan="9"
                             class="workflow-empty">
 
                             No compliance rules found.
@@ -130,160 +123,215 @@
 
                     </tr>
                 }
-
-
-                @for (var i = 0;
-                      i < Model.Count;
-                      i++)
+                else
                 {
-                    var rule =
-                        Model[i];
+                    @for (var i = 0;
+                          i < Model.Count;
+                          i++)
+                    {
+                        var rule =
+                            Model[i];
 
-                    <tr>
+                        <tr>
 
-                        <td>
-                            @(i + 1)
-                        </td>
-
-
-                        @if (canViewAllClients)
-                        {
                             <td>
-                                @rule.ClientId
+                                @(i + 1)
                             </td>
-                        }
 
 
-                        <td>
+                            <td>
 
-                            <strong>
-                                @rule.RuleCode
-                            </strong>
+                                <strong>
+                                    @rule.RuleCode
+                                </strong>
 
-                            <div>
-                                @rule.RuleName
-                            </div>
+                                <div>
+                                    @rule.RuleName
+                                </div>
 
-                        </td>
-
-
-                        <td>
-                            @rule.RuleType
-                        </td>
+                            </td>
 
 
-                        <td>
-                            v@rule.RuleVersion
-                        </td>
+                            <td>
+                                @rule.RuleType
+                            </td>
 
 
-                        <td>
-                            @rule.RiskScore
-                        </td>
+                            <td>
+                                v@rule.RuleVersion
+                            </td>
 
 
-                        <td>
-                            @rule.Action
-                        </td>
+                            <td>
+                                @rule.RiskScore
+                            </td>
 
 
-                        <td>
-
-                            @if (rule.ApprovalStatus ==
-                                 "APPROVED")
-                            {
-                                <span class="risk-status approved">
-                                    Approved
-                                </span>
-                            }
-                            else
-                            {
-                                <span class="risk-status pending">
-                                    Pending
-                                </span>
-                            }
-
-                        </td>
+                            <td>
+                                @rule.Action
+                            </td>
 
 
-                        <td>
+                            <td>
 
-                            @(rule.IsActive
-                                ? "Yes"
-                                : "No")
-
-                        </td>
-
-
-                        <td>
-
-                            <div class="workflow-actions">
-
-
-                                @if (rule.CanEdit)
+                                @if (string.Equals(
+                                    rule.ApprovalStatus,
+                                    "APPROVED",
+                                    StringComparison.OrdinalIgnoreCase))
                                 {
-                                    <a asp-action="Edit"
-                                       asp-route-id="@rule.Id">
-
-                                        Edit Pending
-
-                                    </a>
+                                    <span class="risk-status approved">
+                                        Approved
+                                    </span>
+                                }
+                                else if (string.Equals(
+                                    rule.ApprovalStatus,
+                                    "PENDING",
+                                    StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <span class="risk-status pending">
+                                        Pending
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="risk-status">
+                                        @rule.ApprovalStatus
+                                    </span>
                                 }
 
+                            </td>
 
-                                @if (rule.CanApprove)
+
+                            <td>
+
+                                @if (rule.IsActive)
                                 {
-                                    <a asp-action="Review"
-                                       asp-route-id="@rule.Id">
-
-                                        Review
-
-                                    </a>
+                                    <span class="risk-status approved">
+                                        Yes
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="risk-status pending">
+                                        No
+                                    </span>
                                 }
 
-
-                                @if (rule.ApprovalStatus ==
-                                     "APPROVED" &&
-                                     User.HasClaim(
-                                         AppPermissions.ClaimType,
-                                         AppPermissions.ComplianceRulesEdit))
-                                {
-                                    <a asp-action="Edit"
-                                       asp-route-id="@rule.Id">
-
-                                        New Version
-
-                                    </a>
-                                }
+                            </td>
 
 
-                                @if (rule.CanDelete)
-                                {
-                                    <form asp-action="Delete"
-                                          method="post"
-                                          class="d-inline">
+                            <td>
 
-                                        @Html.AntiForgeryToken()
+                                <div class="workflow-actions">
 
-                                        <input type="hidden"
-                                               name="id"
-                                               value="@rule.Id" />
 
-                                        <button type="submit"
-                                                class="btn btn-link p-0">
+                                    @* =================================================
+                                       EDIT PENDING
+                                       Only original maker can edit.
+                                       Controller already sets CanEdit.
+                                       ================================================= *@
 
-                                            Delete Pending
+                                    @if (rule.CanEdit)
+                                    {
+                                        <a asp-action="Edit"
+                                           asp-route-id="@rule.Id">
 
-                                        </button>
+                                            Edit Pending
 
-                                    </form>
-                                }
+                                        </a>
+                                    }
 
-                            </div>
 
-                        </td>
+                                    @* =================================================
+                                       REVIEW / APPROVE
+                                       Only another authorized checker.
+                                       Controller sets CanApprove.
+                                       ================================================= *@
 
-                    </tr>
+                                    @if (rule.CanApprove &&
+                                         canApprove)
+                                    {
+                                        <a asp-action="Review"
+                                           asp-route-id="@rule.Id">
+
+                                            Review
+
+                                        </a>
+                                    }
+
+
+                                    @* =================================================
+                                       CREATE NEW VERSION
+                                       An approved rule can be edited by a user
+                                       having Compliance.Manage.
+                                       The current approved version remains active
+                                       until the new pending version is approved.
+                                       ================================================= *@
+
+                                    @if (
+                                        canManage
+                                        &&
+                                        string.Equals(
+                                            rule.ApprovalStatus,
+                                            "APPROVED",
+                                            StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <a asp-action="Edit"
+                                           asp-route-id="@rule.Id">
+
+                                            New Version
+
+                                        </a>
+                                    }
+
+
+                                    @* =================================================
+                                       DELETE PENDING
+                                       RowVersion MUST be posted.
+                                       ================================================= *@
+
+                                    @if (rule.CanDelete)
+                                    {
+                                        <form asp-action="Delete"
+                                              method="post"
+                                              class="d-inline">
+
+                                            @Html.AntiForgeryToken()
+
+
+                                            <input type="hidden"
+                                                   name="id"
+                                                   value="@rule.Id" />
+
+
+                                            @if (rule.RowVersion is
+                                                { Length: > 0 })
+                                            {
+                                                <input type="hidden"
+                                                       name="rowVersion"
+                                                       value="@Convert.ToBase64String(
+                                                                                                                  rule.RowVersion)" />
+                                            }
+
+
+                                            <button type="submit"
+                                                    class="btn btn-link p-0"
+                                                    onclick="return confirm(
+                                                'Are you sure you want to delete this pending compliance rule?');">
+
+                                                Delete Pending
+
+                                            </button>
+
+                                        </form>
+                                    }
+
+                                </div>
+
+                            </td>
+
+                        </tr>
+                    }
                 }
 
             </tbody>

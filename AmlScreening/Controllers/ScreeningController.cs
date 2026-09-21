@@ -9,7 +9,7 @@ using System.Security.Claims;
 
 namespace AmlScreening.Portal.Controllers
 {
-    [Authorize(Policy = AppPermissions.Aml.View)]
+    [Authorize(Policy = AppPermissions.Screening.View)]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public class ScreeningController : Controller
     {

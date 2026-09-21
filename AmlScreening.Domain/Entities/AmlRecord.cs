@@ -8,11 +8,11 @@ namespace AmlScreening.Domain.Entities
 {
     public class AmlRecord : BaseEntity
     {
-        public int PartnerId { get; set; }
+        public int? PartnerId { get; set; }
 
-        public int BranchId { get; set; }
+        public int? BranchId { get; set; }
 
-        public long CreatedByUserId { get; set; }
+        public long? CreatedByUserId { get; set; }
         public string RecordType { get; set; } = string.Empty;
 
         public string FullName { get; set; } = string.Empty;
@@ -40,6 +40,7 @@ namespace AmlScreening.Domain.Entities
         public DateTime? LastSyncDate { get; set; }
 
         public DateTime? SourceUpdatedDate { get; set; }
+        public bool IsGlobal { get; set; }
 
         public void Activate()
         {

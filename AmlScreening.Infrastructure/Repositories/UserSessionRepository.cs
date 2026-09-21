@@ -2,7 +2,6 @@
 using AmlScreening.Infrastructure.Persistence;
 using Dapper;
 using System.Data;
-using System.Data.Entity.Infrastructure;
 
 namespace AmlScreening.Infrastructure.Repositories;
 

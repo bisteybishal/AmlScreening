@@ -1,3 +1,5 @@
+@using AmlScreening.Application.Security
+
 @model AmlScreening.Portal.ViewModels.DashboardViewModel
 @{
     ViewData["Title"] = "Dashboard";
@@ -61,7 +63,7 @@
     <article class="panel activity-panel">
         <div class="panel-header">
             <h2>Recent AML Records</h2>
-            @if (User.HasClaim(AmlScreening.Application.Security.AppPermissions.ClaimType, AmlScreening.Application.Security.AppPermissions.AmlRecordsView))
+            @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.Aml.View))
             {
                 <a class="outline-button text-decoration-none" asp-controller="AmlRecords" asp-action="Index">View All</a>
             }

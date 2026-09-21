@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AmlScreening.Portal.Controllers;
 
-[Authorize(Policy = AppPermissions.CustomersView)]
+[Authorize(Policy = AppPermissions.Customers.View)]
 public sealed class CustomersController : Controller
 {
     private readonly IAmlWorkflowService _workflow;

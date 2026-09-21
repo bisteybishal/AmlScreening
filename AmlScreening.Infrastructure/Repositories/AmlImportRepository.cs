@@ -1,11 +1,9 @@
 ﻿using AmlScreening.Application.Common;
 using AmlScreening.Application.Interface;
 using AmlScreening.Application.Interface.Provider;
-using AmlScreening.Application.Security;
 using AmlScreening.Domain.Entities;
-using AmlScreening.Infrastructure.Persistence;
-using Dapper;
-using System.Data;
+using AmlScreening.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace AmlScreening.Infrastructure.Repositories;
 
@@ -13,123 +11,505 @@ namespace AmlScreening.Infrastructure.Repositories;
 public sealed class AmlImportRepository
     : IAmlImportRepository
 {
-    private readonly IDBConnectionFactory
-        _dbConnectionFactory;
+    private readonly AmlScreeningDbContext
+        _db;
 
     private readonly ICurrentUserContext
         _currentUser;
 
 
     public AmlImportRepository(
-        IDBConnectionFactory dbConnectionFactory,
+        AmlScreeningDbContext db,
         ICurrentUserContext currentUser)
     {
-        _dbConnectionFactory =
-            dbConnectionFactory;
+        _db =
+            db;
 
         _currentUser =
             currentUser;
     }
 
 
-    public async Task SaveAsync(
-        IEnumerable<AmlRecord> records)
+    // =========================================================
+    // SAVE EXTERNAL AML SOURCE
+    // =========================================================
+
+    public async Task<int> SaveAsync(
+        string sourceCode,
+        IReadOnlyList<AmlRecord> records,
+        CancellationToken cancellationToken = default)
     {
-        // Defense in depth:
-        // imports are platform operations.
-        if (_currentUser.ClientId <= 0 || _currentUser.UserId <= 0 || !_currentUser.IsAuthenticated
-            ||
-            !_currentUser.HasPermission(
-                AppPermissions.AmlSourceSync)
-            ||
-            !_currentUser.HasPermission(
-                AppPermissions.PlatformCrossClientAccess))
+        EnsureSignedIn();
+
+
+        sourceCode =
+            sourceCode?
+                .Trim()
+                .ToUpperInvariant()
+            ?? string.Empty;
+
+
+        // -----------------------------------------------------
+        // SOURCE VALIDATION
+        // -----------------------------------------------------
+
+        if (sourceCode is not ("UN" or "EU"))
         {
-            throw new UnauthorizedAccessException(
-                "You are not authorized to import AML source data.");
+            throw new ArgumentException(
+                "Unsupported AML source.",
+                nameof(sourceCode));
         }
 
 
-        using var connection =
-            _dbConnectionFactory
-                .CreateConnection();
-
-
-        if (connection.State !=
-            ConnectionState.Open)
+        if (records == null)
         {
-            connection.Open();
+            throw new ArgumentNullException(
+                nameof(records));
         }
 
 
-        using var transaction =
-            connection
-                .BeginTransaction();
+        var now =
+            DateTime.UtcNow;
 
 
-        try
+        // -----------------------------------------------------
+        // CLEAN INCOMING DATA
+        // -----------------------------------------------------
+
+        var incoming =
+            records
+
+                .Where(
+                    record =>
+                        !string.IsNullOrWhiteSpace(
+                            record.FullName)
+
+                        &&
+
+                        !string.IsNullOrWhiteSpace(
+                            record.ReferenceNo))
+
+                .GroupBy(
+                    record =>
+                        record.ReferenceNo.Trim(),
+
+                    StringComparer
+                        .OrdinalIgnoreCase)
+
+                .Select(
+                    group =>
+                        group.First())
+
+                .ToList();
+
+
+        if (incoming.Count == 0)
         {
-            foreach (var record
-                in records)
-            {
-                var normalizedName =
-                    AmlNameNormalizer.Normalize(
-                        record.FullName);
+            return 0;
+        }
 
 
-                var namePrefix =
-                    AmlNameNormalizer.GetPrefix(
-                        record.FullName);
+        // -----------------------------------------------------
+        // GET EXISTING GLOBAL RECORDS
+        // -----------------------------------------------------
+
+        /*
+         * IgnoreQueryFilters is intentional.
+         *
+         * Normal AML query:
+         *
+         * PartnerId = CurrentPartner
+         * OR
+         * PartnerId IS NULL
+         *
+         * But during synchronization we need
+         * only the GLOBAL records belonging
+         * to this source.
+         */
+
+        var existing =
+            await _db
+                .AmlRecords
+
+                .IgnoreQueryFilters()
+
+                .Where(
+                    record =>
+                        record.IsGlobal == false
+
+                        &&
+
+                        record.SourceName ==
+                            sourceCode
+
+                        &&
+
+                        record.DeleteFg ==
+                            "N")
+
+                .ToListAsync(
+                    cancellationToken);
 
 
-                await connection.ExecuteAsync(
-                    // SQL validates GLOBAL scope and preserves existing record ownership.
-                    "dbo.spa_AML_Record_BulkInsert",
-                    new
-                    {
-                        record.RecordType,
-                        record.FullName,
-                        record.SourceName,
-                        record.DateOfBirth,
-                        record.Nationality,
-                        record.Remarks,
+        // -----------------------------------------------------
+        // EXISTING LOOKUP
+        // -----------------------------------------------------
+
+        var existingByReference =
+            existing
+
+                .GroupBy(
+                    record =>
                         record.ReferenceNo,
-                        record.Country,
 
-                        ClientId =
-                            _currentUser.ClientId,
+                    StringComparer
+                        .OrdinalIgnoreCase)
 
-                        OwnerUserId =
-                            _currentUser.UserId,
+                .ToDictionary(
+                    group =>
+                        group.Key,
 
-                        IsShared =
-                            true,
+                    group =>
+                        group.First(),
 
-                        RecordScope =
-                            "GLOBAL",
+                    StringComparer
+                        .OrdinalIgnoreCase);
 
-                        NormalizedName =
-                            normalizedName,
 
-                        NamePrefix =
-                            namePrefix,
+        var incomingReferences =
+            new HashSet<string>(
+                StringComparer
+                    .OrdinalIgnoreCase);
 
-                        CreatedBy =
-                            _currentUser.Username
-                    },
-                    transaction:
-                        transaction,
-                    commandType:
-                        CommandType.StoredProcedure);
+
+        // -----------------------------------------------------
+        // INSERT / UPDATE
+        // -----------------------------------------------------
+
+        foreach (var sourceRecord in incoming)
+        {
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+
+            var referenceNo =
+                sourceRecord
+                    .ReferenceNo
+                    .Trim();
+
+
+            incomingReferences.Add(
+                referenceNo);
+
+
+            var fullName =
+                sourceRecord
+                    .FullName
+                    .Trim();
+
+
+            var normalizedName =
+                AmlNameNormalizer
+                    .Normalize(
+                        fullName);
+
+
+            var namePrefix =
+                AmlNameNormalizer
+                    .GetPrefix(
+                        fullName);
+
+
+
+            // =================================================
+            // UPDATE EXISTING GLOBAL RECORD
+            // =================================================
+
+            if (existingByReference
+                .TryGetValue(
+                    referenceNo,
+                    out var existingRecord))
+            {
+                existingRecord.RecordType =
+                    NormalizeRequired(
+                        sourceRecord.RecordType,
+                        "UNKNOWN");
+
+
+                existingRecord.FullName =
+                    fullName;
+
+
+                existingRecord.DateOfBirth =
+                    sourceRecord.DateOfBirth;
+
+
+                existingRecord.Country =
+                    NullIfWhiteSpace(
+                        sourceRecord.Country);
+
+
+                existingRecord.Nationality =
+                    NullIfWhiteSpace(
+                        sourceRecord.Nationality);
+
+
+                /*
+                 * Always use the selected provider code.
+                 *
+                 * Do not trust SourceName coming
+                 * from XML/provider mapper.
+                 */
+
+                existingRecord.SourceName =
+                    sourceCode;
+
+
+                existingRecord.Remarks =
+                    NullIfWhiteSpace(
+                        sourceRecord.Remarks);
+
+
+                existingRecord.NormalizedName =
+                    normalizedName;
+
+
+                existingRecord.NamePrefix =
+                    namePrefix;
+
+
+                existingRecord.SourceUpdatedDate =
+                    sourceRecord
+                        .SourceUpdatedDate;
+
+
+                existingRecord.LastSyncDate =
+                    now;
+
+
+                existingRecord.IsActive =
+                    true;
+
+
+                existingRecord.UpdatedDate =
+                    now;
+
+
+                existingRecord.UpdatedBy =
+                    _currentUser.Username;
+
+
+                continue;
             }
 
 
-            transaction.Commit();
+            // =================================================
+            // INSERT NEW GLOBAL RECORD
+            // =================================================
+
+            var newRecord =
+                new AmlRecord
+                {
+                    /*
+                     * NULL means:
+                     * global UN/EU record.
+                     */
+
+                    PartnerId =_currentUser.PartnerId,
+
+                    BranchId =_currentUser.BranchId,
+                       
+
+
+                    /*
+                     * This is only audit information.
+                     *
+                     * It does NOT make the record
+                     * Partner-owned.
+                     */
+
+                    CreatedByUserId =
+                        _currentUser.UserId,
+
+
+                    RecordType =
+                        NormalizeRequired(
+                            sourceRecord.RecordType,
+                            "UNKNOWN"),
+
+
+                    FullName =
+                        fullName,
+
+
+                    DateOfBirth =
+                        sourceRecord.DateOfBirth,
+
+
+                    Country =
+                        NullIfWhiteSpace(
+                            sourceRecord.Country),
+
+
+                    Nationality =
+                        NullIfWhiteSpace(
+                            sourceRecord.Nationality),
+
+
+                    ReferenceNo =
+                        referenceNo,
+
+
+                    SourceName =
+                        sourceCode,
+
+
+                    Remarks =
+                        NullIfWhiteSpace(
+                            sourceRecord.Remarks),
+
+
+                    NormalizedName =
+                        normalizedName,
+
+
+                    NamePrefix =
+                        namePrefix,
+
+
+                    LastSyncDate =
+                        now,
+
+
+                    SourceUpdatedDate =
+                        sourceRecord
+                            .SourceUpdatedDate,
+
+
+                    IsActive =
+                        true,
+
+
+                    CreatedDate =
+                        now,
+
+
+                    CreatedBy =
+                        _currentUser.Username,
+                    IsGlobal=true,
+
+
+                    DeleteFg =
+                        "N"
+                };
+
+
+            _db.AmlRecords.Add(
+                newRecord);
         }
-        catch
+
+
+        // -----------------------------------------------------
+        // DEACTIVATE RECORDS REMOVED FROM SOURCE
+        // -----------------------------------------------------
+
+        /*
+         * Example:
+         *
+         * yesterday UN had:
+         *
+         * REF001
+         * REF002
+         * REF003
+         *
+         * today:
+         *
+         * REF001
+         * REF003
+         *
+         * REF002 is not physically deleted.
+         * It becomes inactive.
+         */
+
+        foreach (var existingRecord in existing)
         {
-            transaction.Rollback();
-            throw;
+            if (incomingReferences.Contains(
+                    existingRecord.ReferenceNo))
+            {
+                continue;
+            }
+
+
+            existingRecord.IsActive =
+                false;
+
+
+            existingRecord.LastSyncDate =
+                now;
+
+
+            existingRecord.UpdatedDate =
+                now;
+
+
+            existingRecord.UpdatedBy =
+                _currentUser.Username;
         }
+
+
+        // -----------------------------------------------------
+        // SAVE
+        // -----------------------------------------------------
+
+        await _db.SaveChangesAsync(
+            cancellationToken);
+
+
+        return incoming.Count;
+    }
+
+
+    // =========================================================
+    // AUTHENTICATION
+    // =========================================================
+
+    private void EnsureSignedIn()
+    {
+        if (!_currentUser.IsAuthenticated
+            ||
+            _currentUser.UserId <= 0)
+        {
+            throw new UnauthorizedAccessException(
+                "Login required.");
+        }
+    }
+
+
+    // =========================================================
+    // HELPERS
+    // =========================================================
+
+    private static string? NullIfWhiteSpace(
+        string? value)
+    {
+        return string.IsNullOrWhiteSpace(
+                value)
+
+            ? null
+
+            : value.Trim();
+    }
+
+
+    private static string NormalizeRequired(
+        string? value,
+        string defaultValue)
+    {
+        return string.IsNullOrWhiteSpace(
+                value)
+
+            ? defaultValue
+
+            : value.Trim();
     }
 }

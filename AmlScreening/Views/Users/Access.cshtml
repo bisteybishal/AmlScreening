@@ -3,92 +3,85 @@
 @{
     ViewData["Title"] = "Manage User Access";
     ViewData["WorkspaceKey"] = "Users";
-    ViewData["WorkspaceUrl"] = Url.Action("Index", "Users");
+    ViewData["WorkspaceUrl"] =
+        Url.Action("Index", "Users");
 
-    var userInitials = string.Join(
-        "",
-        (Model.FullName ?? string.Empty)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Take(2)
-            .Select(x => x[0].ToString()))
-        .ToUpperInvariant();
-
-    var permissionGroups =
-        Model.Permissions
-    .Where(x => !x.PermissionName.StartsWith("Platform.", StringComparison.OrdinalIgnoreCase))
-    .GroupBy(x => x.PermissionName.Split('.')[0]);
-
-    
-
-    string GetDisplayName(string key)
-    {
-        return key switch
-        {
-            "Users" => "User",
-            "AMLRecords" => "AML Records",
-            "ComplianceRules" => "Compliance",
-            "Screening" => "Screening",
-            "SearchScreening" => "Screening",
-            "RiskScoring" => "Risk Scoring",
-            "AmlSource" => "AML Source",
-            "AuditLogs" => "Audit Logs",
-            "Transactions" => "Transactions",
-            "Customers" => "Customers",
-            "Alerts" => "Alerts",
-            "Cases" => "Cases",
-            "Subscription" => "Subscription",
-            "Roles" => "Roles",
-            "Platform" => "Platform",
-            _ => key
-        };
-    }
-
-    string GetIcon(string key)
-    {
-        return key switch
-        {
-            "Users" => "bi-people",
-            "AMLRecords" => "bi-shield-check",
-            "ComplianceRules" => "bi-clipboard-check",
-            "Screening" => "bi-search",
-            "SearchScreening" => "bi-search",
-            "RiskScoring" => "bi-speedometer2",
-            "AmlSource" => "bi-database",
-            "AuditLogs" => "bi-journal-text",
-            "Transactions" => "bi-arrow-left-right",
-            "Customers" => "bi-person-vcard",
-            "Alerts" => "bi-bell",
-            "Cases" => "bi-folder2-open",
-            "Subscription" => "bi-credit-card",
-            "Roles" => "bi-person-lock",
-            "Platform" => "bi-lock",
-            _ => "bi-lock"
-        };
-    }
+    var userInitials =
+        string.IsNullOrWhiteSpace(Model.Username)
+            ? "U"
+            : Model.Username
+                .Substring(
+                    0,
+                    Math.Min(
+                        2,
+                        Model.Username.Length))
+                .ToUpperInvariant();
 }
 
+
 @section Styles {
+
     <link rel="stylesheet"
           href="~/css/users.css"
           asp-append-version="true" />
+
 }
 
 
 <section class="user-editor-heading">
 
     <a asp-action="Index">
+
         <i class="bi bi-arrow-left"></i>
+
         Back to Users
+
     </a>
 
-    <h1>Manage User Access</h1>
+
+    <h1>
+        Manage User Access
+    </h1>
+
 
     <p>
-        Manage roles and permissions for
-        <strong>@Model.FullName</strong>.
+
+        Assign one or more roles to
+
+        <strong>
+            @Model.Username
+        </strong>.
+
+        Permissions are inherited from
+        the selected roles.
+
     </p>
 
 </section>
+
+
+@if (TempData["SuccessMessage"] is string success)
+{
+    <div class="alert alert-success">
+
+        <i class="bi bi-check-circle me-2"></i>
+
+        @success
+
+    </div>
+}
+
+
+@if (TempData["ErrorMessage"] is string error)
+{
+    <div class="alert alert-danger">
+
+        <i class="bi bi-exclamation-triangle me-2"></i>
+
+        @error
+
+    </div>
+}
 
 
 <form asp-action="Access"
@@ -97,38 +90,72 @@
 
     @Html.AntiForgeryToken()
 
+
     <input asp-for="UserId"
            type="hidden" />
+
 
     <div asp-validation-summary="ModelOnly"
          class="users-validation">
     </div>
 
 
-    <!-- ===================================== -->
+    <!-- ====================================== -->
     <!-- USER SUMMARY -->
-    <!-- ===================================== -->
+    <!-- ====================================== -->
 
     <section class="access-user-summary">
 
         <div class="access-avatar">
+
             @userInitials
+
         </div>
+
 
         <div class="access-user-info">
 
             <h2>
-                @Model.FullName
+                @Model.Username
             </h2>
+
 
             <p>
 
-                @@@Model.Username
-
-                @if (!string.IsNullOrWhiteSpace(Model.RoleNames))
+                @if (!string.IsNullOrWhiteSpace(
+                    Model.PartnerName))
                 {
                     <span>
-                        · @Model.RoleNames
+                        @Model.PartnerName
+                    </span>
+                }
+
+
+                @if (!string.IsNullOrWhiteSpace(
+                    Model.BranchName))
+                {
+                    <span>
+                        · @Model.BranchName
+                    </span>
+                }
+
+            </p>
+
+
+            <p>
+
+                Status:
+
+                @if (Model.IsActive)
+                {
+                    <span class="badge bg-success">
+                        Active
+                    </span>
+                }
+                else
+                {
+                    <span class="badge bg-secondary">
+                        Inactive
                     </span>
                 }
 
@@ -139,76 +166,44 @@
     </section>
 
 
-    <!-- ===================================== -->
+    <!-- ====================================== -->
     <!-- INFORMATION -->
-    <!-- ===================================== -->
+    <!-- ====================================== -->
 
     <div class="access-help">
 
         <i class="bi bi-info-circle"></i>
 
+
         <span>
-            Roles provide default permissions.
-            You can also review and assign individual
-            module permissions below.
-            The user should sign in again after changes.
+
+            Permissions are configured on roles.
+
+            Select the roles this user should have.
+
+            After changing access, the user should
+            sign in again so the new permissions
+            are loaded.
+
         </span>
 
     </div>
 
 
-    <!-- ===================================== -->
-    <!-- ACCESS TABS -->
-    <!-- ===================================== -->
+    <!-- ====================================== -->
+    <!-- ROLES -->
+    <!-- ====================================== -->
 
-    <div class="access-module-tabs">
-
-        <button type="button"
-                class="access-module-tab active"
-                data-target="access-user">
-
-            <i class="bi bi-person-badge"></i>
-
-            <span>
-                User
-            </span>
-
-        </button>
-
-
-        @foreach (var group in permissionGroups)
-        {
-            var tabId =
-                $"access-{group.Key.ToLowerInvariant()}";
-
-            <button type="button"
-                    class="access-module-tab"
-                    data-target="@tabId">
-
-                <i class="bi @GetIcon(group.Key)"></i>
-
-                <span>
-                    @GetDisplayName(group.Key)
-                </span>
-
-            </button>
-        }
-
-    </div>
-
-
-    <!-- ===================================== -->
-    <!-- USER / ROLE TAB -->
-    <!-- ===================================== -->
-
-    <section id="access-user"
-             class="access-module-panel active">
+    <section class="access-module-panel active">
 
         <div class="access-panel-heading">
 
             <div class="access-panel-icon">
+
                 <i class="bi bi-person-badge"></i>
+
             </div>
+
 
             <div>
 
@@ -216,10 +211,12 @@
                     User Roles
                 </h2>
 
+
                 <p>
-                    Select one or more roles.
-                    Expand a role to see the permissions
-                    inherited from that role.
+
+                    Select one or more roles for
+                    this user.
+
                 </p>
 
             </div>
@@ -232,259 +229,87 @@
         </span>
 
 
-        @foreach (var role in Model.RoleAccess)
+        @if (Model.Roles.Count == 0)
         {
-            var panelId =
-                $"role-panel-{role.RoleId}";
+            <div class="role-access-empty">
 
-            <article class="role-access-card">
+                <i class="bi bi-info-circle"></i>
 
-                <div class="role-access-header">
+                <span>
+                    No active roles are available.
+                </span>
 
-                    <label class="role-access-select">
+            </div>
+        }
+        else
+        {
+            <div class="role-access-list">
 
-                        <input type="checkbox"
-                               name="SelectedRoleIds"
-                               value="@role.RoleId"
-                               checked="@Model.SelectedRoleIds.Contains(role.RoleId)" />
-
-                        <span class="role-access-check">
-                            <i class="bi bi-check"></i>
-                        </span>
-
-                        <div class="role-access-name">
-
-                            <strong>
-                                @role.RoleName
-                            </strong>
-
-                            <small>
-                                @role.Permissions.Count
-                                permission@(role.Permissions.Count == 1 ? "" : "s")
-                            </small>
-
-                        </div>
-
-                    </label>
+                @foreach (var role in Model.Roles)
+                {
+                    var selected =
+                        Model.SelectedRoleIds
+                            .Contains(
+                                role.RoleId);
 
 
-                    <button type="button"
-                            class="role-access-toggle"
-                            data-target="@panelId"
-                            aria-expanded="false"
-                            aria-controls="@panelId">
+                    <article class="role-access-card">
 
-                        <i class="bi bi-chevron-down"></i>
+                        <div class="role-access-header">
 
-                    </button>
+                            <label class="role-access-select">
 
-                </div>
+                                <input type="checkbox"
+                                       name="SelectedRoleIds"
+                                       value="@role.RoleId"
+                                       checked="@selected" />
 
 
-                <div id="@panelId"
-                     class="role-access-permissions">
+                                <span class="role-access-check">
 
-                    @if (role.Permissions.Count == 0)
-                    {
-                        <div class="role-access-empty">
+                                    <i class="bi bi-check"></i>
 
-                            <i class="bi bi-info-circle"></i>
+                                </span>
 
-                            <span>
-                                No permissions assigned
-                                to this role.
-                            </span>
 
-                        </div>
-                    }
-                    else
-                    {
-                        @foreach (
-    var group in role.Permissions
-        .Where(x =>
-            !x.PermissionName.StartsWith(
-                "Platform.",
-                StringComparison.OrdinalIgnoreCase))
-        .GroupBy(
-            x =>
-                x.PermissionName
-                    .Split('.')[0])
-        .OrderBy(x => x.Key))
-                        {
-                            <div class="role-permission-group">
-
-                                <div class="role-permission-group-title">
-
-                                    <i class="bi @GetIcon(group.Key)">
-                                    </i>
+                                <div class="role-access-name">
 
                                     <strong>
-                                        @GetDisplayName(group.Key)
+                                        @role.RoleName
                                     </strong>
 
-                                </div>
 
-
-                                <div class="role-permission-list">
-
-                                    @foreach (
-                                        var permission in
-                                        group.OrderBy(
-                                            x => x.PermissionName))
+                                    @if (selected)
                                     {
-                                        var actionName =
-                                            permission.PermissionName
-                                                .Split('.')
-                                                .Last();
-
-                                        <div class="role-permission-item">
-
-                                            <span class="role-permission-icon">
-
-                                                <i class="bi bi-check2"></i>
-
-                                            </span>
-
-                                            <div>
-
-                                                <strong>
-                                                    @actionName
-                                                </strong>
-
-                                                @if (
-                                                    !string.IsNullOrWhiteSpace(
-                                                        permission.Description))
-                                                {
-                                                    <small>
-                                                        @permission.Description
-                                                    </small>
-                                                }
-
-                                            </div>
-
-                                        </div>
+                                        <small>
+                                            Currently assigned
+                                        </small>
+                                    }
+                                    else
+                                    {
+                                        <small>
+                                            Not assigned
+                                        </small>
                                     }
 
                                 </div>
 
-                            </div>
-                        }
-                    }
+                            </label>
 
-                </div>
+                        </div>
 
-            </article>
+                    </article>
+                }
+
+            </div>
         }
 
     </section>
 
 
-    <!-- ===================================== -->
-    <!-- MODULE PERMISSION PANELS -->
-    <!-- ===================================== -->
-    @foreach (var group in permissionGroups)
-    {
-        var panelId =
-            $"access-{group.Key.ToLowerInvariant()}";
-
-        <section id="@panelId"
-                 class="access-module-panel">
-
-            <div class="access-panel-heading">
-
-                <div class="access-panel-icon">
-
-                    <i class="bi @GetIcon(group.Key)">
-                    </i>
-
-                </div>
-
-                <div>
-
-                    <h2>
-                        @GetDisplayName(group.Key)
-                    </h2>
-
-                    <p>
-                        @group.Count()
-                        permission@(group.Count() == 1 ? "" : "s")
-                    </p>
-
-                </div>
-
-            </div>
-
-
-            <div class="module-permission-list">
-
-                @foreach (
-                    var permission in
-                    group.OrderBy(
-                        x => x.PermissionName))
-                {
-                    var actionName =
-                        permission.PermissionName
-                            .Split('.')
-                            .Last();
-
-                    <label class="module-permission-item">
-
-                        <input type="checkbox"
-                               name="SelectedPermissionIds"
-                               value="@permission.PermissionId"
-                               checked="@permission.IsSelected" />
-
-                        <span class="module-permission-checkbox">
-
-                            <i class="bi bi-check"></i>
-
-                        </span>
-
-                        <div class="module-permission-copy">
-
-                            <strong>
-                                @actionName
-                            </strong>
-
-                            @if (
-                                !string.IsNullOrWhiteSpace(
-                                    permission.Description))
-                            {
-                                <small>
-                                    @permission.Description
-                                </small>
-                            }
-
-                            <span class="
-                                permission-source
-                                @(permission.HasOverride
-                                        ? "override"
-                                        : "inherited")">
-
-                                @(
-                                    permission.HasOverride
-                                        ? "Individual permission"
-                                        : permission.IsRoleGranted
-                                            ? "Inherited from role"
-                                            : "Not granted by role"
-                                )
-
-                            </span>
-
-                        </div>
-
-                    </label>
-                }
-
-            </div>
-
-        </section>
-    }
-
-
-    <!-- ===================================== -->
+    <!-- ====================================== -->
     <!-- ACTIONS -->
-    <!-- ===================================== -->
+    <!-- ====================================== -->
 
     <div class="user-editor-actions">
 
@@ -494,6 +319,7 @@
             Cancel
 
         </a>
+
 
         <button class="users-primary-button"
                 type="submit">
@@ -507,110 +333,3 @@
     </div>
 
 </form>
-
-
-@section Scripts {
-
-    <script>
-
-        // =====================================
-        // MODULE TABS
-        // =====================================
-
-        document
-            .querySelectorAll(".access-module-tab")
-            .forEach(tab => {
-
-                tab.addEventListener(
-                    "click",
-                    function () {
-
-                        const target =
-                            this.dataset.target;
-
-                        document
-                            .querySelectorAll(
-                                ".access-module-tab")
-                            .forEach(item => {
-
-                                item.classList.remove(
-                                    "active");
-
-                            });
-
-                        document
-                            .querySelectorAll(
-                                ".access-module-panel")
-                            .forEach(panel => {
-
-                                panel.classList.remove(
-                                    "active");
-
-                            });
-
-                        this.classList.add(
-                            "active");
-
-                        document
-                            .getElementById(target)
-                            ?.classList.add(
-                                "active");
-
-                    });
-
-            });
-
-
-        // =====================================
-        // ROLE ACCORDION
-        // =====================================
-
-        document
-            .querySelectorAll(
-                ".role-access-toggle")
-            .forEach(button => {
-
-                button.addEventListener(
-                    "click",
-                    function () {
-
-                        const targetId =
-                            this.dataset.target;
-
-                        const panel =
-                            document.getElementById(
-                                targetId);
-
-                        if (!panel) {
-                            return;
-                        }
-
-                        const opened =
-                            panel.classList.toggle(
-                                "open");
-
-                        const icon =
-                            this.querySelector("i");
-
-                        this.setAttribute(
-                            "aria-expanded",
-                            opened
-                                ? "true"
-                                : "false");
-
-                        if (icon) {
-
-                            icon.className =
-                                opened
-                                    ? "bi bi-chevron-up"
-                                    : "bi bi-chevron-down";
-
-                        }
-
-                    });
-
-            });
-
-    </script>
-
-}

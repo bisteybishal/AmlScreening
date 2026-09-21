@@ -1,9 +1,7 @@
 using AmlScreening.Application.Models;
-using AmlScreening.Application.Security;
 using AmlScreening.Domain.Common;
 using AmlScreening.Domain.Entities.Compliance;
 using Microsoft.EntityFrameworkCore;
-using System.Runtime.CompilerServices;
 
 namespace AmlScreening.Infrastructure.Services;
 
@@ -19,7 +17,7 @@ public sealed partial class RiskScoringService
                     throw new RiskConfigurationException("Reload the initial range form.");
                 var initial = ranges.Select(x => new RiskBand
                 {
-                    ClientId = _currentUser.ClientId,
+                    PartnerId = _currentUser.PartnerId,
                     BandVersion = 1,
                     RiskLevel = x.RiskLevel.Trim().ToUpperInvariant(),
                     MinimumScore = x.MinimumScore,
@@ -84,12 +82,12 @@ public sealed partial class RiskScoringService
 
     // One SQL transaction saves both the change and its audit record.
     // The transaction-owned lock prevents two editors creating competing drafts.
-    private async Task ChangeConfigurationAsync(Func<Task> change, CancellationToken ct, string requiredPermission = AppPermissions.RiskScoringManage)
+    private async Task ChangeConfigurationAsync(Func<Task> change, CancellationToken ct, string requiredPermission = AppPermissions.Risk.Manage)
     {
         EnsureConfigurationAccess(requiredPermission);
 
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
-        var resource = $"AML-RiskConfiguration-{_currentUser.ClientId}";
+        var resource = $"AML-RiskConfiguration-{_currentUser.PartnerId}";
         await _db.Database.ExecuteSqlInterpolatedAsync($"""
             DECLARE @result int;
             EXEC @result = sys.sp_getapplock @Resource={resource},
@@ -112,7 +110,7 @@ public sealed partial class RiskScoringService
     private void EnsureConfigurationAccess(string permission)
     {
         if (!_currentUser.IsAuthenticated ||
-            _currentUser.ClientId <= 0 ||
+            _currentUser.PartnerId <= 0 ||
             _currentUser.UserId <= 0 ||
             !_currentUser.HasPermission(permission))
             throw new RiskConfigurationException(
@@ -121,14 +119,14 @@ public sealed partial class RiskScoringService
 
     private IQueryable<RiskFactorRule> RuleHistory() => _db.RiskFactorRules
         .IgnoreQueryFilters(["SoftDeleteFilter"])
-        .Where(x => x.ClientId == _currentUser.ClientId);
+        .Where(x => x.PartnerId == _currentUser.PartnerId);
 
     private IQueryable<RiskBand> BandHistory() => _db.RiskBands
         .IgnoreQueryFilters(["SoftDeleteFilter"])
-        .Where(x => x.ClientId == _currentUser.ClientId);
+        .Where(x => x.PartnerId == _currentUser.PartnerId);
 
     private IQueryable<RiskModel> ModelHistory() => _db.RiskModels.IgnoreQueryFilters(["SoftDeleteFilter"])
-        .Where(x => x.ClientId == _currentUser.ClientId);
+        .Where(x => x.PartnerId == _currentUser.PartnerId);
 
     private static void CheckToken(BaseEntity entity, byte[] token)
     {
@@ -176,7 +174,7 @@ public sealed partial class RiskScoringService
 
         var copy = new RiskFactorRule
         {
-            ClientId = _currentUser.ClientId,
+            PartnerId = _currentUser.PartnerId,
             RiskFactorId = factorId,
             ReplacesRuleId = target.Id,
             ValueCode = target.ValueCode,
@@ -200,7 +198,7 @@ public sealed partial class RiskScoringService
         ChangeConfigurationAsync(async () =>
         {
             var factor = await _db.RiskFactors.SingleOrDefaultAsync(x =>
-                x.ClientId == _currentUser.ClientId && x.IsActive && x.FactorCode == input.FactorCode, cancellationToken)
+                x.PartnerId == _currentUser.PartnerId && x.IsActive && x.FactorCode == input.FactorCode, cancellationToken)
                 ?? throw new RiskConfigurationException("Select an existing risk factor.");
             if (input.Id < 0 || input.Score is < 0 or > 100 || input.Remarks?.Length > 1000 || input.ValueName?.Length > 200)
                 throw new RiskConfigurationException("Enter a score from 0 to 100 and keep the description within its limit.");
@@ -225,7 +223,7 @@ public sealed partial class RiskScoringService
                 throw new RiskConfigurationException("This value code already exists in the draft.");
             var row = draft.Target ?? new RiskFactorRule
             {
-                ClientId = _currentUser.ClientId,
+                PartnerId = _currentUser.PartnerId,
                 RiskFactorId = factor.Id,
                 RuleVersion = draft.Version,
                 CreatedBy = _currentUser.Username,
@@ -250,7 +248,7 @@ public sealed partial class RiskScoringService
         ChangeConfigurationAsync(async () =>
         {
             var original = await _db.RiskFactorRules.FirstOrDefaultAsync(x =>
-                x.Id == id && x.ClientId == _currentUser.ClientId, cancellationToken)
+                x.Id == id && x.PartnerId == _currentUser.PartnerId, cancellationToken)
                 ?? throw new RiskConfigurationException("Risk score was not found.");
             var draft = await RuleDraftAsync(original.RiskFactorId, id, rowVersion, cancellationToken);
             SoftDelete(draft.Target!);
@@ -309,7 +307,7 @@ public sealed partial class RiskScoringService
         {
             var copy = new RiskBand
             {
-                ClientId = _currentUser.ClientId,
+                PartnerId = _currentUser.PartnerId,
                 RiskLevel = row.RiskLevel,
                 MinimumScore = row.MinimumScore,
                 MaximumScore = row.MaximumScore,
@@ -341,7 +339,7 @@ public sealed partial class RiskScoringService
                 throw new RiskConfigurationException("This risk level already exists in the draft.");
             var row = draft.Target ?? new RiskBand
             {
-                ClientId = _currentUser.ClientId,
+                PartnerId = _currentUser.PartnerId,
                 BandVersion = draft.Version,
                 CreatedBy = _currentUser.Username,
                 MakerUserId = _currentUser.UserId,
@@ -481,8 +479,8 @@ public sealed partial class RiskScoringService
 
                 model = new RiskModel
                 {
-                    ClientId =
-                        _currentUser.ClientId,
+                    PartnerId =
+                        _currentUser.PartnerId,
 
                     ModelCode =
                         "AML-RISK",

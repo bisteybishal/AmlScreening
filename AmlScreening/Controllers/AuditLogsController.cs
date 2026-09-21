@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AmlScreening.Portal.Controllers;
 
-[Authorize(Policy = AppPermissions.AuditLogsView)]
+[Authorize(Policy = AppPermissions.Audit.View)]
 public sealed class AuditLogsController : Controller
 {
     private readonly IAuditService _auditService;

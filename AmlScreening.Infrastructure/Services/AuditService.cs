@@ -35,7 +35,7 @@ public sealed class AuditService : IAuditService
             sql,
             new
             {
-                ClientId = _currentUser.ClientId,
+                PartnerId = _currentUser.PartnerId,
                 UserId = _currentUser.UserId,
                 Username = _currentUser.Username,
                 auditEvent.Action,
@@ -65,8 +65,8 @@ public sealed class AuditService : IAuditService
             new
             {
                 MaximumRecords = Math.Clamp(maximumRecords, 1, 1000),
-                ClientId = _currentUser.ClientId,
-                CanViewAll = _currentUser.HasPermission(AppPermissions.PlatformCrossClientAccess)
+                PartnerId = _currentUser.PartnerId,
+                CanViewAll = _currentUser.HasPermission(AppPermissions.Portal.Access)
             },
             cancellationToken: cancellationToken));
         return records.AsList();

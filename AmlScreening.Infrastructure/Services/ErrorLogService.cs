@@ -2,7 +2,7 @@
 using AmlScreening.Application.Interface.Services;
 using AmlScreening.Application.Models;
 using Microsoft.AspNetCore.Http;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using System.Security.Claims;
 
 namespace AmlScreening.Portal.Services

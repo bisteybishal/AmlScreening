@@ -10,7 +10,7 @@
 
 <section class="subscription-heading">
     <div><h1>Subscription Plans</h1><p>@Model.TotalRecords available plan@(Model.TotalRecords == 1 ? "" : "s")</p></div>
-    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.SubscriptionCreate))
+    @if (User.HasClaim(AppPermissions.ClaimType, AppPermissions.Subscription.Manage))
     {
         <a class="records-primary-button" asp-action="Add"><i class="bi bi-plus-lg"></i> Add Subscription</a>
     }
@@ -153,7 +153,7 @@ else
 
                     @if (User.HasClaim(
                         AppPermissions.ClaimType,
-                        AppPermissions.SubscriptionEdit))
+                        AppPermissions.Subscription.Manage))
                     {
                         <a class="action-button edit"
                            asp-action="Edit"
@@ -168,7 +168,7 @@ else
 
                     @if (User.HasClaim(
                         AppPermissions.ClaimType,
-                        AppPermissions.SubscriptionDelete))
+                        AppPermissions.Subscription.Manage))
                     {
                         <form asp-action="Delete"
                               method="post"

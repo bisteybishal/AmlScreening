@@ -7,26 +7,31 @@ public interface IUserRepository
 {
     //partner
 
-    Task<IReadOnlyList<PartnerOption>>
-       GetActivePartnersAsync();
+    Task<PartnerPageResult> GetPartnersAsync(int pageNumber, int pageSize);
+    Task<IReadOnlyList<PartnerOption>> GetActivePartnersAsync();
 
-    Task<bool> PartnerCodeExistsAsync(
-        string partnerCode);
+    Task<Partner?> GetPartnerByIdAsync(int partnerId);
 
-    Task<int> CreatePartnerAsync(
-        Partner partner);
+    Task<bool> PartnerCodeExistsAsync(string partnerCode);
+    Task<bool> PartnerCodeExistsAsync(string partnercode, int excludepartnerId);
+
+    Task<int> CreatePartnerAsync(Partner partner);
+
+    Task<bool> UpdatePartnerAsync(Partner partner);
+
     //Branch
 
-    Task<IReadOnlyList<BranchOption>>
-        GetActiveBranchesAsync(
-            int partnerId);
+    Task<IReadOnlyList<BranchOption>> GetActiveBranchesAsync(int partnerId);
 
-    Task<bool> BranchNameExistsAsync(
-        int partnerId,
-        string branchName);
+    Task<IReadOnlyList<BranchListItem>> GetBranchesByPartnerAsync(int partnerid);
+    Task<PartnerBranch> GetBranchByIdAsync(int branchId);
+    Task<bool> BranchNameExistsAsync(int partnerId,string branchName);
+    Task<bool> BranchNameExistsAsync(int partnerId, string branchName,int excludePartnerid);
 
-    Task<int> CreateBranchAsync(
-        PartnerBranch branch);
+    Task<int> CreateBranchAsync(PartnerBranch branch);
+
+    Task<bool> UpdateBranchAsync(PartnerBranch branch);
+   
 
 
     //user
@@ -44,5 +49,24 @@ public interface IUserRepository
 
     Task<long> CreateAsync(
         User user,
+        IReadOnlyCollection<int> roleIds);
+
+    // =========================================================
+    // USER ACCESS
+    // =========================================================
+
+    Task<UserAccessInfo?>
+        GetAccessAsync(
+            long userId);
+
+
+    Task<IReadOnlyList<int>>
+        GetUserRoleIdsAsync(
+            long userId);
+
+
+    Task UpdateAccessAsync(
+        long userId,
+        bool isActive,
         IReadOnlyCollection<int> roleIds);
 }

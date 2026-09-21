@@ -4,6 +4,6 @@ namespace AmlScreening.Application.Interface.Provider
 {
     public interface IAmlImportRepository
     {
-        Task SaveAsync(IEnumerable<AmlRecord> records);
+        Task<int> SaveAsync(string sourceCode,IReadOnlyList<AmlRecord> records,CancellationToken cancellation=default);
     }
 }

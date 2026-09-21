@@ -1,31 +1,30 @@
-﻿using AmlScreening.Application.Interface.Provider;
-using AmlScreening.Application.Security;
-using AmlScreening.Application.Interface;
+﻿using AmlScreening.Application.Interface;
+using AmlScreening.Application.Interface.Provider;
+using AmlScreening.Application.Interface.Repositories;
+using AmlScreening.Application.Interface.Services;
 using AmlScreening.Application.Models;
+using AmlScreening.Application.Security;
+using AmlScreening.Application.Services;
+using AmlScreening.Portal.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using AmlScreening.Application.Interface.Repositories;
+using System.Security.Claims;
 
 namespace AmlScreening.Portal.Controllers
 {
 
-    [Authorize(Policy = AppPermissions.AmlSourceView)]
+    [Authorize(Policy = AppPermissions.AmlSource.View)]
     public sealed class AmlSourceController : Controller
     {
-        private readonly IAmlSourceSyncService _amlSyncService;
-        private readonly IAuditService _auditService;
-        private readonly ILogger<AmlSourceController> _logger;
-        private readonly IErrorRepository _errorRepository;
+        private readonly IAmlSourceSyncService _amlSourceSyncService;
+        private readonly IErrorLogService _errorLogService;
 
         public AmlSourceController(
-            IAmlSourceSyncService amlSyncService,
-            IAuditService auditService,
-            ILogger<AmlSourceController> logger, IErrorRepository errorRepository)
+            IAmlSourceSyncService amlSourceSyncService,
+            IErrorLogService errorLogService)
         {
-            _amlSyncService = amlSyncService;
-            _auditService = auditService;
-            _logger = logger;
-            _errorRepository = errorRepository;
+            _amlSourceSyncService = amlSourceSyncService;
+            _errorLogService = errorLogService;
         }
 
         [HttpGet]
@@ -35,73 +34,80 @@ namespace AmlScreening.Portal.Controllers
         }
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Policy = AppPermissions.AmlSourceSync)]
-        public async Task<IActionResult> Sync(string? sourceCode, CancellationToken cancellationToken)
+        [Authorize(Policy = AppPermissions.AmlSource.Sync)]
+        public async Task<IActionResult> Sync(
+        string? sourceCode,
+        CancellationToken cancellationToken = default)
         {
-            var normalizedSourceCode = sourceCode?.Trim().ToUpperInvariant();
-            if (normalizedSourceCode is not ("UN" or "EU"))
+            var normalizedSourceCode =
+                sourceCode?
+                    .Trim()
+                    .ToUpperInvariant()
+                ?? string.Empty;
+
+
+            if (normalizedSourceCode
+                is not ("UN" or "EU"))
             {
-                TempData["ErrorMessage"] = "The selected AML source is invalid.";
-                return RedirectToAction(nameof(Index));
+                TempData["ErrorMessage"] =
+                    "The selected AML source is invalid.";
+
+                return RedirectToAction(
+                    nameof(Index));
             }
+
 
             try
             {
-                var count = await _amlSyncService.SyncAsync(normalizedSourceCode);
+                var count =
+                    await _amlSourceSyncService
+                        .SyncAsync(
+                            normalizedSourceCode,
+                            cancellationToken);
+
+
                 TempData["SuccessMessage"] =
                     $"{count:N0} {normalizedSourceCode} record(s) synchronized successfully.";
-
-                await TryWriteAuditAsync(
-                    new AuditEvent(
-                        "Synchronize",
-                        "AmlSource",
-                        normalizedSourceCode,
-                        $"Synchronized {count} record(s)."),
-                    cancellationToken);
+            }
+            catch (OperationCanceledException)
+                when (
+                    cancellationToken
+                        .IsCancellationRequested)
+            {
+                TempData["ErrorMessage"] =
+                    "AML source synchronization was cancelled.";
             }
             catch (Exception ex)
             {
-                var errorLog = new ErrorLogModel
-                {
-                    ErrorDescription = $"{ex.GetType().Name}; TraceId: {HttpContext.TraceIdentifier}",
-                    PartnerCode = normalizedSourceCode,
-                    ErrorNumber = ex.HResult.ToString(),
-                    Script = "AmlSourceController.Sync",
-                    ErrorScript = ex.StackTrace ?? string.Empty,
-                    QueryString = null,
-                    IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
-                };
-                _logger.LogError(ex, "AML source synchronization failed. TraceId {TraceId}.", HttpContext.TraceIdentifier);
-                try
-                {
-                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-                    await _errorRepository.LogErrorAsync(errorLog, timeout.Token);
-                }
-                catch (Exception loggingError)
-                {
-                    _logger.LogError(loggingError, "Database error logging failed. TraceId {TraceId}.", HttpContext.TraceIdentifier);
-                }
-                
+                var errorId =
+                    await LogErrorAsync(
+                        ex,
+                        nameof(Sync));
+
+
                 TempData["ErrorMessage"] =
-                    $"Synchronization could not be completed. Reference: {HttpContext.TraceIdentifier}.";
+                    errorId.HasValue
+                        ? $"AML source synchronization failed. Error reference: {errorId}"
+                        : "AML source synchronization failed.";
             }
 
-            return RedirectToAction(nameof(Index));
+
+            return RedirectToAction(
+                nameof(Index));
         }
 
-        private async Task TryWriteAuditAsync(
-            AuditEvent auditEvent,
-            CancellationToken cancellationToken)
+      
+        private Task<long?> LogErrorAsync(
+        Exception exception,
+        string action)
         {
-            try
-            {
-                await _auditService.WriteAsync(auditEvent, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex,
-                    "AML source synchronization succeeded, but its audit entry could not be written.");
-            }
+            return _errorLogService
+                .LogAsync(
+                    exception,
+                    nameof(AmlSourceController),
+                    action,
+                    User.FindFirstValue(
+                        AppClaimTypes.PartnerCode));
         }
 
     }

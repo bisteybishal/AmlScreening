@@ -1,18 +1,13 @@
 @model AmlScreening.Portal.ViewModels.UsersPageViewModel
 
 @{
-    ViewData["Title"] = "Users";
+    ViewData["Title"] = "User Management";
     ViewData["WorkspaceKey"] = "Users";
-
     ViewData["WorkspaceUrl"] =
         Url.Action("Index", "Users");
 }
 
 @section Styles {
-    <link rel="stylesheet"
-          href="~/css/aml-records.css"
-          asp-append-version="true" />
-
     <link rel="stylesheet"
           href="~/css/users.css"
           asp-append-version="true" />
@@ -24,256 +19,245 @@
         <h1>User Management</h1>
 
         <p>
-            Create accounts and review access
-            to the AML screening portal.
+            Manage partners, branches and portal users.
         </p>
     </div>
 
-    @if (User.HasClaim(
-            AppPermissions.ClaimType,
-            AppPermissions.UsersCreate))
-    {
-        <a class="users-primary-button"
-           asp-action="Create">
 
-            <i class="bi bi-person-plus"></i>
-            Add User
+    <a asp-action="CreatePartner"
+       class="users-primary-button">
 
-        </a>
-    }
+        <i class="bi bi-building-add"></i>
+
+        Add Partner
+    </a>
 
 </section>
 
 
-@if (TempData["SuccessMessage"] is string message)
+@if (TempData["SuccessMessage"] is string success)
 {
-    <div class="users-alert">
-
-        <i class="bi bi-check-circle-fill"></i>
-
-        @message
-
+    <div class="alert alert-success">
+        @success
     </div>
 }
-
-
-@if (TempData["ErrorMessage"] is string errorMessage)
-{
-    <div class="users-alert error"
-         role="alert">
-
-        <i class="bi bi-exclamation-triangle-fill"></i>
-
-        @errorMessage
-
-    </div>
-}
-
 
 @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
 {
-    <div class="users-alert error"
-         role="alert">
-
-        <i class="bi bi-exclamation-triangle-fill"></i>
-
+    <div class="alert alert-danger">
         @Model.ErrorMessage
-
     </div>
 }
 
 
-<section class="users-summary"
-         aria-label="User summary">
+<div class="row g-3 mb-3">
 
-    <article>
+    <div class="col-md-3">
 
-        <span class="teal">
-            <i class="bi bi-people"></i>
-        </span>
+        <div class="card h-100">
+            <div class="card-body">
 
-        <div>
-            <small>Total Users</small>
-            <strong>@Model.TotalUsers</strong>
+                <small class="text-muted">
+                    Total Partners
+                </small>
+
+                <h3 class="mb-0">
+                    @Model.TotalPartners
+                </h3>
+
+            </div>
         </div>
 
-    </article>
+    </div>
 
 
-    <article>
+    <div class="col-md-3">
 
-        <span class="green">
-            <i class="bi bi-person-check"></i>
-        </span>
+        <div class="card h-100">
+            <div class="card-body">
 
-        <div>
-            <small>Active Users</small>
-            <strong>@Model.ActiveUsers</strong>
+                <small class="text-muted">
+                    Active Partners
+                </small>
+
+                <h3 class="mb-0">
+                    @Model.ActivePartners
+                </h3>
+
+            </div>
         </div>
 
-    </article>
+    </div>
 
 
-    <article>
+    <div class="col-md-3">
 
-        <span class="gray">
-            <i class="bi bi-person-dash"></i>
-        </span>
+        <div class="card h-100">
+            <div class="card-body">
 
-        <div>
-            <small>Inactive Users</small>
-            <strong>@Model.InactiveUsers</strong>
+                <small class="text-muted">
+                    Inactive Partners
+                </small>
+
+                <h3 class="mb-0">
+                    @Model.IActivePartners
+                </h3>
+
+            </div>
         </div>
 
-    </article>
+    </div>
 
 
-    <article>
+    <div class="col-md-3">
 
-        <span class="blue">
-            <i class="bi bi-shield-lock"></i>
-        </span>
+        <div class="card h-100">
+            <div class="card-body">
 
-        <div>
-            <small>Administrators</small>
-            <strong>@Model.Administrators</strong>
+                <small class="text-muted">
+                    Total Users
+                </small>
+
+                <h3 class="mb-0">
+                    @Model.TotalUsers
+                </h3>
+
+            </div>
         </div>
 
-    </article>
+    </div>
 
-</section>
+</div>
 
 
-<section class="users-panel">
+<section class="card">
 
-    <div class="users-panel-title">
+    <div class="card-header bg-white">
 
-        <div>
-            <h2>Portal users</h2>
+        <h5 class="mb-1">
+            Partners
+        </h5>
 
-            <p>
-                Accounts currently registered in the system.
-            </p>
-        </div>
-
-        <span>
-            @Model.TotalUsers
-            user@(Model.TotalUsers == 1 ? "" : "s")
-        </span>
+        <small class="text-muted">
+            Click Partner ID or Partner Name to edit.
+        </small>
 
     </div>
 
 
     <div class="table-responsive">
 
-        <table class="users-table">
+        <table class="table table-hover align-middle mb-0">
 
-            <thead>
+            <thead class="table-light">
+
                 <tr>
-                    <th>Sno</th>
-                    <th>User</th>
-                    <th>Username</th>
-                    <th>Roles</th>
+                    <th>SNo</th>
+                    <th>ID</th>
+                    <th>Partner Name</th>
+                    <th>Address</th>
+                    <th>Email</th>
+                    <th>Phone Number</th>
+                    <th>Country</th>
                     <th>Status</th>
-                    <th>Last Login</th>
                     <th>Created</th>
+                    <th>Action</th>
                 </tr>
+
             </thead>
 
             <tbody>
 
-                @if (Model.Users.Count == 0)
+                @if (Model.Partners.Count == 0)
                 {
                     <tr>
+                        <td colspan="9"
+                            class="text-center py-5">
 
-                        <td colspan="7">
-
-                            <div class="users-empty">
-
-                                <i class="bi bi-people"></i>
-
-                                <strong>
-                                    No users found
-                                </strong>
-
-                                <span>
-                                    Create the first portal user.
-                                </span>
-
-                            </div>
+                            No partners found.
 
                         </td>
-
                     </tr>
                 }
                 else
                 {
-                    @for (int i = 0;
-                          i < Model.Users.Count;
+                    @for (var i = 0;
+                          i < Model.Partners.Count;
                           i++)
                     {
-                        var user = Model.Users[i];
+                        var partner =
+                            Model.Partners[i];
+
+                        var sno =
+                            ((Model.Page - 1)
+                                * Model.PageSize)
+                            + i
+                            + 1;
 
                         <tr>
 
                             <td>
-                                @(
-                                    ((Model.Page - 1)
-                                    * Model.PageSize)
-                                    + i + 1
-                                )
+                                @sno
                             </td>
 
 
                             <td>
 
-                                <div class="users-person">
+                                <a asp-action="EditPartner"
+                                   asp-route-partnerId="@partner.PartnerId"
+                                   class="fw-semibold text-decoration-none">
 
-                                    @if (
-                                        User.HasClaim(
-                                            AppPermissions.ClaimType,
-                                            AppPermissions.RolesManage)
-                                        &&
-                                        !user.HasAdminRole)
-                                    {
-                                        <a class="user-permission-link"
-                                           asp-action="Access"
-                                           asp-route-id="@user.UserId">
+                                    @partner.PartnerId
 
-                                            @user.FullName
-
-                                        </a>
-                                    }
-                                    else
-                                    {
-                                        <strong>
-                                            @user.FullName
-                                        </strong>
-                                    }
-
-                                </div>
+                                </a>
 
                             </td>
 
 
                             <td>
-                                @user.Username
+
+                                <a asp-action="EditPartner"
+                                   asp-route-partnerId="@partner.PartnerId"
+                                   class="fw-semibold text-decoration-none">
+
+                                    @partner.PartnerName
+
+                                </a>
+
+                            </td>
+
+
+                            <td>
+                                @partner.Address
+                            </td>
+
+
+                            <td>
+                                @partner.Email
+                            </td>
+
+
+                            <td>
+                                @partner.PhoneNumber
+                            </td>
+
+                            <td>
+                                @partner.Country
                             </td>
 
 
                             <td>
 
-                                @if (!string.IsNullOrWhiteSpace(
-                                        user.RoleName))
+                                @if (partner.IsActive)
                                 {
-                                    <span class="users-role">
-                                        @user.RoleName
+                                    <span class="badge bg-success">
+                                        Active
                                     </span>
                                 }
                                 else
                                 {
-                                    <span class="text-muted">
-                                        No role
+                                    <span class="badge bg-secondary">
+                                        Inactive
                                     </span>
                                 }
 
@@ -281,41 +265,22 @@
 
 
                             <td>
-
-                                <span class="
-                                    users-status
-                                    @(user.IsActive
-                                          ? "active"
-                                          : "inactive")">
-
-                                    <i></i>
-
-                                    @(user.IsActive
-                                        ? "Active"
-                                        : "Inactive")
-
-                                </span>
-
+                                @partner.CreatedDate.ToString(
+                                    "dd MMM yyyy")
                             </td>
 
 
                             <td>
 
-                                @(
-                                    user.LastLoginDate?
-                                        .ToString(
-                                            "dd MMM yyyy, hh:mm tt")
-                                    ?? "Never"
-                                )
+                                <a asp-action="PartnerBranchesDetail"
+                                   asp-route-partnerId="@partner.PartnerId"
+                                   class="btn btn-sm btn-outline-primary">
 
-                            </td>
+                                    <i class="bi bi-diagram-3"></i>
 
+                                    Branch
 
-                            <td>
-
-                                @user.CreatedDate
-                                .ToString(
-                                "dd MMM yyyy")
+                                </a>
 
                             </td>
 
@@ -329,70 +294,48 @@
 
     </div>
 
-</section>
+
+    @if (Model.TotalPages > 1)
+    {
+        <div class="card-footer bg-white">
+
+            <div class="d-flex justify-content-between">
+
+                <span>
+                    Page @Model.Page of @Model.TotalPages
+                </span>
 
 
-@if (Model.TotalPages > 1)
-{
-    <nav class="records-pagination mt-3"
-         aria-label="Users pagination">
+                <div class="d-flex gap-2">
 
-        <span>
-            Page @Model.Page
-            of @Model.TotalPages
-        </span>
+                    @if (Model.Page > 1)
+                    {
+                        <a asp-action="Index"
+                           asp-route-page="@(Model.Page - 1)"
+                           class="btn btn-sm btn-outline-secondary">
 
+                            Previous
 
-        <div>
-
-            <a class="
-                page-button
-                @(Model.HasPreviousPage
-                   ? ""
-                   : "disabled")"
-               asp-action="Index"
-               asp-route-page="@(Model.Page - 1)"
-               aria-disabled="@(!Model.HasPreviousPage)">
-
-                <i class="bi bi-chevron-left"></i>
-                Previous
-
-            </a>
+                        </a>
+                    }
 
 
-            @for (var pageNumber = 1;
-                  pageNumber <= Model.TotalPages;
-                  pageNumber++)
-            {
-                <a class="
-                    page-number
-                    @(pageNumber == Model.Page
-                       ? "active"
-                       : "")"
-                   asp-action="Index"
-                   asp-route-page="@pageNumber">
+                    @if (Model.Page < Model.TotalPages)
+                    {
+                        <a asp-action="Index"
+                           asp-route-page="@(Model.Page + 1)"
+                           class="btn btn-sm btn-outline-secondary">
 
-                    @pageNumber
+                            Next
 
-                </a>
-            }
+                        </a>
+                    }
 
+                </div>
 
-            <a class="
-                page-button
-                @(Model.HasNextPage
-                   ? ""
-                   : "disabled")"
-               asp-action="Index"
-               asp-route-page="@(Model.Page + 1)"
-               aria-disabled="@(!Model.HasNextPage)">
-
-                Next
-                <i class="bi bi-chevron-right"></i>
-
-            </a>
+            </div>
 
         </div>
+    }
 
-    </nav>
-}
+</section>

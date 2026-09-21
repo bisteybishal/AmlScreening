@@ -12,7 +12,7 @@ namespace AmlScreening.Infrastructure.Persistence
             _connectionString =
                 configuration.GetConnectionString("AMLDatabase")
                 ?? throw new InvalidOperationException(
-                    "The AMLDatabase connection string was not found.");
+                    "The Screening connection string was not found.");
         }
         public SqlConnection CreateConnection()
         {

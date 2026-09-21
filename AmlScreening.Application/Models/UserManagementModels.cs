@@ -60,4 +60,30 @@ namespace AmlScreening.Application.Models
         bool IsActive,
         IReadOnlyCollection<int> RoleIds,
         IReadOnlyCollection<int> PermissionIds);
+
+    public sealed class UserAccessInfo
+    {
+        public long UserId { get; set; }
+
+
+        public int PartnerId { get; set; }
+
+
+        public string PartnerName { get; set; }
+            = string.Empty;
+
+
+        public int BranchId { get; set; }
+
+
+        public string BranchName { get; set; }
+            = string.Empty;
+
+
+        public string Username { get; set; }
+            = string.Empty;
+
+
+        public bool IsActive { get; set; }
+    }
 }

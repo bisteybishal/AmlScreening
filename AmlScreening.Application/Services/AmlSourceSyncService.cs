@@ -16,7 +16,7 @@ namespace AmlScreening.Application.Services
             _strategies = strategies;
             _repository = repository;
         }
-        public async Task<int> SyncAsync(string sourceCode)
+        public async Task<int> SyncAsync(string sourceCode,CancellationToken cancellation=default)
         {
             var validSourcecode=sourceCode.Trim().ToUpperInvariant();
             var strategy = _strategies.FirstOrDefault(s => s.SourceCode.Equals(validSourcecode, StringComparison.OrdinalIgnoreCase));
@@ -25,7 +25,7 @@ namespace AmlScreening.Application.Services
                 throw new InvalidOperationException($"No strategy found for source code: {sourceCode}");
             }
             var records = await strategy.GetRecordsAsync();
-            await _repository.SaveAsync(records);
+            await _repository.SaveAsync(validSourcecode,records,cancellation);
             return records.Count;
         }
     }

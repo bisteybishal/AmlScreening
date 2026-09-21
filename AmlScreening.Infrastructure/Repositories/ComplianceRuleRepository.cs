@@ -4,6 +4,7 @@ using AmlScreening.Application.Security;
 using AmlScreening.Domain.Entities.Compliance;
 using AmlScreening.Infrastructure.Persistence;
 using Dapper;
+using Microsoft.VisualBasic;
 using System.Data;
 
 namespace AmlScreening.Infrastructure.Repositories
@@ -21,27 +22,38 @@ namespace AmlScreening.Infrastructure.Repositories
 
         public async Task<IReadOnlyList<ComplianceRule>> GetAllAsync()
         {
+            EnsurePartnerContext();
             using var connection = _dBConnectionFactory.CreateConnection();
             var rows = await connection.QueryAsync<ComplianceRule>(
                "dbo.spa_ComplianceRules_GetAll", new
                {
-                   clientid = _currentUser.ClientId,
-                   canviewAll = CanViewAllClients()
+                   PartnerId = _currentUser.PartnerId,
                }, commandType: CommandType.StoredProcedure);
             return rows.AsList();
 
         }
         public async Task<ComplianceRule?> GetByIdAsync(int id)
         {
+            EnsurePartnerContext();
             using var connection = _dBConnectionFactory.CreateConnection();
-            var result = await connection.QueryFirstOrDefaultAsync<ComplianceRule>
-                ("dbo.spa_ComplianceRules_GetById", new
-                {
-                    Id = id,
-                    clientid = _currentUser.ClientId,
-                },
-                     commandType: CommandType.StoredProcedure);
-            return result;
+            var command =
+        new CommandDefinition(
+            "dbo.spa_ComplianceRules_GetById",
+            new
+            {
+                Id =
+                    id,
+
+                PartnerId =
+                    _currentUser.PartnerId
+            },
+            commandType:
+                CommandType.StoredProcedure);
+
+
+            return await connection
+                .QueryFirstOrDefaultAsync<ComplianceRule>(
+                    command);
 
 
 
@@ -49,22 +61,27 @@ namespace AmlScreening.Infrastructure.Repositories
         public async Task<long> CreatePendingAsync(ComplianceRule rule,
              long makerUserId, string makerUsername)
         {
+            EnsurePartnerContext();
+
+            EnsureCurrentUser(
+                makerUserId);
+
             using var connection = _dBConnectionFactory.CreateConnection();
             var parameters = new
             {
-                ClientId = _currentUser.ClientId,
-                rule.RuleCode,
-                rule.RuleName,
-                rule.RuleType,
+                PartnerId = _currentUser.PartnerId,
+                RuleCode =NormalizeRequired(rule.RuleCode),
+                RuleName = NormalizeRequired(  rule.RuleName),
+                RuleType =NormalizeRequired( rule.RuleType),
                 rule.ThresholdAmount,
                 rule.Currency,
                 rule.LookbackMinutes,
                 rule.TransactionCount,
                 rule.RiskScore,
-                rule.Action,
+                Action = NormalizeRequired(rule.Action).ToUpperInvariant(),
                 rule.Priority,
                 MakerUserId = makerUserId,
-                MakerUsername = makerUsername,
+                MakerUsername = NormalizeRequired(makerUsername),
                
 
             };
@@ -75,36 +92,112 @@ namespace AmlScreening.Infrastructure.Repositories
         long currentUserId,
         string userName)
         {
+            EnsurePartnerContext();
+            EnsureCurrentUser(currentUserId);
             using var connection = _dBConnectionFactory.CreateConnection();
             var updateDetail = await connection.QuerySingleAsync<int>(
                 "dbo.spa_ComplianceRules_UdpatePending", new
                 {
                     rule.Id,
-                    clientid = _currentUser.ClientId,
-                    rule.RuleName,
-                    rule.RuleType,
+                    PartnerId = _currentUser.PartnerId,
+                    RuleName =
+                            NormalizeRequired(
+                                rule.RuleName),
+
+                    RuleType =
+                            NormalizeRequired(
+                                rule.RuleType),
                     rule.ThresholdAmount,
-                    rule.Currency,
+                    Currency =
+                            NullIfWhiteSpace(
+                                rule.Currency)?
+                                .ToUpperInvariant(),
                     rule.RiskScore,
                     rule.TransactionCount,
                     rule.LookbackMinutes,
-                    rule.Action,
+                    Action =
+                            NormalizeRequired(
+                                rule.Action)
+                                .ToUpperInvariant(),
                     rule.Priority,
                     CurrentUserId =
                         currentUserId,
 
                     Username =
-                        userName,
+                            NormalizeRequired(
+                                userName),
 
                     rule.RowVersion
                 }, commandType: CommandType.StoredProcedure);
             return updateDetail > 0;
         }
+        public async Task<long>
+      CreatePendingVersionAsync(
+          int approvedRuleId,
+          ComplianceRule changedRule,
+          long makerUserId,
+          string makerUsername)
+        {
+            EnsurePartnerContext();
+
+            EnsureCurrentUser(
+                makerUserId);
+            using var connection =
+                _dBConnectionFactory.CreateConnection();
+
+            var UpdateId=await connection
+                .QuerySingleAsync<long>(
+                    "dbo.spa_ComplianceRules_CreatePendingVersion",
+                    new
+                    {
+                        PartnerId = _currentUser.PartnerId,
+
+                        ApprovedRuleId =
+                            approvedRuleId,
+
+                        RuleName =
+                            NormalizeRequired(
+                                changedRule.RuleName),
+
+                        RuleType =
+                            NormalizeRequired(
+                                changedRule.RuleType),
+
+                        changedRule.ThresholdAmount,
+
+                        Currency =
+                            NullIfWhiteSpace(
+                                changedRule.Currency)?
+                                .ToUpperInvariant(),
+                        changedRule.LookbackMinutes,
+                        changedRule.TransactionCount,
+                        changedRule.RiskScore,
+                        Action =
+                            NormalizeRequired(
+                                changedRule.Action)
+                                .ToUpperInvariant(),
+                        changedRule.Priority,
+
+                        MakerUserId =
+                            makerUserId,
+
+                        MakerUsername =
+                            NormalizeRequired(
+                                makerUsername)
+                    },
+                    commandType:
+                        CommandType.StoredProcedure);
+
+            return UpdateId;
+        }
+
+
 
         public async Task<ComplianceRule?>
         GetPendingForReviewAsync(
             int id)
         {
+            EnsurePartnerContext();
             using var connection =
                 _dBConnectionFactory.CreateConnection();
 
@@ -115,21 +208,17 @@ namespace AmlScreening.Infrastructure.Repositories
                     {
                         Id = id,
 
-                        ClientId =
-                            _currentUser.ClientId
+                        PrtnerId =
+                            _currentUser.PartnerId
                     },
                     commandType:
                         CommandType.StoredProcedure);
         }
         public async Task<ComplianceRule?>
         GetActiveVersionAsync(
-            string ruleCode,
-            int clientId)
+            string ruleCode)
         {
-            if (clientId != _currentUser.ClientId)
-            {
-                return null;
-            }
+            EnsurePartnerContext();
             using var connection =
                 _dBConnectionFactory.CreateConnection();
 
@@ -139,7 +228,7 @@ namespace AmlScreening.Infrastructure.Repositories
                     new
                     {
                         RuleCode = ruleCode,
-                        ClientId = _currentUser.ClientId
+                        PartnerId = _currentUser.PartnerId
 
         },
                     commandType:
@@ -152,6 +241,10 @@ namespace AmlScreening.Infrastructure.Repositories
        string checkerUsername,
        byte[] rowVersion)
         {
+            EnsurePartnerContext();
+
+            EnsureCurrentUser(
+                checkerUserId);
             using var connection =
                 _dBConnectionFactory.CreateConnection();
 
@@ -160,16 +253,18 @@ namespace AmlScreening.Infrastructure.Repositories
                     "dbo.spa_ComplianceRules_Approve",
                     new
                     {
-                        Id = id,
+                        Id =
+                            id,
 
-                        ClientId =
-                            _currentUser.ClientId,
+                        PartnerId =
+                            _currentUser.PartnerId,
 
                         CheckerUserId =
                             checkerUserId,
 
                         CheckerUsername =
-                            checkerUsername,
+                            NormalizeRequired(
+                                checkerUsername),
 
                         RowVersion =
                             rowVersion
@@ -182,82 +277,98 @@ namespace AmlScreening.Infrastructure.Repositories
         public async Task<bool> DeletePendingAsync(
        int id,
        long currentUserId,
-       string deletedBy)
+       string deletedBy, byte[] rowVersion)
+        
         {
+            EnsurePartnerContext();
 
+            EnsureCurrentUser(
+                currentUserId);
             using var connection =
                 _dBConnectionFactory.CreateConnection();
 
             var affected =
-                await connection.ExecuteScalarAsync<int>(
+                await connection.QuerySingleAsync<int>(
                     "dbo.spa_ComplianceRules_DeletePending",
                     new
                     {
-                        Id = id,
+                        Id =
+                            id,
 
-                        ClientId =
-                            _currentUser.ClientId,
+                        PartnerId =
+                            _currentUser.PartnerId,
 
                         CurrentUserId =
                             currentUserId,
 
                         DeletedBy =
-                            deletedBy
+                            NormalizeRequired(
+                                deletedBy),
+
+                        RowVersion =
+                            rowVersion
                     },
                     commandType:
                         CommandType.StoredProcedure);
 
             return affected > 0;
         }
-        public async Task<long>
-        CreatePendingVersionAsync(
-            ComplianceRule currentApproved,
-            ComplianceRule changedRule,
-            long makerUserId,
-            string makerUsername)
+        private void EnsurePartnerContext()
         {
-            using var connection =
-                _dBConnectionFactory.CreateConnection();
+            if (!_currentUser.IsAuthenticated)
+            {
+                throw new UnauthorizedAccessException(
+                    "Login required.");
+            }
 
-            return await connection
-                .QuerySingleAsync<long>(
-                    "dbo.spa_ComplianceRules_CreatePendingVersion",
-                    new
-                    {
-                        ClientId =
-                            _currentUser.ClientId,
 
-                        CurrentRuleId =
-                            currentApproved.Id,
+            if (_currentUser.UserId <= 0)
+            {
+                throw new UnauthorizedAccessException(
+                    "Current user is invalid.");
+            }
 
-                        currentApproved.RuleCode,
 
-                        changedRule.RuleName,
-                        changedRule.RuleType,
-                        changedRule.ThresholdAmount,
-                        changedRule.Currency,
-                        changedRule.LookbackMinutes,
-                        changedRule.TransactionCount,
-                        changedRule.RiskScore,
-                        changedRule.Action,
-                        changedRule.Priority,
-
-                        MakerUserId =
-                            makerUserId,
-
-                        MakerUsername =
-                            makerUsername
-                    },
-                    commandType:
-                        CommandType.StoredProcedure);
+            if (_currentUser.PartnerId <= 0)
+            {
+                throw new UnauthorizedAccessException(
+                    "Current partner is invalid.");
+            }
         }
-        private bool CanViewAllClients()
+        private void EnsureCurrentUser(
+        long suppliedUserId)
         {
-            return
-                _currentUser.HasPermission(
-                    AppPermissions.PlatformCrossClientAccess);
-              
+            if (suppliedUserId <= 0
+                ||
+                suppliedUserId !=
+                    _currentUser.UserId)
+            {
+                throw new UnauthorizedAccessException(
+                    "The supplied user does not match the authenticated user.");
+            }
         }
+        private static string NormalizeRequired(
+        string? value)
+        {
+            if (string.IsNullOrWhiteSpace(
+                    value))
+            {
+                throw new ArgumentException(
+                    "A required value is missing.");
+            }
 
+
+            return value.Trim();
+        }
+        private static string? NullIfWhiteSpace(
+       string? value)
+        {
+            return string.IsNullOrWhiteSpace(
+                    value)
+
+                ? null
+
+                : value.Trim();
+        }
     }
 }

@@ -2,7 +2,7 @@
     ViewData["Title"] = "AML Data Sources";
 }
 @{
-    var canSync = User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlSourceSync);
+    var canSync = User.HasClaim(AppPermissions.ClaimType, AppPermissions.AmlSource.Sync);
 }
 
 @section Styles {

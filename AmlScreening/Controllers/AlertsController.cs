@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AmlScreening.Portal.Controllers;
 
-[Authorize(Policy = AppPermissions.AlertsView)]
+[Authorize(Policy = AppPermissions.Alerts.View)]
 public sealed class AlertsController : Controller
 {
     private readonly IAmlWorkflowService _workflow;
@@ -31,7 +31,7 @@ public sealed class AlertsController : Controller
         }
     }
 
-    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = AppPermissions.AlertsManage)]
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = AppPermissions.Alerts.Manage)]
     public async Task<IActionResult> Update(AlertUpdateModel model)
     {
         if (!ModelState.IsValid)

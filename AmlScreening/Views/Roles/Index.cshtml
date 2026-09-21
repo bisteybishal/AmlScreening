@@ -1,41 +1,288 @@
 @model AmlScreening.Portal.ViewModels.RolesPageViewModel
+@using AmlScreening.Application.Security
+
 @{
-    ViewData["Title"] = "Roles & Permissions";
+    ViewData["Title"] =
+        "Roles & Permissions";
 }
 
-@section Styles { <link rel="stylesheet" href="~/css/roles.css" asp-append-version="true" /> }
+@section Styles
+{
+    <link rel="stylesheet"
+          href="~/css/roles.css"
+          asp-append-version="true" />
+}
+
 
 <section class="roles-heading">
-    <div><h1>Roles &amp; Permissions</h1><p>Control which parts of the AML portal each role can access.</p></div>
-    <a class="roles-primary-button" asp-action="Create"><i class="bi bi-plus-lg"></i> Add Role</a>
+
+    <div>
+
+        <h1>
+            Roles &amp; Permissions
+        </h1>
+
+        <p>
+            Control which areas of the AML portal
+            users can access.
+        </p>
+
+    </div>
+
+
+    <a class="roles-primary-button"
+       asp-controller="Roles"
+       asp-action="Create">
+
+        <i class="bi bi-plus-lg"></i>
+
+        Add Role
+
+    </a>
+
 </section>
 
-@if (TempData["SuccessMessage"] is string message)
+
+@if (TempData["SuccessMessage"] is string successMessage)
 {
-    <div class="roles-alert"><i class="bi bi-check-circle-fill"></i>@message</div>
+    <div class="roles-alert">
+
+        <i class="bi bi-check-circle-fill"></i>
+
+        @successMessage
+
+    </div>
 }
+
+
 @if (TempData["ErrorMessage"] is string errorMessage)
 {
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <div class="alert alert-danger"
+         role="alert">
+
+        @errorMessage
+
+    </div>
 }
-@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+
+
+@if (!string.IsNullOrWhiteSpace(
+        Model.ErrorMessage))
 {
-    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+    <div class="alert alert-danger"
+         role="alert">
+
+        @Model.ErrorMessage
+
+    </div>
 }
+
 
 <section class="roles-guide">
-    <div><span>1</span><p><strong>Create a role</strong><small>For example AML User or Viewer.</small></p></div><i class="bi bi-chevron-right"></i>
-    <div><span>2</span><p><strong>Assign permissions</strong><small>Select the allowed portal actions.</small></p></div><i class="bi bi-chevron-right"></i>
-    <div><span>3</span><p><strong>Assign users</strong><small>Choose the role when creating a user.</small></p></div>
+
+    <div>
+
+        <span>1</span>
+
+        <p>
+
+            <strong>
+                Create a role
+            </strong>
+
+            <small>
+                Create a custom access profile.
+            </small>
+
+        </p>
+
+    </div>
+
+
+    <i class="bi bi-chevron-right"></i>
+
+
+    <div>
+
+        <span>2</span>
+
+        <p>
+
+            <strong>
+                Assign permissions
+            </strong>
+
+            <small>
+                Select what the role can access.
+            </small>
+
+        </p>
+
+    </div>
+
+
+    <i class="bi bi-chevron-right"></i>
+
+
+    <div>
+
+        <span>3</span>
+
+        <p>
+
+            <strong>
+                Assign users
+            </strong>
+
+            <small>
+                Select the role while creating a user.
+            </small>
+
+        </p>
+
+    </div>
+
 </section>
 
+
 <section class="roles-grid">
-    @foreach (var role in Model.Roles)
+
+    @if (Model.Roles.Count == 0)
     {
-        <article class="role-card @(role.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase) ? "admin" : "")">
-            <div class="role-card-top"><span><i class="bi bi-shield-lock"></i></span><div><h2>@role.RoleName</h2><small class="@(role.IsActive ? "active" : "inactive")">@(role.IsActive ? "Active" : "Inactive")</small></div></div>
-            <div class="role-metrics"><p><strong>@role.UserCount</strong><small>Users</small></p><p><strong>@role.PermissionCount</strong><small>Permissions</small></p></div>
-            <div class="role-card-footer"><span>Created @role.CreatedDate.ToString("dd MMM yyyy")</span><a asp-action="Permissions" asp-route-id="@role.RoleId"><i class="bi bi-sliders"></i> Manage Permissions</a></div>
-        </article>
+        <div class="roles-empty">
+
+            <i class="bi bi-shield"></i>
+
+            <strong>
+                No roles found
+            </strong>
+
+        </div>
     }
+    else
+    {
+        @foreach (var role in Model.Roles)
+        {
+            var isAdmin =
+                role.RoleName.Equals(
+                    AppRoles.Admin,
+                    StringComparison.OrdinalIgnoreCase);
+
+            var isApi =
+                role.RoleName.Equals(
+                    AppRoles.ApiUser,
+                    StringComparison.OrdinalIgnoreCase);
+
+
+            <article class="
+                role-card
+                @(isAdmin ? "admin" : "")">
+
+                <div class="role-card-top">
+
+                    <span>
+
+                        <i class="
+                            bi
+                            @(isApi
+                               ? "bi-key"
+                               : isAdmin
+                                   ? "bi-shield-check"
+                                   : "bi-shield-lock")">
+                        </i>
+
+                    </span>
+
+
+                    <div>
+
+                        <h2>
+                            @role.RoleName
+                        </h2>
+
+
+                        <small class="
+                            @(role.IsActive
+                                   ? "active"
+                                   : "inactive")">
+
+                            @(role.IsActive
+                                ? "Active"
+                                : "Inactive")
+
+                        </small>
+
+
+                        @if (isAdmin)
+                        {
+                            <small class="text-muted">
+
+                                Protected system role
+
+                            </small>
+                        }
+
+                    </div>
+
+                </div>
+
+
+                <div class="role-metrics">
+
+                    <p>
+
+                        <strong>
+                            @role.UserCount
+                        </strong>
+
+                        <small>
+                            Users
+                        </small>
+
+                    </p>
+
+
+                    <p>
+
+                        <strong>
+                            @role.PermissionCount
+                        </strong>
+
+                        <small>
+                            Permissions
+                        </small>
+
+                    </p>
+
+                </div>
+
+
+                <div class="role-card-footer">
+
+                    <span>
+
+                        Created
+                        @role.CreatedDate
+                        .ToString(
+                        "dd MMM yyyy")
+
+                    </span>
+
+
+                    <a asp-controller="Roles"
+                       asp-action="Permissions"
+                       asp-route-id="@role.RoleId">
+
+                        <i class="bi bi-sliders"></i>
+
+                        Manage Permissions
+
+                    </a>
+
+                </div>
+
+            </article>
+        }
+    }
+
 </section>

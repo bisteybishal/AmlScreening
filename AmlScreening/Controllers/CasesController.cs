@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AmlScreening.Portal.Controllers;
 
-[Authorize(Policy = AppPermissions.CasesView)]
+[Authorize(Policy = AppPermissions.Cases.View)]
 public sealed class CasesController : Controller
 {
     private readonly IAmlWorkflowService _workflow;
@@ -38,7 +38,7 @@ public sealed class CasesController : Controller
         return complianceCase is null ? NotFound() : View(complianceCase);
     }
 
-    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = AppPermissions.CasesManage)]
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = AppPermissions.Cases.Manage)]
     public async Task<IActionResult> Update(CaseUpdateModel model)
     {
         if (!ModelState.IsValid) return RedirectToAction(nameof(Details), new { id = model.Id });

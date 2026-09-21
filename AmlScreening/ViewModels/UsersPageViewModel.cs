@@ -8,26 +8,15 @@ namespace AmlScreening.Portal.ViewModels;
 
 public sealed class UsersPageViewModel
 {
-    public IReadOnlyList<UserListItem> Users { get; set; }
-        = Array.Empty<UserListItem>();
+    public IReadOnlyList<PartnerListItem> Partners { get; set; }
+        = Array.Empty<PartnerListItem>();
 
-    public IReadOnlyList<PartnerOption> Partners { get; set; }
-        = Array.Empty<PartnerOption>();
-
-    public IReadOnlyList<BranchOption> Branches { get; set; }
-        = Array.Empty<BranchOption>();
-
-
-    public int? PartnerId { get; set; }
-
-    public int? BranchId { get; set; }
-
-
+    public int TotalPartners { get; set; }
     public int TotalUsers { get; set; }
 
-    public int ActiveUsers { get; set; }
+    public int ActivePartners { get; set; }
 
-    public int InactiveUsers { get; set; }
+    public int IActivePartners { get; set; }
 
 
     public int Page { get; set; } = 1;
@@ -40,11 +29,7 @@ public sealed class UsersPageViewModel
     public string? ErrorMessage { get; set; }
 
 
-    public bool HasPreviousPage =>
-        Page > 1;
-
-    public bool HasNextPage =>
-        Page < TotalPages;
+  
 }
 
 
@@ -58,7 +43,7 @@ public sealed class CreatePartnerViewModel
     [StringLength(
         30,
         MinimumLength = 2)]
-    [Display(Name = "Partner code")]
+    [Display(Name = "Short code")]
     public string PartnerCode { get; set; }
         = string.Empty;
 
@@ -223,6 +208,55 @@ public sealed class CreateUserViewModel
 
     [BindNever]
     [ValidateNever]
+    public IReadOnlyList<RoleOption>
+        Roles
+    { get; set; }
+        = Array.Empty<RoleOption>();
+}
+// ============================================================
+// USER ACCESS
+// ============================================================
+
+public sealed class UserAccessViewModel
+{
+    [Range(
+        1,
+        long.MaxValue,
+        ErrorMessage =
+            "Invalid user.")]
+
+    public long UserId { get; set; }
+
+
+    public string Username { get; set; }
+        = string.Empty;
+
+
+    public string PartnerName { get; set; }
+        = string.Empty;
+
+
+    public string BranchName { get; set; }
+        = string.Empty;
+
+
+    public bool IsActive { get; set; }
+
+
+    [MinLength(
+        1,
+        ErrorMessage =
+            "Select at least one role.")]
+
+    public List<int>
+        SelectedRoleIds
+    { get; set; }
+        = [];
+
+
+    [BindNever]
+    [ValidateNever]
+
     public IReadOnlyList<RoleOption>
         Roles
     { get; set; }

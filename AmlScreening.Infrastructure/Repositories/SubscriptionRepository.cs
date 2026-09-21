@@ -1,5 +1,6 @@
 using AmlScreening.Application.Interface;
 using AmlScreening.Application.Interface.Repositories;
+using AmlScreening.Application.Models;
 using AmlScreening.Domain.Entities;
 using AmlScreening.Infrastructure.Persistence;
 using Dapper;
@@ -106,8 +107,7 @@ public sealed class SubscriptionRepository : ISubscriptionRepository
             }, transaction, cancellationToken: cancellationToken);
             var planId = await connection.ExecuteScalarAsync<int>(command);
 
-            await InsertAuditAsync(connection, transaction, "Create", planId,
-                $"Created subscription plan {plan.SourceCode}.");
+            
             transaction.Commit();
             return planId;
         }
@@ -156,8 +156,7 @@ public sealed class SubscriptionRepository : ISubscriptionRepository
                 return false;
             }
 
-            await InsertAuditAsync(connection, transaction, "Update", plan.PlanId,
-                $"Updated subscription plan {plan.SourceCode}.");
+            
             transaction.Commit();
             return true;
         }
@@ -198,8 +197,6 @@ public sealed class SubscriptionRepository : ISubscriptionRepository
                 return false;
             }
 
-            await InsertAuditAsync(connection, transaction, "Delete", id,
-                "Soft deleted a subscription plan.");
             transaction.Commit();
             return true;
         }
@@ -210,28 +207,5 @@ public sealed class SubscriptionRepository : ISubscriptionRepository
         }
     }
 
-    private async Task InsertAuditAsync(
-        IDbConnection connection,
-        IDbTransaction transaction,
-        string action,
-        int planId,
-        string details)
-    {
-        const string sql = """
-            INSERT INTO dbo.AuditLogs
-                (ClientId, UserId, Username, Action, EntityType, EntityId, Details, CreatedDate)
-            VALUES
-                (@ClientId, @UserId, @Username, @Action, 'SubscriptionPlan', @EntityId, @Details, SYSUTCDATETIME());
-            """;
-
-        await connection.ExecuteAsync(sql, new
-        {
-            ClientId = _currentUser.ClientId,
-            UserId = _currentUser.UserId,
-            Username = _currentUser.Username,
-            Action = action,
-            EntityId = planId.ToString(),
-            Details = details
-        }, transaction);
-    }
+   
 }

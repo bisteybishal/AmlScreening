@@ -1,4 +1,5 @@
 ﻿
+using AmlScreening.Application.Models;
 using AmlScreening.Domain.Entities;
 namespace AmlScreening.Application.Interface.Repositories
 {

@@ -22,7 +22,7 @@ public sealed class ComplianceRuleViewModel
     public DateTime? EffectiveTo { get; set; }
     public bool IsActive { get; set; }
 
-    public int ClientId { get; set; }
+    public int PartnerId { get; set; }
 
     public long? MakerUserId { get; set; }
 

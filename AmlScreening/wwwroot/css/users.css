@@ -1021,6 +1021,15 @@
             color: #9a6200;
         }
 
+.partner-name-link {
+    font-weight: 600;
+    text-decoration: none;
+    color: inherit;
+}
+
+    .partner-name-link:hover {
+        text-decoration: underline;
+    }
 
 /* =========================================
    RESPONSIVE

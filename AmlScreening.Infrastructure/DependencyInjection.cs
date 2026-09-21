@@ -22,7 +22,7 @@ namespace AmlScreening.Infrastructure
         public static IServiceCollection AddInfrastructure(this IServiceCollection services,IConfiguration configuration)
         {
             services.AddScoped<IDBConnectionFactory, DBConnectionFactory>();
-             services.AddDbContext<AmlScreeningDbContext>(options => options.UseSqlServer(configuration.GetConnectionString("Screening")));
+             services.AddDbContext<AmlScreeningDbContext>(options => options.UseSqlServer(configuration.GetConnectionString("AMLDatabase")));
 
             services.AddScoped<IUserRepository,UserRepository>();
             services.AddScoped<IRoleRepository, RoleRepository>();

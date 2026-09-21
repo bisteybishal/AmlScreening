@@ -1,23 +1,149 @@
 @model AmlScreening.Portal.ViewModels.CreateRoleViewModel
+
 @{
-    ViewData["Title"] = "Add Role";
+    ViewData["Title"] =
+        "Add Role";
 }
 
-@section Styles { <link rel="stylesheet" href="~/css/roles.css" asp-append-version="true" /> }
+@section Styles
+{
+    <link rel="stylesheet"
+          href="~/css/roles.css"
+          asp-append-version="true" />
+}
 
-<section class="role-editor-heading"><a asp-action="Index"><i class="bi bi-arrow-left"></i> Back to Roles</a><h1>Add Role</h1><p>Create a role, then choose its permissions.</p></section>
 
-<section class="role-editor-card">
-    <div class="role-editor-title"><span><i class="bi bi-shield-plus"></i></span><div><h2>Role details</h2><p>Use a clear name that describes this level of access.</p></div></div>
-    <form asp-action="Create" method="post">
-        @Html.AntiForgeryToken()
-        <div asp-validation-summary="ModelOnly" class="roles-validation"></div>
-        <div class="role-form-body">
-            <div class="role-field"><label asp-for="RoleName"></label><input asp-for="RoleName" placeholder="e.g. Compliance Officer" /><span asp-validation-for="RoleName"></span></div>
-            <label class="role-active-switch"><input asp-for="IsActive" /><span></span><strong>Active role</strong><small>Users can be assigned to this role.</small></label>
-        </div>
-        <div class="role-editor-actions"><a class="roles-secondary-button" asp-action="Index">Cancel</a><button class="roles-primary-button" type="submit"><i class="bi bi-arrow-right"></i> Create and Continue</button></div>
-    </form>
+<section class="role-editor-heading">
+
+    <a asp-controller="Roles"
+       asp-action="Index">
+
+        <i class="bi bi-arrow-left"></i>
+
+        Back to Roles
+
+    </a>
+
+
+    <h1>
+        Add Role
+    </h1>
+
+
+    <p>
+        Create a role and then assign
+        its application permissions.
+    </p>
+
 </section>
 
-@section Scripts { <partial name="_ValidationScriptsPartial" /> }
+
+<section class="role-editor-card">
+
+    <div class="role-editor-title">
+
+        <span>
+
+            <i class="bi bi-shield-plus"></i>
+
+        </span>
+
+
+        <div>
+
+            <h2>
+                Role details
+            </h2>
+
+            <p>
+                Use a clear name that describes
+                this level of access.
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <form asp-controller="Roles"
+          asp-action="Create"
+          method="post">
+
+        @Html.AntiForgeryToken()
+
+
+        <div asp-validation-summary="ModelOnly"
+             class="roles-validation">
+        </div>
+
+
+        <div class="role-form-body">
+
+            <div class="role-field">
+
+                <label asp-for="RoleName">
+                </label>
+
+
+                <input asp-for="RoleName"
+                       autocomplete="off"
+                       placeholder="e.g. Compliance Officer" />
+
+
+                <span asp-validation-for="RoleName">
+                </span>
+
+            </div>
+
+
+            <label class="role-active-switch">
+
+                <input asp-for="IsActive" />
+
+                <span></span>
+
+                <strong>
+                    Active role
+                </strong>
+
+                <small>
+                    Users can be assigned to
+                    this role.
+                </small>
+
+            </label>
+
+        </div>
+
+
+        <div class="role-editor-actions">
+
+            <a class="roles-secondary-button"
+               asp-controller="Roles"
+               asp-action="Index">
+
+                Cancel
+
+            </a>
+
+
+            <button class="roles-primary-button"
+                    type="submit">
+
+                <i class="bi bi-arrow-right"></i>
+
+                Create and Continue
+
+            </button>
+
+        </div>
+
+    </form>
+
+</section>
+
+
+@section Scripts
+{
+    <partial name="_ValidationScriptsPartial" />
+}

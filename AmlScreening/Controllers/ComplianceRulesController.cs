@@ -1,15 +1,16 @@
-﻿using System.Security.Claims;
-using AmlScreening.Application.Interface.Repositories;
+﻿using AmlScreening.Application.Interface.Repositories;
 using AmlScreening.Application.Security;
 using AmlScreening.Domain.Entities.Compliance;
 using AmlScreening.Portal.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.VisualBasic;
+using System.Security.Claims;
 
 namespace AmlScreening.Portal.Controllers;
 
 [Authorize(
-    Policy = AppPermissions.ComplianceRulesView)]
+    Policy = AppPermissions.Compliance.View)]
 public sealed class ComplianceRulesController
     : Controller
 {
@@ -44,19 +45,19 @@ public sealed class ComplianceRulesController
         var canEdit =
             User.HasClaim(
                 AppPermissions.ClaimType,
-                AppPermissions.ComplianceRulesEdit);
+                AppPermissions.Compliance.Manage);
 
 
         var canDelete =
             User.HasClaim(
                 AppPermissions.ClaimType,
-                AppPermissions.ComplianceRulesDelete);
+                AppPermissions.Compliance.Manage);
 
 
         var canApprove =
             User.HasClaim(
                 AppPermissions.ClaimType,
-                AppPermissions.ComplianceRulesApprove);
+                AppPermissions.Compliance.Approve);
 
 
         var model =
@@ -67,8 +68,8 @@ public sealed class ComplianceRulesController
                         Id =
                             rule.Id,
 
-                        ClientId =
-                            rule.ClientId,
+                        PartnerId =
+                            rule.PartnerId,
 
                         RuleCode =
                             rule.RuleCode,
@@ -174,7 +175,7 @@ public sealed class ComplianceRulesController
     [HttpGet]
     [Authorize(
         Policy =
-            AppPermissions.ComplianceRulesCreate)]
+            AppPermissions.Compliance.Manage)]
     public IActionResult Add()
     {
         return View(
@@ -201,7 +202,7 @@ public sealed class ComplianceRulesController
     [HttpPost]
     [Authorize(
         Policy =
-            AppPermissions.ComplianceRulesCreate)]
+            AppPermissions.Compliance.Manage)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Add(
         ComplianceRuleViewModel model)
@@ -277,7 +278,7 @@ public sealed class ComplianceRulesController
     [HttpGet]
     [Authorize(
         Policy =
-            AppPermissions.ComplianceRulesEdit)]
+            AppPermissions.Compliance.Manage)]
     public async Task<IActionResult> Edit(
         int id)
     {
@@ -298,8 +299,8 @@ public sealed class ComplianceRulesController
                 Id =
                     rule.Id,
 
-                ClientId =
-                    rule.ClientId,
+                PartnerId =
+                    rule.PartnerId,
 
                 RowVersion =
                     rule.RowVersion,
@@ -362,7 +363,7 @@ public sealed class ComplianceRulesController
     [HttpPost]
     [Authorize(
         Policy =
-            AppPermissions.ComplianceRulesEdit)]
+            AppPermissions.Compliance.Manage)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(
         ComplianceRuleViewModel model)
@@ -481,7 +482,7 @@ public sealed class ComplianceRulesController
         {
             await _repository
                 .CreatePendingVersionAsync(
-                    source,
+                    source.Id,
                     changedRule,
                     userId,
                     username);
@@ -528,14 +529,13 @@ public sealed class ComplianceRulesController
         var active =
             await _repository
                 .GetActiveVersionAsync(
-                    pending.RuleCode,
-                    pending.ClientId);
+                    pending.RuleCode);
 
 
         var hasApprovePermission =
             User.HasClaim(
                 AppPermissions.ClaimType,
-                AppPermissions.ComplianceRulesApprove);
+                AppPermissions.Compliance.Approve);
 
 
         var isMaker =
@@ -577,7 +577,7 @@ public sealed class ComplianceRulesController
     [ValidateAntiForgeryToken]
     [Authorize(
         Policy =
-            AppPermissions.ComplianceRulesApprove)]
+            AppPermissions.Compliance.Approve)]
     public async Task<IActionResult> Approve(
         int id,
         string rowVersion)
@@ -635,29 +635,69 @@ public sealed class ComplianceRulesController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(
-        Policy =
-            AppPermissions.ComplianceRulesDelete)]
+    [Authorize(Policy = AppPermissions.Compliance.Manage)]
     public async Task<IActionResult> Delete(
-        int id)
+        int id, string rowVersion)
     {
-        var deleted =
-            await _repository
-                .DeletePendingAsync(
-                    id,
-                    GetCurrentUserId(),
-                    GetCurrentUsername());
+        try
+        {
+            if (id <= 0)
+            {
+                TempData["ErrorMessage"] =
+                    "Invalid compliance rule.";
+
+                return RedirectToAction(
+                    nameof(Index));
+            }
+
+            if (string.IsNullOrWhiteSpace(
+               rowVersion))
+            {
+                TempData["ErrorMessage"] =
+                    "The rule version is missing. Reload the page and try again.";
+
+                return RedirectToAction(
+                    nameof(Index));
+            }
 
 
-        TempData[
-            deleted
-                ? "SuccessMessage"
-                : "ErrorMessage"] =
-            deleted
-                ? "Pending compliance rule deleted successfully."
-                : "Only your own pending compliance rule can be deleted.";
+            byte[] bytes;
+            try
+            {
+                bytes =
+                    Convert.FromBase64String(
+                        rowVersion);
+            }
+            catch (FormatException)
+            {
+                TempData["ErrorMessage"] =
+                    "Invalid compliance rule version.";
+
+                return RedirectToAction(
+                    nameof(Index));
+            }
+            var deleted =
+                await _repository
+                    .DeletePendingAsync(
+                        id,
+                        GetCurrentUserId(),
+                        GetCurrentUsername(), bytes);
 
 
+            TempData[
+                deleted
+                    ? "SuccessMessage"
+                    : "ErrorMessage"] =
+                deleted
+                    ? "Pending compliance rule deleted successfully."
+                    : "Only your own pending compliance rule can be deleted.";
+
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] =
+                ex.Message;
+        }
         return RedirectToAction(
             nameof(Index));
     }

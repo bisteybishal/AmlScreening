@@ -24,7 +24,7 @@ public sealed partial class RiskScoringService
 
     private string ReviewToken(string kind, string? factorCode, IEnumerable<BaseEntity> rows)
     {
-        var snapshot = $"{_currentUser.ClientId}:{kind}:{factorCode}:" + string.Join("|",
+        var snapshot = $"{_currentUser.PartnerId}:{kind}:{factorCode}:" + string.Join("|",
             rows.OrderBy(x => x.Id).Select(x => $"{x.Id}:{Convert.ToBase64String(x.RowVersion)}"));
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(snapshot)));
     }
@@ -36,7 +36,7 @@ public sealed partial class RiskScoringService
             return "Maker information is missing or inconsistent. Legacy ownership must be verified before approval.";
         if (ids[0] == _currentUser.UserId)
             return "You made these changes. A different administrator must approve them.";
-        if (!_currentUser.HasPermission(AppPermissions.RiskScoringApprove))
+        if (!_currentUser.HasPermission(AppPermissions.Risk.Approve))
             return "You need RiskScoring.Approve permission to approve these changes.";
         return null;
     }
@@ -57,7 +57,7 @@ public sealed partial class RiskScoringService
         {
             if (kind == "Rules")
             {
-                var factor = await _db.RiskFactors.SingleOrDefaultAsync(x => x.ClientId == _currentUser.ClientId &&
+                var factor = await _db.RiskFactors.SingleOrDefaultAsync(x => x.PartnerId == _currentUser.PartnerId &&
                     x.IsActive && x.FactorCode == factorCode, cancellationToken)
                     ?? throw new RiskConfigurationException("Risk category was not found.");
                 var history = await RuleHistory().AsNoTracking().Where(x => x.RiskFactorId == factor.Id).ToListAsync(cancellationToken);
@@ -171,7 +171,7 @@ public sealed partial class RiskScoringService
                     "Unknown review type.");
             }
            
-        }, cancellationToken, AppPermissions.RiskScoringView);
+        }, cancellationToken, AppPermissions.Risk.View);
         return review!;
     }
 
@@ -186,7 +186,7 @@ public sealed partial class RiskScoringService
     public Task ActivateRulesAsync(string factorCode, int ruleId, string reviewToken, CancellationToken cancellationToken = default) =>
         ChangeConfigurationAsync(async () =>
         {
-            var factor = await _db.RiskFactors.SingleOrDefaultAsync(x => x.ClientId == _currentUser.ClientId &&
+            var factor = await _db.RiskFactors.SingleOrDefaultAsync(x => x.PartnerId == _currentUser.PartnerId &&
                 x.FactorCode == factorCode && x.IsActive, cancellationToken)
                 ?? throw new RiskConfigurationException("Risk category was not found.");
             var history = await RuleHistory().Where(x => x.RiskFactorId == factor.Id).ToListAsync(cancellationToken);
@@ -222,7 +222,7 @@ public sealed partial class RiskScoringService
             Stamp(pending);
             AddAudit("Approve", "RiskFactorRule", pending.Id,
                 $"Approved score change; original {pending.ReplacesRuleId}; maker {pending.MakerUserId}, checker {_currentUser.UserId}.");
-        }, cancellationToken, AppPermissions.RiskScoringApprove);
+        }, cancellationToken, AppPermissions.Risk.Approve);
 
     public Task ActivateBandsAsync(string reviewToken, CancellationToken cancellationToken = default) =>
         ChangeConfigurationAsync(async () =>
@@ -251,7 +251,7 @@ public sealed partial class RiskScoringService
             }
             AddAudit("Approve", "RiskBand", 0,
                 $"Approved ranges v{version}; maker {pending[0].MakerUserId}, checker {_currentUser.UserId}.");
-        }, cancellationToken, AppPermissions.RiskScoringApprove);
+        }, cancellationToken, AppPermissions.Risk.Approve);
 
     public Task ActivateModelAsync(
     string reviewToken,
@@ -347,7 +347,7 @@ public sealed partial class RiskScoringService
                 $"checker {_currentUser.UserId}.");
         },
         cancellationToken,
-        AppPermissions.RiskScoringApprove);
+        AppPermissions.Risk.Approve);
 
     private static IReadOnlyList<RiskReviewRow>
     ModelReviewRows(RiskModel model) =>

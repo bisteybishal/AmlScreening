@@ -1,11 +1,8 @@
 using AmlScreening.Application;
-using AmlScreening.Application.Security;
 using AmlScreening.Infrastructure;
 using AmlScreening.Portal.Extension;
-using AmlScreening.Portal.Middleware;
 using AmlScreening.Portal.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using System.Threading.RateLimiting;
 
@@ -139,7 +136,7 @@ static void ValidateHostedConfiguration(
     IConfiguration configuration,
     IHostEnvironment environment)
 {
-    var connectionString = configuration.GetConnectionString("AMLDatabase");
+    var connectionString = configuration.GetConnectionString("Screening");
     if (string.IsNullOrWhiteSpace(connectionString))
         throw new InvalidOperationException(
             "ConnectionStrings__AMLDatabase must be supplied by the host secret store.");

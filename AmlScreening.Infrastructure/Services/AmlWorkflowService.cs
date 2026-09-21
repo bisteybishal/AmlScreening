@@ -34,70 +34,32 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
     public async Task<ComplianceDashboardSummary> GetDashboardSummaryAsync(CancellationToken cancellationToken = default)
     {
         return await _complianceDashboardRepository.GetSummaryAsync(
-       _currentUser.ClientId,
+       _currentUser.PartnerId,
        _currentUser.HasPermission(
-           AppPermissions.TransactionsView),
+           AppPermissions.Transactions.View),
 
        _currentUser.HasPermission(
-           AppPermissions.AlertsView),
+           AppPermissions.Alerts.View),
 
        _currentUser.HasPermission(
-           AppPermissions.CasesView),
+           AppPermissions.Cases.View),
 
        cancellationToken);
-        //var summary = new ComplianceDashboardSummary();
-
-        //if (_currentUser.HasPermission(AppPermissions.TransactionsView))
-        //{
-        //    var transactionSummary = await _db.Transactions
-        //        .AsNoTracking()
-        //        .GroupBy(_ => 1)
-        //        .Select(group => new
-        //        {
-        //            Total = group.Count(),
-        //            Review = group.Count(transaction => transaction.Decision == "REVIEW"),
-        //            Block = group.Count(transaction => transaction.Decision == "BLOCK")
-        //        })
-        //        .SingleOrDefaultAsync();
-
-        //    if (transactionSummary is not null)
-        //    {
-        //        summary.TransactionCount = transactionSummary.Total;
-        //        summary.ReviewCount = transactionSummary.Review;
-        //        summary.BlockCount = transactionSummary.Block;
-        //    }
-        //}
-
-        //if (_currentUser.HasPermission(AppPermissions.AlertsView))
-        //{
-        //    summary.OpenAlertCount = await _db.ComplianceAlerts
-        //        .AsNoTracking()
-        //        .CountAsync(alert => alert.Status != "RESOLVED" && alert.Status != "CLOSED");
-        //}
-
-        //if (_currentUser.HasPermission(AppPermissions.CasesView))
-        //{
-        //    summary.OpenCaseCount = await _db.ComplianceCases
-        //        .AsNoTracking()
-        //        .CountAsync(complianceCase => complianceCase.Status != "CLOSED");
-        //}
-
-        //return summary;
     }
 
     public async Task<IReadOnlyList<Customer>> GetCustomersAsync() =>
         await _db.Customers.AsNoTracking()
-            .Where(x => x.ClientId == _currentUser.ClientId)
+            .Where(x => x.PartnerId == _currentUser.PartnerId)
             .OrderBy(x => x.FullName)
             .ToListAsync();
 
     public Task<Customer?> GetCustomerAsync(int id) =>
         _db.Customers.AsNoTracking().FirstOrDefaultAsync(x =>
-            x.Id == id && x.ClientId == _currentUser.ClientId);
+            x.Id == id && x.PartnerId == _currentUser.PartnerId);
 
     public async Task<int> CreateCustomerAsync(Customer customer)
     {
-        customer.ClientId = _currentUser.ClientId;
+        customer.PartnerId = _currentUser.PartnerId;
         customer.CreatedBy = _currentUser.Username;
         customer.CreatedDate = DateTime.UtcNow;
         customer.RiskScore = CalculateCustomerRisk(customer);
@@ -116,10 +78,10 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
     public async Task<bool> UpdateCustomerAsync(Customer customer)
     {
         var existing = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(x =>
-            x.Id == customer.Id && x.ClientId == _currentUser.ClientId);
+            x.Id == customer.Id && x.PartnerId == _currentUser.PartnerId);
         if (existing is null) return false;
 
-        customer.ClientId = _currentUser.ClientId;
+        customer.PartnerId = _currentUser.PartnerId;
         customer.CreatedBy = existing.CreatedBy;
         customer.CreatedDate = existing.CreatedDate;
         customer.UpdatedBy = _currentUser.Username;
@@ -149,7 +111,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
     public async Task<bool> DeleteCustomerAsync(int id)
     {
         var customer = await _db.Customers.FirstOrDefaultAsync(x =>
-            x.Id == id && x.ClientId == _currentUser.ClientId);
+            x.Id == id && x.PartnerId == _currentUser.PartnerId);
         if (customer is null) return false;
 
         customer.DeleteFg = "Y";
@@ -167,7 +129,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
 
     public async Task<IReadOnlyList<AmlTransaction>> GetTransactionsAsync() =>
         await _db.Transactions.AsNoTracking()
-            .Where(x => x.ClientId == _currentUser.ClientId)
+            .Where(x => x.PartnerId == _currentUser.PartnerId)
             .OrderByDescending(x => x.TransactionDate)
             .ThenByDescending(x => x.Id)
             .Take(500)
@@ -176,7 +138,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
     public async Task<AmlTransactionDetails?> GetTransactionDetailsAsync(int id)
     {
         var transaction = await _db.Transactions.AsNoTracking().FirstOrDefaultAsync(x =>
-            x.Id == id && x.ClientId == _currentUser.ClientId);
+            x.Id == id && x.PartnerId == _currentUser.PartnerId);
         if (transaction is null) return null;
 
         var assessment = await _db.RiskAssessments.AsNoTracking()
@@ -206,11 +168,11 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
     public async Task<int> CreateTransactionAsync(AmlTransaction transaction)
     {
         var customerExists = await _db.Customers.AsNoTracking().AnyAsync(x =>
-            x.Id == transaction.CustomerId && x.ClientId == _currentUser.ClientId);
+            x.Id == transaction.CustomerId && x.PartnerId == _currentUser.PartnerId);
         if (!customerExists)
             throw new InvalidOperationException("The selected customer does not exist for this client.");
 
-        transaction.ClientId = _currentUser.ClientId;
+        transaction.PartnerId = _currentUser.PartnerId;
         transaction.CreatedBy = _currentUser.Username;
         transaction.CreatedDate = DateTime.UtcNow;
         transaction.Status = "NEW";
@@ -229,7 +191,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
     public async Task<AmlEvaluationResult?> EvaluateAsync(int transactionId)
     {
         var transaction = await _db.Transactions.FirstOrDefaultAsync(x =>
-            x.Id == transactionId && x.ClientId == _currentUser.ClientId);
+            x.Id == transactionId && x.PartnerId == _currentUser.PartnerId);
         if (transaction is null) return null;
 
         var existingDecision = await _db.AmlDecisions.AsNoTracking()
@@ -238,7 +200,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
             return await LoadExistingResultAsync(transaction, existingDecision);
 
         var customer = await _db.Customers.FirstOrDefaultAsync(x =>
-            x.Id == transaction.CustomerId && x.ClientId == _currentUser.ClientId);
+            x.Id == transaction.CustomerId && x.PartnerId == _currentUser.PartnerId);
         if (customer is null)
             throw new InvalidOperationException("The transaction customer no longer exists.");
 
@@ -297,7 +259,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
 
             var assessment = new RiskAssessment
             {
-                ClientId = _currentUser.ClientId,
+                PartnerId = _currentUser.PartnerId,
                 TransactionId = transaction.Id,
                 CustomerRiskScore = scoring.CustomerRiskScore,
                 TransactionRiskScore = scoring.TransactionRiskScore,
@@ -315,7 +277,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
             var assessmentFactors = scoring.Factors.Select(factor =>
                 new RiskAssessmentFactor
                 {
-                    ClientId = _currentUser.ClientId,
+                    PartnerId = _currentUser.PartnerId,
                     RiskAssessmentId = assessment.Id,
                     FactorCode = factor.FactorCode,
                     InputValue = factor.InputValue,
@@ -337,7 +299,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
 
             var decision = new AmlDecision
             {
-                ClientId = _currentUser.ClientId,
+                PartnerId = _currentUser.PartnerId,
                 TransactionId = transaction.Id,
                 RiskAssessmentId = assessment.Id,
                 CorrelationId = transaction.CorrelationId ?? Guid.NewGuid().ToString("N"),
@@ -368,7 +330,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
             {
                 alert = new ComplianceAlert
                 {
-                    ClientId = _currentUser.ClientId,
+                    PartnerId = _currentUser.PartnerId,
                     AlertReference = Reference("ALT"),
                     TransactionId = transaction.Id,
                     RiskAssessmentId = assessment.Id,
@@ -382,7 +344,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
 
                 complianceCase = new ComplianceCase
                 {
-                    ClientId = _currentUser.ClientId,
+                    PartnerId = _currentUser.PartnerId,
                     CaseReference = Reference("CASE"),
                     AlertId = alert.Id,
                     TransactionId = transaction.Id,
@@ -417,14 +379,14 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
 
     public async Task<IReadOnlyList<ComplianceAlert>> GetAlertsAsync() =>
         await _db.ComplianceAlerts.AsNoTracking()
-            .Where(x => x.ClientId == _currentUser.ClientId)
+            .Where(x => x.PartnerId == _currentUser.PartnerId)
             .OrderByDescending(x => x.CreatedDate)
             .Take(500)
             .ToListAsync();
 
     public Task<ComplianceAlert?> GetAlertAsync(int id) =>
         _db.ComplianceAlerts.AsNoTracking().FirstOrDefaultAsync(x =>
-            x.Id == id && x.ClientId == _currentUser.ClientId);
+            x.Id == id && x.PartnerId == _currentUser.PartnerId);
 
     public async Task<bool> UpdateAlertAsync(int id, string status, string? resolution)
     {
@@ -432,7 +394,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
         if (normalizedStatus is "RESOLVED" or "CLOSED" && string.IsNullOrWhiteSpace(resolution))
             throw new InvalidOperationException("A resolution is required before an alert can be closed.");
         var alert = await _db.ComplianceAlerts.FirstOrDefaultAsync(x =>
-            x.Id == id && x.ClientId == _currentUser.ClientId);
+            x.Id == id && x.PartnerId == _currentUser.PartnerId);
         if (alert is null) return false;
 
         alert.Status = normalizedStatus;
@@ -449,14 +411,14 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
 
     public async Task<IReadOnlyList<ComplianceCase>> GetCasesAsync() =>
         await _db.ComplianceCases.AsNoTracking()
-            .Where(x => x.ClientId == _currentUser.ClientId)
+            .Where(x => x.PartnerId == _currentUser.PartnerId)
             .OrderByDescending(x => x.CreatedDate)
             .Take(500)
             .ToListAsync();
 
     public Task<ComplianceCase?> GetCaseAsync(int id) =>
         _db.ComplianceCases.AsNoTracking().FirstOrDefaultAsync(x =>
-            x.Id == id && x.ClientId == _currentUser.ClientId);
+            x.Id == id && x.PartnerId == _currentUser.PartnerId);
 
     public async Task<bool> UpdateCaseAsync(
         int id,
@@ -469,7 +431,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
             string.IsNullOrWhiteSpace(disposition))
             throw new InvalidOperationException("A disposition is required for the selected case status.");
         var complianceCase = await _db.ComplianceCases.FirstOrDefaultAsync(x =>
-            x.Id == id && x.ClientId == _currentUser.ClientId);
+            x.Id == id && x.PartnerId == _currentUser.PartnerId);
         if (complianceCase is null) return false;
 
         complianceCase.Status = normalizedStatus;
@@ -516,7 +478,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
                 if (score < 75) continue;
                 matches.Add(new ScreeningMatch
                 {
-                    ClientId = _currentUser.ClientId,
+                    PartnerId = _currentUser.PartnerId,
                     TransactionId = transaction.Id,
                     AmlRecordId = record.Id,
                     SubjectName = subject,
@@ -540,7 +502,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
     {
         var now = DateTime.UtcNow;
         var rules = await _db.ComplianceRules.AsNoTracking()
-            .Where(x => x.ClientId == _currentUser.ClientId && x.IsActive &&
+            .Where(x => x.PartnerId == _currentUser.PartnerId && x.IsActive &&
                 x.ApprovalStatus == "APPROVED" && x.EffectiveFrom <= now &&
                 (!x.EffectiveTo.HasValue || x.EffectiveTo >= now))
             .OrderBy(x => x.Priority)
@@ -564,7 +526,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
             {
                 var from = transaction.TransactionDate.AddMinutes(-rule.LookbackMinutes.Value);
                 var count = await _db.Transactions.AsNoTracking().CountAsync(x =>
-                    x.ClientId == _currentUser.ClientId &&
+                    x.PartnerId == _currentUser.PartnerId &&
                     x.CustomerId == transaction.CustomerId &&
                     x.TransactionDate >= from && x.TransactionDate <= transaction.TransactionDate);
                 triggered = count >= rule.TransactionCount.Value;
@@ -732,7 +694,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
     private void AddAudit(string action, string entityType, int entityId, string details) =>
         _db.AuditLogs.Add(new AuditLog
         {
-            ClientId = _currentUser.ClientId,
+            PartnerId = _currentUser.PartnerId,
             UserId = _currentUser.UserId,
             Username = _currentUser.Username,
             Action = action,
@@ -774,16 +736,16 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
                 x.DeleteFg == "N"
                 &&
                 (
-                    x.RecordScope == "GLOBAL"
-                    ||
-                    x.ClientId ==
-                        _currentUser.ClientId
+                    
+                    x.PartnerId ==
+                        _currentUser.PartnerId
                 ))
             .OrderBy(x => x.FullName)
             .Take(10001)
             .Select(x => new AmlRecord
             {
-                Id=x.Id, ClientId=x.ClientId, RecordScope=x.RecordScope, FullName=x.FullName,
+                Id=x.Id,
+                PartnerId = x.PartnerId, FullName=x.FullName,
                 DateOfBirth=x.DateOfBirth, Nationality=x.Nationality, SourceName=x.SourceName,
                 LastSyncDate=x.LastSyncDate, SourceUpdatedDate=x.SourceUpdatedDate
             })

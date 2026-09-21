@@ -1,8 +1,6 @@
 using AmlScreening.Application.Interface.Repositories;
 using AmlScreening.Application.Interface.Services;
-using AmlScreening.Application.Models;
 using AmlScreening.Application.Security;
-using AmlScreening.Portal.Services;
 using AmlScreening.Portal.ViewModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;

@@ -1,5 +1,7 @@
 @model AmlScreening.Portal.ViewModels.CreateUserViewModel
 
+@using AmlScreening.Application.Security
+
 @{
     ViewData["Title"] = "Add User";
 
@@ -10,31 +12,53 @@
         Url.Action(
             "Index",
             "Users");
+
+    var canManagePartners =
+        User.HasClaim(
+            AppPermissions.ClaimType,
+            AppPermissions.Partners.Manage);
 }
 
 @section Styles {
+
     <link rel="stylesheet"
           href="~/css/users.css"
           asp-append-version="true" />
+
 }
 
+
+<!-- ========================================================= -->
+<!-- HEADER -->
+<!-- ========================================================= -->
 
 <section class="user-editor-heading">
 
     <a asp-action="Index">
+
         <i class="bi bi-arrow-left"></i>
+
         Back to Users
+
     </a>
 
-    <h1>Add User</h1>
+
+    <h1>
+        Add User
+    </h1>
+
 
     <p>
-        Create a user, select their organization,
+        Create a portal user, select the Partner and Branch,
         and assign one or more roles.
     </p>
 
 </section>
 
+
+<!-- ========================================================= -->
+<!-- FORM CARD -->
+<!-- ========================================================= -->
 
 <section class="user-editor-card">
 
@@ -44,21 +68,30 @@
             <i class="bi bi-person-plus"></i>
         </span>
 
+
         <div>
-            <h2>Account details</h2>
+
+            <h2>
+                Account Details
+            </h2>
+
+
             <p>
-                Client determines data ownership.
-                Roles determine what the user can do.
+                Partner and Branch determine data ownership.
+                Roles determine what the user can access.
             </p>
+
         </div>
 
     </div>
 
 
     <form asp-action="Create"
-          method="post">
+          method="post"
+          autocomplete="off">
 
         @Html.AntiForgeryToken()
+
 
         <div asp-validation-summary="ModelOnly"
              class="users-validation">
@@ -68,140 +101,286 @@
         <div class="user-form-grid">
 
 
-            <!-- FULL NAME -->
+            <!-- ================================================= -->
+            <!-- PARTNER -->
+            <!-- ================================================= -->
 
             <div class="user-field">
 
-                <label asp-for="FullName"></label>
-
-                <input asp-for="FullName"
-                       autocomplete="name" />
-
-                <span asp-validation-for="FullName">
-                </span>
-
-            </div>
-
-
-            <!-- CLIENT -->
-
-            <div class="user-field">
-
-                <label asp-for="ClientId">
-                    Client / Organization
+                <label asp-for="PartnerId">
+                    Partner
                 </label>
 
 
-                @if (Model.CanChooseClient)
-                {
-                    <select asp-for="ClientId"
-                            class="form-select">
+                <select asp-for="PartnerId"
+                        id="partnerSelect"
+                        class="form-select">
 
-                        <option value="0">
-                            -- Select Client / Company --
-                        </option>
+                    <option value="0">
+                        -- Select Partner --
+                    </option>
 
-                        @foreach (var client
-                            in Model.Clients)
-                        {
-                            <option value="@client.ClientId">
-                                @client.ClientName
-                            </option>
-                        }
 
-                    </select>
-                    @if (User.HasClaim("Permission", "Clients.Manage"))
+                    @foreach (var partner in Model.Partners)
                     {
-                        <a asp-controller="Clients" asp-action="Create">+ Create a new partner first</a>
+                        <option value="@partner.PartnerId">
+                            @partner.PartnerName
+                        </option>
                     }
-                    <small>All users of this partner share its client data. Select multiple roles for portal and API access; do not create another client.</small>
-                }
-                else
+
+                </select>
+
+
+                <span asp-validation-for="PartnerId"
+                      class="text-danger">
+                </span>
+
+
+                @if (canManagePartners)
                 {
-                    var currentClient =
-                        Model.Clients
-                            .FirstOrDefault(
-                                x =>
-                                    x.ClientId
-                                    ==
-                                    Model.ClientId);
+                    <small>
 
-                    <input asp-for="ClientId"
-                           type="hidden" />
+                        Partner not available?
 
-                    <input type="text"
-                           value="@currentClient?.ClientName"
-                           readonly />
+                        <a asp-controller="Users"
+                           asp-action="CreatePartner">
+
+                            Create Partner
+
+                        </a>
+
+                    </small>
                 }
 
-
-                <span asp-validation-for="ClientId">
-                </span>
-
             </div>
 
 
-            <!-- EMAIL -->
+            <!-- ================================================= -->
+            <!-- BRANCH -->
+            <!-- ================================================= -->
 
             <div class="user-field">
 
-                <label asp-for="Email"></label>
+                <label asp-for="BranchId">
+                    Branch
+                </label>
 
-                <input asp-for="Email"
-                       autocomplete="email" />
 
-                <span asp-validation-for="Email">
+                <select asp-for="BranchId"
+                        id="branchSelect"
+                        class="form-select"
+                        data-selected="@Model.BranchId">
+
+                    <option value="0">
+                        -- Select Branch --
+                    </option>
+
+
+                    @foreach (var branch in Model.Branches)
+                    {
+                        <option value="@branch.BranchId">
+                            @branch.BranchName
+                        </option>
+                    }
+
+                </select>
+
+
+                <span asp-validation-for="BranchId"
+                      class="text-danger">
                 </span>
+
+
+                @if (canManagePartners)
+                {
+                    <small>
+
+                        Branch not available?
+
+                        <a asp-controller="Users"
+                           asp-action="CreateBranch"
+                           asp-route-partnerId="@Model.PartnerId">
+
+                            Create Branch
+
+                        </a>
+
+                    </small>
+                }
 
             </div>
 
 
-            <!-- ADDRESS -->
-
-            <div class="user-field">
-
-                <label asp-for="Address"></label>
-
-                <input asp-for="Address"
-                       autocomplete="street-address" />
-
-                <span asp-validation-for="Address">
-                </span>
-
-            </div>
-
-
-            <!-- PHONE -->
-
-            <div class="user-field">
-
-                <label asp-for="PhoneNumber"></label>
-
-                <input asp-for="PhoneNumber"
-                       autocomplete="tel" />
-
-                <span asp-validation-for="PhoneNumber">
-                </span>
-
-            </div>
-
-
+            <!-- ================================================= -->
             <!-- USERNAME -->
+            <!-- ================================================= -->
 
             <div class="user-field">
 
-                <label asp-for="Username"></label>
+                <label asp-for="Username">
+                    Username
+                </label>
+
 
                 <input asp-for="Username"
-                       autocomplete="username" />
+                       autocomplete="username"
+                       placeholder="Enter username" />
 
-                <span asp-validation-for="Username">
+
+                <span asp-validation-for="Username"
+                      class="text-danger">
                 </span>
 
             </div>
 
 
+            <!-- ================================================= -->
+            <!-- EMAIL -->
+            <!-- ================================================= -->
+
+            <div class="user-field">
+
+                <label asp-for="Email">
+                    Email
+                </label>
+
+
+                <input asp-for="Email"
+                       type="email"
+                       autocomplete="email"
+                       placeholder="user@example.com" />
+
+
+                <span asp-validation-for="Email"
+                      class="text-danger">
+                </span>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- PHONE -->
+            <!-- ================================================= -->
+
+            <div class="user-field">
+
+                <label asp-for="PhoneNumber">
+                    Phone Number
+                </label>
+
+
+                <input asp-for="PhoneNumber"
+                       autocomplete="tel"
+                       placeholder="Phone number" />
+
+
+                <span asp-validation-for="PhoneNumber"
+                      class="text-danger">
+                </span>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- ADDRESS -->
+            <!-- ================================================= -->
+
+            <div class="user-field">
+
+                <label asp-for="Address">
+                    Address
+                </label>
+
+
+                <input asp-for="Address"
+                       autocomplete="street-address"
+                       placeholder="Address" />
+
+
+                <span asp-validation-for="Address"
+                      class="text-danger">
+                </span>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- PASSWORD -->
+            <!-- ================================================= -->
+
+            <div class="user-field user-password">
+
+                <label asp-for="Password">
+                    Password
+                </label>
+
+
+                <div>
+
+                    <input asp-for="Password"
+                           type="password"
+                           autocomplete="new-password"
+                           placeholder="Minimum 8 characters" />
+
+
+                    <button type="button"
+                            class="password-toggle"
+                            aria-label="Show password">
+
+                        <i class="bi bi-eye"></i>
+
+                    </button>
+
+                </div>
+
+
+                <span asp-validation-for="Password"
+                      class="text-danger">
+                </span>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- CONFIRM PASSWORD -->
+            <!-- ================================================= -->
+
+            <div class="user-field user-password">
+
+                <label asp-for="ConfirmPassword">
+                    Confirm Password
+                </label>
+
+
+                <div>
+
+                    <input asp-for="ConfirmPassword"
+                           type="password"
+                           autocomplete="new-password"
+                           placeholder="Enter password again" />
+
+
+                    <button type="button"
+                            class="password-toggle"
+                            aria-label="Show password">
+
+                        <i class="bi bi-eye"></i>
+
+                    </button>
+
+                </div>
+
+
+                <span asp-validation-for="ConfirmPassword"
+                      class="text-danger">
+                </span>
+
+            </div>
+
+
+            <!-- ================================================= -->
             <!-- ROLES -->
+            <!-- ================================================= -->
 
             <div class="user-field">
 
@@ -209,126 +388,106 @@
                     Roles
                 </label>
 
-                <div class="role-checkbox-list">
 
-                    @foreach (var role
-                        in Model.Roles)
-                    {
-                        <label class="role-checkbox">
+                @if (Model.Roles == null ||
+                     Model.Roles.Count == 0)
+                {
+                    <div class="users-validation">
 
-                            <input type="checkbox"
-                                   name="SelectedRoleIds"
-                                   value="@role.RoleId"
-                                   checked="@Model.SelectedRoleIds.Contains(role.RoleId)" />
+                        No active roles are available.
 
-                            <span>
-                                @role.RoleName
-                            </span>
+                    </div>
+                }
+                else
+                {
+                    <div class="role-checkbox-list">
 
-                        </label>
-                    }
+                        @foreach (var role in Model.Roles)
+                        {
+                            var selected =
+                                Model.SelectedRoleIds != null
+                                &&
+                                Model.SelectedRoleIds.Contains(
+                                    role.RoleId);
 
-                </div>
 
-                <span asp-validation-for="SelectedRoleIds">
+                            <label class="role-checkbox">
+
+                                <input type="checkbox"
+                                       name="SelectedRoleIds"
+                                       value="@role.RoleId"
+                                       checked="@selected" />
+
+
+                                <span>
+                                    @role.RoleName
+                                </span>
+
+                            </label>
+                        }
+
+                    </div>
+                }
+
+
+                <span asp-validation-for="SelectedRoleIds"
+                      class="text-danger">
                 </span>
-                <div class="user-field api-credentials" id="apiCredentials" hidden>
-                    <label><input asp-for="ApiEnabled" type="checkbox" /> Enable API access</label>
-                    <label asp-for="ApiUsername"></label><input asp-for="ApiUsername" autocomplete="off" />
-                    <label asp-for="ApiSecret"></label><input asp-for="ApiSecret" autocomplete="new-password" />
-                    <small>Store this secret securely. It is saved as a one-way hash and cannot be displayed later.</small>
-                    <span asp-validation-for="ApiUsername"></span><span asp-validation-for="ApiSecret"></span>
-                </div>
+
 
                 <small>
                     Permissions are inherited from the selected roles.
-                    Advanced permission overrides can be configured after creation.
+                    Roles and permissions can be changed later from
+                    User Access.
                 </small>
 
             </div>
 
 
-            <!-- PASSWORD -->
-
-            <div class="user-field user-password">
-
-                <label asp-for="Password"></label>
-
-                <div>
-
-                    <input asp-for="Password"
-                           placeholder="Minimum 8 characters"
-                           autocomplete="new-password" />
-
-                    <button type="button"
-                            aria-label="Show password">
-
-                        <i class="bi bi-eye"></i>
-
-                    </button>
-
-                </div>
-
-                <span asp-validation-for="Password">
-                </span>
-
-            </div>
-
-
-            <!-- CONFIRM PASSWORD -->
-
-            <div class="user-field user-password">
-
-                <label asp-for="ConfirmPassword"></label>
-
-                <div>
-
-                    <input asp-for="ConfirmPassword"
-                           placeholder="Enter the password again"
-                           autocomplete="new-password" />
-
-                    <button type="button"
-                            aria-label="Show password">
-
-                        <i class="bi bi-eye"></i>
-
-                    </button>
-
-                </div>
-
-                <span asp-validation-for="ConfirmPassword">
-                </span>
-
-            </div>
-
-
+            <!-- ================================================= -->
             <!-- STATUS -->
+            <!-- ================================================= -->
 
-            <label class="user-active-switch">
+            <div class="user-field">
 
-                <input asp-for="IsActive" />
+                <label class="user-active-switch">
 
-                <span></span>
+                    <input asp-for="IsActive"
+                           type="checkbox" />
 
-                <strong>
-                    Active user
-                </strong>
 
-                <small>
-                    User can sign in immediately.
-                </small>
+                    <span></span>
 
-            </label>
+
+                    <strong>
+                        Active User
+                    </strong>
+
+
+                    <small>
+                        Active users can sign in to the portal.
+                    </small>
+
+                </label>
+
+            </div>
 
         </div>
 
+
+        <!-- ===================================================== -->
+        <!-- ACTION BUTTONS -->
+        <!-- ===================================================== -->
 
         <div class="user-editor-actions">
 
             <a class="users-secondary-button"
                asp-action="Index">
+
                 Cancel
+
             </a>
+
 
             <button class="users-primary-button"
                     type="submit">
@@ -344,48 +503,238 @@
     </form>
 
 </section>
-<script>
-(() => { const box=document.getElementById('apiCredentials'); const roles=[...document.querySelectorAll('input[name="SelectedRoleIds"]')];
-  const update=()=>{ const api=roles.some(x=>x.checked && /apiuser|api user/i.test(x.closest('label')?.innerText||'')); if(box) box.hidden=!api; };
-  roles.forEach(x=>x.addEventListener('change',update)); update(); })();
-</script>
 
 
 @section Scripts {
 
     <partial name="_ValidationScriptsPartial" />
 
+
     <script>
 
-        document
-            .querySelectorAll(
-                ".user-password button")
-            .forEach(button => {
+        document.addEventListener(
+            "DOMContentLoaded",
+            function () {
 
-                button.addEventListener(
-                    "click",
-                    () => {
+                // ============================================
+                // PARTNER -> BRANCH
+                // ============================================
 
-                        const input =
-                            button
-                                .parentElement
-                                .querySelector("input");
+                const partnerSelect =
+                    document.getElementById(
+                        "partnerSelect");
 
-                        const showing =
-                            input.type === "text";
+                const branchSelect =
+                    document.getElementById(
+                        "branchSelect");
 
-                        input.type =
-                            showing
-                                ? "password"
-                                : "text";
+                const getBranchesUrl =
+                    '@Url.Action("GetBranches", "Users")';
 
-                        button.innerHTML =
-                            showing
-                                ? '<i class="bi bi-eye"></i>'
-                                : '<i class="bi bi-eye-slash"></i>';
 
-                    });
+                async function loadBranches(
+                    partnerId,
+                    selectedBranchId = 0) {
+
+                    branchSelect.innerHTML =
+                        '<option value="0">-- Select Branch --</option>';
+
+
+                    if (!partnerId ||
+                        Number(partnerId) <= 0) {
+
+                        branchSelect.disabled =
+                            true;
+
+                        return;
+                    }
+
+
+                    branchSelect.disabled =
+                        true;
+
+
+                    try {
+
+                        const response =
+                            await fetch(
+                                `${getBranchesUrl}?partnerId=${encodeURIComponent(partnerId)}`,
+                                {
+                                    method:
+                                        "GET",
+
+                                    headers:
+                                    {
+                                        "X-Requested-With":
+                                            "XMLHttpRequest"
+                                    }
+                                });
+
+
+                        if (!response.ok) {
+
+                            throw new Error(
+                                "Unable to load branches.");
+
+                        }
+
+
+                        const branches =
+                            await response.json();
+
+
+                        branches.forEach(
+                            branch => {
+
+                                const option =
+                                    document.createElement(
+                                        "option");
+
+
+                                option.value =
+                                    branch.branchId;
+
+
+                                option.textContent =
+                                    branch.branchName;
+
+
+                                if (
+                                    Number(
+                                        branch.branchId)
+                                    ===
+                                    Number(
+                                        selectedBranchId)
+                                ) {
+
+                                    option.selected =
+                                        true;
+
+                                }
+
+
+                                branchSelect.appendChild(
+                                    option);
+
+                            });
+
+                    }
+                    catch (error) {
+
+                        console.error(
+                            "Unable to load branches.",
+                            error);
+
+                    }
+                    finally {
+
+                        branchSelect.disabled =
+                            false;
+
+                    }
+                }
+
+
+                if (partnerSelect &&
+                    branchSelect) {
+
+                    partnerSelect
+                        .addEventListener(
+                            "change",
+                            function () {
+
+                                loadBranches(
+                                    this.value,
+                                    0);
+
+                            });
+
+
+                    /*
+                     * If Partner is already selected but
+                     * Branch list was not populated,
+                     * load it from GetBranches.
+                     */
+
+                    if (
+                        Number(
+                            partnerSelect.value) > 0
+                        &&
+                        branchSelect.options.length <= 1
+                    ) {
+
+                        loadBranches(
+                            partnerSelect.value,
+                            branchSelect.dataset.selected);
+
+                    }
+
+                }
+
+
+                // ============================================
+                // PASSWORD SHOW/HIDE
+                // ============================================
+
+                document
+                    .querySelectorAll(
+                        ".user-password .password-toggle")
+                    .forEach(
+                        button => {
+
+                            button.addEventListener(
+                                "click",
+                                function () {
+
+                                    const input =
+                                        this.parentElement
+                                            ?.querySelector(
+                                                "input");
+
+
+                                    if (!input) {
+                                        return;
+                                    }
+
+
+                                    const currentlyShowing =
+                                        input.type ===
+                                        "text";
+
+
+                                    input.type =
+                                        currentlyShowing
+                                            ? "password"
+                                            : "text";
+
+
+                                    const icon =
+                                        this.querySelector(
+                                            "i");
+
+
+                                    if (icon) {
+
+                                        icon.className =
+                                            currentlyShowing
+                                                ? "bi bi-eye"
+                                                : "bi bi-eye-slash";
+
+                                    }
+
+
+                                    this.setAttribute(
+                                        "aria-label",
+                                        currentlyShowing
+                                            ? "Show password"
+                                            : "Hide password");
+
+                                });
+
+                        });
+
             });
 
     </script>
+
 }

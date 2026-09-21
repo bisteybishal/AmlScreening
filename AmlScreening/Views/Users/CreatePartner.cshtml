@@ -1,0 +1,258 @@
+﻿@model AmlScreening.Portal.ViewModels.CreatePartnerViewModel
+
+@{
+    ViewData["Title"] = "Add Partner";
+
+    ViewData["WorkspaceKey"] =
+        "Users";
+
+    ViewData["WorkspaceUrl"] =
+        Url.Action(
+            "Index",
+            "Users");
+}
+
+
+@section Styles {
+
+    <link rel="stylesheet"
+          href="~/css/users.css"
+          asp-append-version="true" />
+
+}
+
+
+<!-- ========================================================= -->
+<!-- HEADER -->
+<!-- ========================================================= -->
+
+<section class="user-editor-heading">
+
+    <a asp-controller="Users"
+       asp-action="Index">
+
+        <i class="bi bi-arrow-left"></i>
+
+        Back to Users
+
+    </a>
+
+
+    <h1>
+        Add Partner
+    </h1>
+
+
+    <p>
+        Create a new partner before creating
+        branches and users.
+    </p>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- FORM -->
+<!-- ========================================================= -->
+
+<section class="user-editor-card">
+
+    <div class="user-editor-title">
+
+        <span>
+            <i class="bi bi-building-add"></i>
+        </span>
+
+
+        <div>
+
+            <h2>
+                Partner Details
+            </h2>
+
+
+            <p>
+                Enter the organization's basic information.
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <form asp-controller="Users"
+          asp-action="CreatePartner"
+          method="post">
+
+        @Html.AntiForgeryToken()
+
+
+        <div asp-validation-summary="ModelOnly"
+             class="users-validation">
+        </div>
+
+
+        <div class="user-form-grid">
+
+
+            <!-- PARTNER CODE -->
+
+            <div class="user-field">
+
+                <label asp-for="PartnerCode">
+                </label>
+
+
+                <input asp-for="PartnerCode"
+                       autocomplete="off"
+                       placeholder="e.g. CITYEXP" />
+
+
+                <span asp-validation-for="PartnerCode">
+                </span>
+
+            </div>
+
+
+            <!-- PARTNER NAME -->
+
+            <div class="user-field">
+
+                <label asp-for="PartnerName">
+                </label>
+
+
+                <input asp-for="PartnerName"
+                       autocomplete="organization"
+                       placeholder="Enter partner name" />
+
+
+                <span asp-validation-for="PartnerName">
+                </span>
+
+            </div>
+
+
+            <!-- EMAIL -->
+
+            <div class="user-field">
+
+                <label asp-for="Email">
+                </label>
+
+
+                <input asp-for="Email"
+                       type="email"
+                       autocomplete="email"
+                       placeholder="partner@example.com" />
+
+
+                <span asp-validation-for="Email">
+                </span>
+
+            </div>
+
+
+            <!-- PHONE -->
+
+            <div class="user-field">
+
+                <label asp-for="PhoneNumber">
+                </label>
+
+
+                <input asp-for="PhoneNumber"
+                       autocomplete="tel"
+                       placeholder="Enter phone number" />
+
+
+                <span asp-validation-for="PhoneNumber">
+                </span>
+
+            </div>
+
+
+            <!-- ADDRESS -->
+
+            <div class="user-field"
+                 style="grid-column: 1 / -1;">
+
+                <label asp-for="Address">
+                </label>
+
+
+                <textarea asp-for="Address"
+                          rows="3"
+                          placeholder="Enter address">
+                </textarea>
+
+
+                <span asp-validation-for="Address">
+                </span>
+
+            </div>
+
+
+            <!-- ACTIVE -->
+
+            <div class="user-field">
+
+                <label>
+                    Status
+                </label>
+
+
+                <div class="form-check">
+
+                    <input asp-for="IsActive"
+                           class="form-check-input" />
+
+
+                    <label asp-for="IsActive"
+                           class="form-check-label">
+
+                        Active Partner
+
+                    </label>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- BUTTONS -->
+
+        <div class="mt-4 d-flex gap-2">
+
+            <button type="submit"
+                    class="users-primary-button">
+
+                <i class="bi bi-check-lg"></i>
+
+                Create Partner
+
+            </button>
+
+
+            <a asp-controller="Users"
+               asp-action="Index"
+               class="btn btn-light">
+
+                Cancel
+
+            </a>
+
+        </div>
+
+    </form>
+
+</section>
+
+
+@section Scripts {
+
+    <partial name="_ValidationScriptsPartial" />
+
+}

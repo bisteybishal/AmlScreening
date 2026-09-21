@@ -1,0 +1,193 @@
+﻿@model AmlScreening.Portal.ViewModels.EditPartnerViewModel
+
+@{
+    ViewData["Title"] = "Edit Partner";
+}
+
+@section Styles {
+    <link rel="stylesheet"
+          href="~/css/users.css"
+          asp-append-version="true" />
+}
+
+
+<section class="user-editor-heading">
+
+    <a asp-action="Index">
+        <i class="bi bi-arrow-left"></i>
+        Back to Partners
+    </a>
+
+    <h1>
+        @Model.PartnerName
+    </h1>
+
+    <p>
+        Update partner information.
+    </p>
+
+</section>
+
+
+<section class="user-editor-card">
+
+    <div class="user-editor-title">
+
+        <span>
+            <i class="bi bi-building"></i>
+        </span>
+
+        <div>
+            <h2>Partner Details</h2>
+            <p>Edit partner information and status.</p>
+        </div>
+
+    </div>
+
+
+    <form asp-action="EditPartner"
+          method="post">
+
+        @Html.AntiForgeryToken()
+
+        <input asp-for="PartnerId"
+               type="hidden" />
+
+
+        <div asp-validation-summary="ModelOnly"
+             class="text-danger mb-3">
+        </div>
+
+
+        <div class="user-form-grid">
+
+
+            <div class="user-field">
+
+                <label asp-for="PartnerCode"></label>
+
+                <input asp-for="PartnerCode" />
+
+                <span asp-validation-for="PartnerCode"
+                      class="text-danger">
+                </span>
+
+            </div>
+
+
+            <div class="user-field">
+
+                <label asp-for="PartnerName"></label>
+
+                <input asp-for="PartnerName" />
+
+                <span asp-validation-for="PartnerName"
+                      class="text-danger">
+                </span>
+
+            </div>
+
+
+            <div class="user-field">
+
+                <label asp-for="Email"></label>
+
+                <input asp-for="Email" />
+
+                <span asp-validation-for="Email"
+                      class="text-danger">
+                </span>
+
+            </div>
+
+
+            <div class="user-field">
+
+                <label asp-for="PhoneNumber"></label>
+
+                <input asp-for="PhoneNumber" />
+
+                <span asp-validation-for="PhoneNumber"
+                      class="text-danger">
+                </span>
+
+            </div>
+
+
+            <div class="user-field"
+                 style="grid-column:1/-1">
+
+                <label asp-for="Address"></label>
+
+                <textarea asp-for="Address"
+                          rows="3">
+                </textarea>
+
+                <span asp-validation-for="Address"
+                      class="text-danger">
+                </span>
+
+            </div>
+
+
+            <div class="user-field">
+
+                <label>Status</label>
+
+                <div class="form-check">
+
+                    <input asp-for="IsActive"
+                           class="form-check-input" />
+
+                    <label asp-for="IsActive"
+                           class="form-check-label">
+                        Active Partner
+                    </label>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="mt-4 d-flex gap-2">
+
+            <button type="submit"
+                    class="users-primary-button">
+
+                <i class="bi bi-check-lg"></i>
+
+                Update Partner
+
+            </button>
+
+
+          @*   <a asp-action="PartnerBranches"
+               asp-route-partnerId="@Model.PartnerId"
+               class="btn btn-outline-primary">
+
+                <i class="bi bi-diagram-3"></i>
+
+                Branches
+
+            </a>
+ *@
+
+            <a asp-action="Index"
+               class="btn btn-light">
+
+                Cancel
+
+            </a>
+
+        </div>
+
+    </form>
+
+</section>
+
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
