@@ -3,6 +3,7 @@ namespace AmlScreening.Application.Interface;
 public interface ICurrentUserContext
 {
     bool IsAuthenticated { get; }
+    bool IsAdmin { get; }
 
     long UserId { get; }
 

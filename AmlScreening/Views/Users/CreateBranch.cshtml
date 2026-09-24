@@ -1,0 +1,54 @@
+﻿@model AmlScreening.Portal.ViewModels.CreateBranchViewModel
+
+@{
+    ViewData["Title"] = "Create branch";
+}
+
+<partial name="_WorkflowMessages" />
+
+<h2>Create branch</h2>
+
+<form asp-action="CreateBranch" method="post">
+    @Html.AntiForgeryToken()
+
+    <input asp-for="PartnerId" type="hidden" />
+
+    <div asp-validation-summary="All" class="text-danger"></div>
+
+    <div class="mb-3">
+        <label asp-for="BranchName" class="form-label"></label>
+        <input asp-for="BranchName" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Address" class="form-label"></label>
+        <textarea asp-for="Address" class="form-control"></textarea>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Email" class="form-label"></label>
+        <input asp-for="Email" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="PhoneNumber" class="form-label"></label>
+        <input asp-for="PhoneNumber" class="form-control" />
+    </div>
+
+    <div class="form-check mb-3">
+        <input asp-for="IsActive" class="form-check-input" />
+        <label asp-for="IsActive" class="form-check-label">Active</label>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Create branch</button>
+
+    <a asp-action="PartnerBranchesDetail"
+       asp-route-partnerId="@Model.PartnerId"
+       class="btn btn-outline-secondary">
+        Cancel
+    </a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

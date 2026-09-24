@@ -2,23 +2,29 @@
 
 namespace AmlScreening.Portal.ViewModels;
 
-public class EditBranchViewModel
+public sealed class EditBranchViewModel
 {
-    [Required]
+    [Range(1, int.MaxValue)]
     public int BranchId { get; set; }
+
+    [Range(1, int.MaxValue)]
     public int PartnerId { get; set; }
+
     [Required]
-    [StringLength(200)]
-    [Display(Name = "Branch Name")]
+    [StringLength(150)]
+    [Display(Name = "Branch name")]
     public string BranchName { get; set; } = string.Empty;
+
     [StringLength(500)]
-    public string? Address { get; set; } 
+    public string? Address { get; set; }
+
     [EmailAddress]
-    [StringLength(200)]
-    public string? Email { get; set; } 
+    [StringLength(250)]
+    public string? Email { get; set; }
+
     [StringLength(50)]
-    [Display(Name = "Phone Number")]
-    public string? PhoneNumber { get; set; } 
-    [Display(Name = "Active Branch")]
+    [Display(Name = "Phone number")]
+    public string? PhoneNumber { get; set; }
+
     public bool IsActive { get; set; }
 }

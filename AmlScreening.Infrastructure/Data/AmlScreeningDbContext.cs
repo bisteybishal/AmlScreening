@@ -39,7 +39,10 @@ public sealed class AmlScreeningDbContext
 
             : -1;
 
-
+    public bool CurrentUserIsAdmin =>
+    _currentUser.IsAuthenticated &&
+    _currentUser.UserId > 0 &&
+    _currentUser.IsAdmin;
     // =========================================================
     // AML
     // =========================================================
@@ -152,217 +155,114 @@ public sealed class AmlScreeningDbContext
     // =========================================================
     // AML RECORD
     // =========================================================
-
-    private void ConfigureAmlRecord(
-        ModelBuilder modelBuilder)
+    private void ConfigureAmlRecord(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<AmlRecord>(
-            entity =>
+        modelBuilder.Entity<AmlRecord>(entity =>
+        {
+            entity.ToTable("AmlRecords", "dbo");
+
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.PartnerId)
+                .IsRequired();
+
+            entity.Property(x => x.BranchId)
+                .IsRequired();
+
+            entity.Property(x => x.RecordType)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.FullName)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(x => x.Country)
+                .HasMaxLength(300);
+
+            entity.Property(x => x.Nationality)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.ReferenceNo)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(x => x.SourceName)
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.Property(x => x.NormalizedName)
+                .HasMaxLength(250);
+
+            entity.Property(x => x.NamePrefix)
+                .HasMaxLength(10);
+
+            entity.Property(x => x.PhotoContentType)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.IsGlobal)
+                .IsRequired()
+                .HasDefaultValue(false);
+
+            ConfigureCommonFields(entity);
+
+            // A global source reference is shared across partners.
+            entity.HasIndex(x => new
             {
-                entity.ToTable(
-                    "AmlRecords",
-                    "dbo");
+                x.SourceName,
+                x.ReferenceNo
+            })
+                .IsUnique()
+                .HasDatabaseName("UX_AmlRecords_Global_Source_Reference")
+                .HasFilter("[IsGlobal] = 1 AND [DeleteFg] = 'N'");
 
+            // Private references are unique within their owning partner.
+            entity.HasIndex(x => new
+            {
+                x.PartnerId,
+                x.SourceName,
+                x.ReferenceNo
+            })
+                .IsUnique()
+                .HasDatabaseName("UX_AmlRecords_Partner_Source_Reference")
+                .HasFilter("[IsGlobal] = 0 AND [DeleteFg] = 'N'");
 
-                entity.HasKey(
-                    x => x.Id);
+            entity.HasIndex(x => new
+            {
+                x.PartnerId,
+                x.CreatedDate
+            })
+                .HasDatabaseName("IX_AmlRecords_Partner_CreatedDate");
 
+            entity.HasIndex(x => new
+            {
+                x.PartnerId,
+                x.NormalizedName
+            })
+                .HasDatabaseName("IX_AmlRecords_Partner_NormalizedName");
 
-                entity.Property(
-                        x => x.RecordType)
-                    .HasMaxLength(50)
-                    .IsRequired();
+            entity.HasIndex(x => new
+            {
+                x.SourceName,
+                x.NormalizedName
+            })
+                .HasDatabaseName("IX_AmlRecords_Source_NormalizedName");
 
+            entity.HasQueryFilter(
+                "SoftDeleteFilter",
+                x => x.DeleteFg == "N");
 
-                entity.Property(
-                        x => x.FullName)
-                    .HasMaxLength(200)
-                    .IsRequired();
-
-
-                entity.Property(
-                        x => x.Country)
-                    .HasMaxLength(300);
-
-
-                entity.Property(
-                        x => x.Nationality)
-                    .HasMaxLength(100);
-
-
-                entity.Property(
-                        x => x.ReferenceNo)
-                    .HasMaxLength(100)
-                    .IsRequired();
-
-
-                entity.Property(
-                        x => x.SourceName)
-                    .HasMaxLength(150)
-                    .IsRequired();
-
-
-                /*
-                 * Remarks remains nvarchar(max).
-                 *
-                 * Therefore no HasMaxLength()
-                 * is required here.
-                 */
-
-
-                entity.Property(
-                        x => x.NormalizedName)
-                    .HasMaxLength(250);
-
-
-                entity.Property(
-                        x => x.NamePrefix)
-                    .HasMaxLength(10);
-
-
-                entity.Property(
-                        x => x.PhotoContentType)
-                    .HasMaxLength(100);
-
-
-                ConfigureCommonFields(
-                    entity);
-
-
-                // =============================================
-                // GLOBAL UN/EU RECORD
-                // =============================================
-
-                /*
-                 * PartnerId = NULL
-                 *
-                 * Example:
-                 *
-                 * SourceName = UN
-                 * ReferenceNo = UN-1234
-                 */
-
-                entity.HasIndex(
-                        x => new
-                        {
-                            x.SourceName,
-                            x.ReferenceNo
-                        })
-
-                    .IsUnique()
-
-                    .HasDatabaseName(
-                        "UX_AmlRecords_Global_Source_Reference")
-
-                    .HasFilter(
-                        "[PartnerId] IS NULL " +
-                        "AND [DeleteFg] = 'N'");
-
-
-                // =============================================
-                // PARTNER MANUAL RECORD
-                // =============================================
-
-                entity.HasIndex(
-                        x => new
-                        {
-                            x.PartnerId,
-                            x.SourceName,
-                            x.ReferenceNo
-                        })
-
-                    .IsUnique()
-
-                    .HasDatabaseName(
-                        "UX_AmlRecords_Partner_Source_Reference")
-
-                    .HasFilter(
-                        "[PartnerId] IS NOT NULL " +
-                        "AND [DeleteFg] = 'N'");
-
-
-                // =============================================
-                // SEARCH INDEX
-                // =============================================
-
-                entity.HasIndex(
-                        x => new
-                        {
-                            x.PartnerId,
-                            x.CreatedDate
-                        })
-
-                    .HasDatabaseName(
-                        "IX_AmlRecords_Partner_CreatedDate");
-
-
-                entity.HasIndex(
-                        x => new
-                        {
-                            x.PartnerId,
-                            x.NormalizedName
-                        })
-
-                    .HasDatabaseName(
-                        "IX_AmlRecords_Partner_NormalizedName");
-
-
-                entity.HasIndex(
-                        x => new
-                        {
-                            x.SourceName,
-                            x.NormalizedName
-                        })
-
-                    .HasDatabaseName(
-                        "IX_AmlRecords_Source_NormalizedName");
-
-
-                // =============================================
-                // SOFT DELETE
-                // =============================================
-
-                entity.HasQueryFilter(
-                    "SoftDeleteFilter",
-                    x =>
-                        x.DeleteFg == "N");
-
-
-                // =============================================
-                // PARTNER SECURITY
-                // =============================================
-
-                /*
-                 * A logged-in Partner sees:
-                 *
-                 * 1. Their own manually created AML data
-                 *
-                 *      PartnerId = CurrentPartnerId
-                 *
-                 * 2. Global UN/EU synchronized data
-                 *
-                 *      PartnerId = NULL
-                 *
-                 * Another Partner's manual records
-                 * are never returned.
-                 */
-
-                entity.HasQueryFilter(
-                    "PartnerFilter",
-                    x =>
-                        CurrentPartnerId > 0
-
-                        &&
-
-                        (
-                            x.PartnerId == null
-
-                            ||
-
-                            x.PartnerId ==
-                                CurrentPartnerId
-                        ));
-            });
+            // PartnerId and BranchId are never used as global flags.
+            // All branches/users within a partner share private records.
+            entity.HasQueryFilter(
+                "PartnerFilter",
+                x => CurrentPartnerId > 0 &&
+                     (
+                      CurrentUserIsAdmin ||
+                         x.IsGlobal ||
+                         x.PartnerId == CurrentPartnerId
+                     ));
+        });
     }
 
 

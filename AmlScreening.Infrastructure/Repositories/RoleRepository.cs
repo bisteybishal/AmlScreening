@@ -8,7 +8,7 @@ using System.Data;
 
 namespace AmlScreening.Infrastructure.Repositories;
 
-public sealed class RoleRepository  : IRoleRepository
+public sealed class RoleRepository : IRoleRepository
 {
     private readonly IDBConnectionFactory
         _connectionFactory;
@@ -735,6 +735,28 @@ public sealed class RoleRepository  : IRoleRepository
                         transaction,
                         cancellationToken:
                             cancellationToken));
+
+            // Existing login cookies contain the previous permission claims.
+            await connection.ExecuteAsync(
+                new CommandDefinition(
+                    """
+        UPDATE sessions
+        SET IsActive = 0,
+            EndedAtUtc = SYSUTCDATETIME(),
+            EndReason = 'Role permissions changed'
+        FROM dbo.UserSessions AS sessions
+        WHERE sessions.IsActive = 1
+          AND EXISTS
+          (
+              SELECT 1
+              FROM dbo.UserRoles AS assigned
+              WHERE assigned.UserId = sessions.UserId
+                AND assigned.RoleId = @RoleId
+          );
+        """,
+                    new { RoleId = roleId },
+                    transaction,
+                    cancellationToken: cancellationToken));
 
 
             transaction.Commit();

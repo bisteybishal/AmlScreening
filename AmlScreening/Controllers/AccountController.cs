@@ -290,4 +290,13 @@ public class AccountController : Controller
                 nameof(Login));
         }
     }
+
+    [AllowAnonymous]
+    [HttpGet]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public IActionResult AccessDenied()
+    {
+        Response.StatusCode = StatusCodes.Status403Forbidden;
+        return View();
+    }
 }

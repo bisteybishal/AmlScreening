@@ -1,571 +1,460 @@
 @model AmlScreening.Portal.ViewModels.RiskScoringPageViewModel
-
 @{
     ViewData["Title"] = "Risk Score Setup";
-
-    var canManageBands = Model.CanEditBands;
-    var canManageModel = Model.CanEditModel;
-
-    var nepal =
-        TimeZoneInfo.FindSystemTimeZoneById(
-            "Nepal Standard Time");
-
-    string LocalTime(DateTime? value) =>
-        value.HasValue
-            ? TimeZoneInfo
-                .ConvertTimeFromUtc(
-                    DateTime.SpecifyKind(
-                        value.Value,
-                        DateTimeKind.Utc),
-                    nepal)
-                .ToString("dd MMM yyyy HH:mm")
-            : "—";
+    var nepal = TimeZoneInfo.FindSystemTimeZoneById("Nepal Standard Time");
+    string LocalTime(DateTime? value) => value.HasValue
+        ? TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc), nepal).ToString("dd MMM yyyy, HH:mm")
+        : "—";
+    string Percent(decimal value) => value.ToString("0.##") + "%";
+    var active = Model.ActiveModel;
+    var pending = Model.PendingModel;
 }
-
 @section Styles {
-    <link rel="stylesheet"
-          href="~/css/workflow.css"
-          asp-append-version="true" />
-
-    <link rel="stylesheet"
-          href="~/css/risk-scoring.css"
-          asp-append-version="true" />
-}
-
-<partial name="_WorkflowMessages" />
-
-
-<!-- ================================================= -->
-<!-- PAGE HEADING -->
-<!-- ================================================= -->
-
-<section class="workflow-heading">
-
-    <div>
-        <h1>Risk Score Setup</h1>
-
-        <p>
-            Manage the risk model and final risk ranges.
-        </p>
-    </div>
-
-</section>
-
-
-<!-- ================================================= -->
-<!-- RISK MODEL GOVERNANCE -->
-<!-- ================================================= -->
-
-<section class="workflow-panel">
-
-    <div class="risk-model-heading">
-
-        <div>
-
-            <h2>Risk Model</h2>
-
-            <p>
-                Defines how Customer,
-                Transaction and Screening risk
-                contribute to the final risk score.
-            </p>
-
-        </div>
-
-
-        @if (canManageModel)
-        {
-            <a class="workflow-primary"
-               asp-controller="RiskScoreSetup"
-               asp-action="EditModel">
-
-                <i class="bi bi-pencil-square"></i>
-
-                @(
-                    Model.ActiveModel == null
-                        ? "Create Model"
-                        : Model.HasModelDraft
-                            ? "Edit Pending Model"
-                            : "Create New Version"
-                )
-
-            </a>
+    <link rel="stylesheet" href="~/css/workflow.css" asp-append-version="true" />
+    <style>
+        .rs-page {
+            max-width: 1200px;
+            margin: 0 auto;
+            color: #18324b;
+            font-size: 14px;
+            line-height: 1.55;
         }
 
-    </div>
-
-
-    <!-- ============================================= -->
-    <!-- ACTIVE APPROVED MODEL -->
-    <!-- ============================================= -->
-    @if (Model.ActiveModel == null)
-    {
-        <div class="risk-review-notice warning">
-
-            <i class="bi bi-exclamation-triangle"></i>
-
-            <div>
-
-                <strong>
-                    No approved risk model is active.
-                </strong>
-
-                <p>
-                    Risk calculation cannot run until
-                    a model is approved.
-                </p>
-
-            </div>
-
-        </div>
-    }
-    else
-    {
-        <div class="risk-model-status-row">
-
-            <div>
-
-                <span class="risk-status-badge approved">
-
-                    <i class="bi bi-check-circle"></i>
-
-                    APPROVED
-
-                </span>
-
-                <strong>
-                    @Model.ActiveModel.ModelCode
-                    v@Model.ActiveModel.ModelVersion
-                </strong>
-
-            </div>
-
-
-            <small>
-                Effective:
-                @LocalTime(
-                    Model.ActiveModel.EffectiveFrom)
-            </small>
-
-        </div>
-
-
-        <div class="risk-model-summary">
-
-            <article>
-
-                <span>
-                    <i class="bi bi-person"></i>
-                </span>
-
-                <div>
-
-                    <small>
-                        Customer Risk
-                    </small>
-
-                    <strong>
-                        @Model.ActiveModel.CustomerWeightPercent%
-                    </strong>
-
-                </div>
-
-            </article>
-
-
-            <article>
-
-                <span>
-                    <i class="bi bi-arrow-left-right"></i>
-                </span>
-
-                <div>
-
-                    <small>
-                        Transaction Risk
-                    </small>
-
-                    <strong>
-                        @Model.ActiveModel.TransactionWeightPercent%
-                    </strong>
-
-                </div>
-
-            </article>
-
-
-            <article>
-
-                <span>
-                    <i class="bi bi-shield-check"></i>
-                </span>
-
-                <div>
-
-                    <small>
-                        Screening Risk
-                    </small>
-
-                    <strong>
-                        @Model.ActiveModel.ScreeningWeightPercent%
-                    </strong>
-
-                </div>
-
-            </article>
-
-
-            <article>
-
-                <span>
-                    <i class="bi bi-calculator"></i>
-                </span>
-
-                <div>
-
-                    <small>
-                        Total Weight
-                    </small>
-
-                    <strong>
-                        @(
-                            Model.ActiveModel.CustomerWeightPercent
-                            +
-                            Model.ActiveModel.TransactionWeightPercent
-                            +
-                            Model.ActiveModel.ScreeningWeightPercent
-                        )%
-                    </strong>
-
-                </div>
-
-            </article>
-
-        </div>
-    }
-
-
-    <!-- ============================================= -->
-    <!-- PENDING MODEL -->
-    <!-- ============================================= -->
-    @if (Model.HasModelDraft &&
-             Model.PendingModel != null)
-    {
-        <div class="risk-pending-model">
-
-            <div class="risk-pending-header">
-
-                <div>
-
-                    <span class="risk-status-badge pending">
-
-                        <i class="bi bi-hourglass-split"></i>
-
-                        PENDING
-
-                    </span>
-
-                    <strong>
-                        Model
-                        v@Model.PendingModel.ModelVersion
-                    </strong>
-
-                </div>
-
-
-                <a class="risk-review-button"
-                   asp-controller="RiskScoreSetup"
-                   asp-action="ReviewModel">
-
-                    <i class="bi bi-eye"></i>
-
-                    Review Model
-
-                </a>
-
-            </div>
-
-
-            <div class="risk-pending-values">
-
-                <span>
-                    Customer
-                    <strong>
-                        @Model.PendingModel.CustomerWeightPercent%
-                    </strong>
-                </span>
-
-                <span>
-                    Transaction
-                    <strong>
-                        @Model.PendingModel.TransactionWeightPercent%
-                    </strong>
-                </span>
-
-                <span>
-                    Screening
-                    <strong>
-                        @Model.PendingModel.ScreeningWeightPercent%
-                    </strong>
-                </span>
-
-            </div>
-
-
-            <div class="risk-pending-info">
-
-                <i class="bi bi-info-circle"></i>
-
-                <span>
-                    Active scoring remains unchanged
-                    until a different authorized checker
-                    approves this model.
-                </span>
-
-            </div>
-
-        </div>
-    }
-
-</section>
-
-
-<!-- ================================================= -->
-<!-- RISK BANDS -->
-<!-- ================================================= -->
-
-<section class="workflow-heading risk-band-heading">
-
-    <div>
-
-        <h2>Risk Ranges</h2>
-
-        <p>
-            Final risk ranges use the 0–100 scale.
-        </p>
-
-    </div>
-
-
-    @if (canManageBands)
-    {
-        <a class="workflow-primary"
-           asp-controller="RiskScoreSetup"
-           asp-action="Edit">
-
-            <i class="bi bi-pencil-square"></i>
-
-            @(
-                Model.Bands.Count == 0
-                    ? "Create Ranges"
-                    : Model.HasBandDraft
-                        ? "Edit Pending Ranges"
-                        : "Create New Version"
-            )
-
-        </a>
-    }
-
-</section>
-
-
-<!-- ================================================= -->
-<!-- PENDING BAND NOTICE -->
-<!-- ================================================= -->
-@if (Model.HasBandDraft)
-{
-    <div class="risk-review-notice">
-
-        <strong>
-            Pending approval.
-        </strong>
-
-        Active ranges remain unchanged until
-        a different authorized checker approves them.
-
-        <a class="risk-edit-link"
-           asp-controller="RiskScoreSetup"
-           asp-action="Review">
-
-            Review changes
-
-        </a>
-
-    </div>
+            .rs-page * {
+                box-sizing: border-box;
+            }
+
+            .rs-page h1 {
+                font-size: 26px;
+                margin: 0 0 4px;
+                font-weight: 700;
+            }
+
+            .rs-page h2 {
+                font-size: 20px;
+                margin: 0 0 4px;
+                font-weight: 650;
+            }
+
+            .rs-page h3 {
+                font-size: 16px;
+                margin: 0;
+                font-weight: 650;
+            }
+
+            .rs-page p {
+                margin: 0;
+            }
+
+        .rs-muted {
+            color: #53677c;
+        }
+
+        .rs-intro {
+            margin: 0 0 24px;
+        }
+
+        .rs-card {
+            background: #fff;
+            border: 1px solid #dce5ed;
+            border-radius: 14px;
+            margin-bottom: 24px;
+            overflow: hidden;
+            box-shadow: 0 3px 12px #17324d06;
+        }
+
+        .rs-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 24px;
+            border-bottom: 1px solid #e8edf2;
+        }
+
+        .rs-body {
+            padding: 24px;
+        }
+
+        .rs-page a.rs-button {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            background: #087f79;
+            color: #fff;
+            border: 1px solid #087f79;
+            border-radius: 8px;
+            padding: 10px 16px;
+            text-decoration: none;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+            .rs-page a.rs-button:hover {
+                background: #06665f;
+            }
+
+        .rs-page a.rs-secondary {
+            background: #fff;
+            color: #17615c;
+            border-color: #a9c9c6;
+        }
+
+            .rs-page a.rs-secondary:hover {
+                background: #edf7f5;
+            }
+
+        .rs-page a:focus-visible, .rs-page summary:focus-visible {
+            outline: 3px solid #276de0;
+            outline-offset: 3px;
+        }
+
+        .rs-status-line {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+            .rs-status-line time {
+                margin-left: auto;
+                font-size: 13px;
+                color: #53677c;
+            }
+
+        .rs-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            background: #edf1f5;
+            color: #42566b;
+        }
+
+        .rs-approved {
+            background: #e5f5ee;
+            color: #166344;
+        }
+
+        .rs-pending {
+            background: #fff0cc;
+            color: #795000;
+        }
+
+        .rs-weights {
+            display: grid;
+            grid-template-columns: repeat(4,minmax(0,1fr));
+            gap: 14px;
+        }
+
+        .rs-weight {
+            padding: 18px;
+            background: #f7f9fc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+        }
+
+            .rs-weight span {
+                display: block;
+                color: #53677c;
+                font-size: 13px;
+            }
+
+            .rs-weight strong {
+                display: block;
+                font-size: 28px;
+                line-height: 1.2;
+                margin-top: 9px;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .rs-weight.rs-total {
+                background: #edf8f6;
+                border-color: #c6e7df;
+            }
+
+        .rs-formula {
+            margin-top: 16px !important;
+            font-size: 13px;
+            color: #53677c;
+        }
+
+        .rs-notice {
+            border: 1px solid #ecd497;
+            background: #fffaf0;
+            border-radius: 10px;
+            padding: 16px 18px;
+        }
+
+            .rs-notice p {
+                margin-top: 4px;
+                color: #6f5b35;
+            }
+
+        .rs-draft {
+            margin-top: 22px;
+            padding: 20px;
+            background: #fffcf5;
+            border: 1px solid #ecd497;
+            border-radius: 10px;
+        }
+
+        .rs-draft-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .rs-draft-title {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .rs-draft .rs-weight {
+            background: #fff;
+        }
+
+        .rs-note {
+            font-size: 13px;
+            color: #6f5b35;
+            margin-top: 14px !important;
+        }
+
+        .rs-empty {
+            padding: 34px 20px;
+            text-align: center;
+            background: #f8fafc;
+            border: 1px dashed #c8d5e1;
+            border-radius: 10px;
+        }
+
+            .rs-empty p {
+                margin: 8px auto 0;
+                max-width: 580px;
+                color: #53677c;
+            }
+
+        .rs-scroll {
+            overflow-x: auto;
+        }
+
+        .rs-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+            .rs-table th {
+                background: #f3f6fa;
+                color: #445a70;
+                text-align: left;
+                padding: 13px 16px;
+                font-size: 12px;
+                letter-spacing: .03em;
+            }
+
+            .rs-table td {
+                padding: 16px;
+                border-bottom: 1px solid #e6edf3;
+                vertical-align: top;
+            }
+
+            .rs-table tr:last-child td {
+                border-bottom: 0;
+            }
+
+            .rs-table .rs-score {
+                white-space: nowrap;
+                font-weight: 650;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .rs-table td:last-child {
+                min-width: 180px;
+                overflow-wrap: anywhere;
+            }
+
+        .rs-audit {
+            margin-top: 20px;
+            border-top: 1px solid #e6edf3;
+            padding-top: 16px;
+        }
+
+            .rs-audit summary {
+                cursor: pointer;
+                color: #425b73;
+                font-weight: 600;
+                margin-bottom: 12px;
+            }
+
+            .rs-audit .rs-table {
+                font-size: 12px;
+                min-width: 750px;
+            }
+
+        @@media (max-width:700px) {
+            .rs-weights {
+                grid-template-columns: repeat(2,minmax(0,1fr));
+            }
+
+            .rs-header, .rs-body {
+                padding: 18px;
+            }
+
+            .rs-status-line time {
+                margin-left: 0;
+                width: 100%;
+            }
+
+            .rs-table {
+                min-width: 580px;
+            }
+
+            .rs-weight {
+                padding: 14px;
+            }
+
+                .rs-weight strong {
+                    font-size: 24px;
+                }
+        }
+
+        @@media (max-width:380px) {
+            .rs-weights {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 }
+<div class="rs-page">
+    <partial name="_WorkflowMessages" />
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="rs-notice" role="alert">@Model.ErrorMessage</div>
+    }
+    <header class="rs-intro">
+        <h1>Risk Score Setup</h1>
+        <p class="rs-muted">Set how risk is calculated and how the final score determines a decision.</p>
+    </header>
 
+    <section class="rs-card" aria-labelledby="model-heading">
+        <header class="rs-header">
+            <div><h2 id="model-heading">Risk model</h2><p class="rs-muted">Customer, transaction and screening weights must total 100%.</p></div>
+            @if (Model.CanEditModel)
+            {
+                <a class="rs-button" asp-controller="RiskScoreSetup" asp-action="EditModel">
+                    @(Model.HasModelDraft ? "Edit pending model" : active == null ? "Create model" : "Create new version")
+                </a>
+            }
+        </header>
+        <div class="rs-body">
+            @if (active == null)
+            {
+                <div class="rs-notice"><strong>No approved model yet</strong><p>@(pending != null ? "A model is awaiting approval. Scoring cannot use it until it is approved." : "Create a model and have a different authorized reviewer approve it before calculating risk.")</p></div>
+            }
+            else
+            {
+                <div class="rs-status-line">
+                    <span class="rs-badge rs-approved">Approved</span>
+                    <strong>@active.ModelCode · Version @(active.ModelVersion)</strong>
+                    <time>Effective @LocalTime(active.EffectiveFrom) (Nepal)</time>
+                </div>
+                <div class="rs-weights">
+                    <div class="rs-weight"><span>Customer risk</span><strong>@Percent(active.CustomerWeightPercent)</strong></div>
+                    <div class="rs-weight"><span>Transaction risk</span><strong>@Percent(active.TransactionWeightPercent)</strong></div>
+                    <div class="rs-weight"><span>Screening risk</span><strong>@Percent(active.ScreeningWeightPercent)</strong></div>
+                    <div class="rs-weight rs-total"><span>Total weight</span><strong>@Percent(active.CustomerWeightPercent + active.TransactionWeightPercent + active.ScreeningWeightPercent)</strong></div>
+                </div>
+                <p class="rs-formula">Final score = (customer score × customer weight) + (transaction score × transaction weight) + (screening score × screening weight).</p>
+            }
+            @if (pending != null)
+            {
+                <section class="rs-draft" aria-labelledby="pending-model-heading">
+                    <div class="rs-draft-head">
+                        <div class="rs-draft-title"><span class="rs-badge rs-pending">Pending approval</span><h3 id="pending-model-heading">@pending.ModelCode · Version @(pending.ModelVersion)</h3></div>
+                        <a class="rs-button rs-secondary" asp-controller="RiskScoreSetup" asp-action="ReviewModel">Review model</a>
+                    </div>
+                    <div class="rs-weights">
+                        <div class="rs-weight"><span>Customer risk</span><strong>@Percent(pending.CustomerWeightPercent)</strong></div>
+                        <div class="rs-weight"><span>Transaction risk</span><strong>@Percent(pending.TransactionWeightPercent)</strong></div>
+                        <div class="rs-weight"><span>Screening risk</span><strong>@Percent(pending.ScreeningWeightPercent)</strong></div>
+                        <div class="rs-weight"><span>Total weight</span><strong>@Percent(pending.CustomerWeightPercent + pending.TransactionWeightPercent + pending.ScreeningWeightPercent)</strong></div>
+                    </div>
+                    <p class="rs-note">A different authorized reviewer must approve this version. Existing approved settings remain in use until then.</p>
+                </section>
+            }
+        </div>
+    </section>
 
-<!-- ================================================= -->
-<!-- BAND TABLE -->
-<!-- ================================================= -->
-
-<section class="workflow-panel">
-
-    <div class="table-responsive">
-
-        <table class="workflow-table risk-simple-table">
-
-            <thead>
-
-                <tr>
-
-                    <th rowspan="2">
-                        S.N.
-                    </th>
-
-                    <th rowspan="2">
-                        Risk type
-                    </th>
-
-                    <th colspan="3">
-                        Range
-                    </th>
-
-                    <th rowspan="2">
-                        Status
-                    </th>
-
-                    <th rowspan="2">
-                        Created by
-                    </th>
-
-                    <th rowspan="2">
-                        Created date (Nepal)
-                    </th>
-
-                    <th rowspan="2">
-                        Updated by
-                    </th>
-
-                    <th rowspan="2">
-                        Updated date (Nepal)
-                    </th>
-
-                </tr>
-
-
-                <tr>
-
-                    <th>
-                        From
-                    </th>
-
-                    <th>
-                        To
-                    </th>
-
-                    <th>
-                        Remarks
-                    </th>
-
-                </tr>
-
-            </thead>
-
-
-            <tbody>
-
-                @if (Model.Bands.Count == 0)
-                {
-                    <tr>
-
-                        <td colspan="10"
-                            class="workflow-empty">
-
-                            No risk ranges are configured.
-
-                            A user with
-                            Risk Scoring Manage permission
-                            can create the initial set.
-
-                        </td>
-
-                    </tr>
-                }
-
-
-                @for (
-                    var i = 0;
-                    i < Model.Bands.Count;
-                    i++)
-                {
-                    var band =
-                        Model.Bands[i];
-
-                    <tr>
-
-                        <td>
-                            @(i + 1)
-                        </td>
-
-
-                        <td>
-                            @band.RiskLevel
-                        </td>
-
-
-                        <td>
-                            @band.MinimumScore
-                        </td>
-
-
-                        <td>
-                            @(band.MaximumScore ?? 100)
-                        </td>
-
-
-                        <td>
-                            @(band.Remarks ?? "—")
-                        </td>
-
-
-                        <td>
-
-                            <span class="
-                                risk-status
-                                @(band.ApprovalStatus == "APPROVED"
-                                      ? "approved"
-                                      : "pending")">
-
-                                @(
-                                    band.ApprovalStatus == "APPROVED"
-                                        ? "Approved"
-                                        : "Pending"
-                                )
-
-                            </span>
-
-                        </td>
-
-
-                        <td>
-                            @(band.CreatedBy ?? "—")
-                        </td>
-
-
-                        <td>
-                            @LocalTime(
-                                band.CreatedDate)
-                        </td>
-
-
-                        <td>
-                            @(band.UpdatedBy ?? "—")
-                        </td>
-
-
-                        <td>
-                            @LocalTime(
-                                band.UpdatedDate)
-                        </td>
-
-                    </tr>
-                }
-
-            </tbody>
-
-        </table>
-
-    </div>
-
-</section>
+    <section class="rs-card" aria-labelledby="ranges-heading">
+        <header class="rs-header">
+            <div><h2 id="ranges-heading">Risk ranges</h2><p class="rs-muted">Map scores from 0 to 100 to a risk level and decision.</p></div>
+            @if (Model.CanEditBands)
+            {
+                <a class="rs-button" asp-controller="RiskScoreSetup" asp-action="Edit">@(Model.HasBandDraft ? "Edit pending ranges" : Model.Bands.Count == 0 ? "Create ranges" : "Create new version")</a>
+            }
+        </header>
+        <div class="rs-body">
+            @if (Model.HasBandDraft)
+            {
+                <div class="rs-draft-head rs-notice">
+                    <div><strong>Range changes are awaiting approval</strong><p>Pending ranges are not used for scoring until approved.</p></div>
+                    <a class="rs-button rs-secondary" asp-controller="RiskScoreSetup" asp-action="Review">Review ranges</a>
+                </div>
+            }
+            @if (Model.Bands.Count == 0)
+            {
+                <div class="rs-empty">
+                    <h3>No risk ranges to display</h3>
+                    <p>@(Model.HasBandDraft ? "Open Review ranges to inspect the pending configuration." : Model.CanEditBands ? "Choose Create ranges to define risk levels and decisions. Cover the full 0–100 scale without gaps or overlaps." : "An authorized setup manager must create the ranges, followed by approval from a different authorized reviewer.")</p>
+                    <p>Risk scoring requires approved ranges as well as an approved model and factor rules.</p>
+                </div>
+            }
+            else
+            {
+                <div class="rs-scroll" tabindex="0" role="region" aria-label="Risk ranges">
+                    <table class="rs-table">
+                        <thead><tr><th scope="col">Risk level</th><th scope="col">Score range</th><th scope="col">Decision</th><th scope="col">Status</th><th scope="col">Remarks</th></tr></thead>
+                        <tbody>
+                            @foreach (var band in Model.Bands.OrderBy(x => x.MinimumScore))
+                            {
+                                <tr>
+                                    <td><strong>@band.RiskLevel</strong></td>
+                                    <td class="rs-score">@band.MinimumScore – @(band.MaximumScore ?? 100)</td>
+                                    <td>@band.Decision</td>
+                                    <td><span class="rs-badge @(band.ApprovalStatus == "APPROVED" ? "rs-approved" : band.ApprovalStatus == "PENDING" ? "rs-pending" : "")">@band.ApprovalStatus</span></td>
+                                    <td>@(string.IsNullOrWhiteSpace(band.Remarks) ? "—" : band.Remarks)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <details class="rs-audit">
+                    <summary>View range creation and update details</summary>
+                    <div class="rs-scroll" tabindex="0" role="region" aria-label="Range audit details">
+                        <table class="rs-table">
+                            <thead><tr><th scope="col">Risk level</th><th scope="col">Created by</th><th scope="col">Created (Nepal)</th><th scope="col">Updated by</th><th scope="col">Updated (Nepal)</th></tr></thead>
+                            <tbody>
+                                @foreach (var band in Model.Bands.OrderBy(x => x.MinimumScore))
+                                {
+                                    <tr><td>@band.RiskLevel</td><td>@(band.CreatedBy ?? "—")</td><td>@LocalTime(band.CreatedDate)</td><td>@(band.UpdatedBy ?? "—")</td><td>@LocalTime(band.UpdatedDate)</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+            }
+        </div>
+    </section>
+</div>

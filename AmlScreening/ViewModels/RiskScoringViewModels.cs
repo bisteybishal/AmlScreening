@@ -104,6 +104,7 @@ public sealed class RiskBandEditViewModel
 
 public sealed class RiskScoreSetupEditViewModel
 {
+    public string? ErrorMessage { get; set; }
     [MinLength(1, ErrorMessage = "At least one risk range is required.")]
     public List<RiskBandEditViewModel> Bands { get; set; } = [];
 }

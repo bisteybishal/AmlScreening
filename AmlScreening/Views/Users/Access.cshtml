@@ -1,335 +1,60 @@
 @model AmlScreening.Portal.ViewModels.UserAccessViewModel
 
 @{
-    ViewData["Title"] = "Manage User Access";
-    ViewData["WorkspaceKey"] = "Users";
-    ViewData["WorkspaceUrl"] =
-        Url.Action("Index", "Users");
-
-    var userInitials =
-        string.IsNullOrWhiteSpace(Model.Username)
-            ? "U"
-            : Model.Username
-                .Substring(
-                    0,
-                    Math.Min(
-                        2,
-                        Model.Username.Length))
-                .ToUpperInvariant();
+    ViewData["Title"] = "User access";
 }
 
+<h2>Access: @Model.Username</h2>
+<p>@Model.PartnerName → @Model.BranchName</p>
 
-@section Styles {
-
-    <link rel="stylesheet"
-          href="~/css/users.css"
-          asp-append-version="true" />
-
-}
-
-
-<section class="user-editor-heading">
-
-    <a asp-action="Index">
-
-        <i class="bi bi-arrow-left"></i>
-
-        Back to Users
-
-    </a>
-
-
-    <h1>
-        Manage User Access
-    </h1>
-
-
-    <p>
-
-        Assign one or more roles to
-
-        <strong>
-            @Model.Username
-        </strong>.
-
-        Permissions are inherited from
-        the selected roles.
-
-    </p>
-
-</section>
-
-
-@if (TempData["SuccessMessage"] is string success)
-{
-    <div class="alert alert-success">
-
-        <i class="bi bi-check-circle me-2"></i>
-
-        @success
-
-    </div>
-}
-
-
-@if (TempData["ErrorMessage"] is string error)
-{
-    <div class="alert alert-danger">
-
-        <i class="bi bi-exclamation-triangle me-2"></i>
-
-        @error
-
-    </div>
-}
-
-
-<form asp-action="Access"
-      method="post"
-      class="user-access-form">
-
+<form asp-action="Access" method="post">
     @Html.AntiForgeryToken()
 
+    <input asp-for="UserId" type="hidden" />
 
-    <input asp-for="UserId"
-           type="hidden" />
+    <div asp-validation-summary="All" class="text-danger"></div>
 
+    <fieldset class="mb-3">
+        <legend class="fs-6">Roles</legend>
 
-    <div asp-validation-summary="ModelOnly"
-         class="users-validation">
-    </div>
-
-
-    <!-- ====================================== -->
-    <!-- USER SUMMARY -->
-    <!-- ====================================== -->
-
-    <section class="access-user-summary">
-
-        <div class="access-avatar">
-
-            @userInitials
-
-        </div>
-
-
-        <div class="access-user-info">
-
-            <h2>
-                @Model.Username
-            </h2>
-
-
-            <p>
-
-                @if (!string.IsNullOrWhiteSpace(
-                    Model.PartnerName))
-                {
-                    <span>
-                        @Model.PartnerName
-                    </span>
-                }
-
-
-                @if (!string.IsNullOrWhiteSpace(
-                    Model.BranchName))
-                {
-                    <span>
-                        · @Model.BranchName
-                    </span>
-                }
-
-            </p>
-
-
-            <p>
-
-                Status:
-
-                @if (Model.IsActive)
-                {
-                    <span class="badge bg-success">
-                        Active
-                    </span>
-                }
-                else
-                {
-                    <span class="badge bg-secondary">
-                        Inactive
-                    </span>
-                }
-
-            </p>
-
-        </div>
-
-    </section>
-
-
-    <!-- ====================================== -->
-    <!-- INFORMATION -->
-    <!-- ====================================== -->
-
-    <div class="access-help">
-
-        <i class="bi bi-info-circle"></i>
-
-
-        <span>
-
-            Permissions are configured on roles.
-
-            Select the roles this user should have.
-
-            After changing access, the user should
-            sign in again so the new permissions
-            are loaded.
-
-        </span>
-
-    </div>
-
-
-    <!-- ====================================== -->
-    <!-- ROLES -->
-    <!-- ====================================== -->
-
-    <section class="access-module-panel active">
-
-        <div class="access-panel-heading">
-
-            <div class="access-panel-icon">
-
-                <i class="bi bi-person-badge"></i>
-
-            </div>
-
-
-            <div>
-
-                <h2>
-                    User Roles
-                </h2>
-
-
-                <p>
-
-                    Select one or more roles for
-                    this user.
-
-                </p>
-
-            </div>
-
-        </div>
-
-
-        <span asp-validation-for="SelectedRoleIds"
-              class="text-danger">
-        </span>
-
-
-        @if (Model.Roles.Count == 0)
+        @foreach (var role in Model.Roles)
         {
-            <div class="role-access-empty">
+            <div class="form-check">
+                <input type="checkbox"
+                       name="SelectedRoleIds"
+                       value="@role.RoleId"
+                       id="role_@role.RoleId"
+                       checked="@Model.SelectedRoleIds.Contains(role.RoleId)"
+                       class="form-check-input" />
 
-                <i class="bi bi-info-circle"></i>
-
-                <span>
-                    No active roles are available.
-                </span>
-
+                <label for="role_@role.RoleId" class="form-check-label">
+                    @role.RoleName
+                </label>
             </div>
         }
-        else
-        {
-            <div class="role-access-list">
+    </fieldset>
 
-                @foreach (var role in Model.Roles)
-                {
-                    var selected =
-                        Model.SelectedRoleIds
-                            .Contains(
-                                role.RoleId);
-
-
-                    <article class="role-access-card">
-
-                        <div class="role-access-header">
-
-                            <label class="role-access-select">
-
-                                <input type="checkbox"
-                                       name="SelectedRoleIds"
-                                       value="@role.RoleId"
-                                       checked="@selected" />
-
-
-                                <span class="role-access-check">
-
-                                    <i class="bi bi-check"></i>
-
-                                </span>
-
-
-                                <div class="role-access-name">
-
-                                    <strong>
-                                        @role.RoleName
-                                    </strong>
-
-
-                                    @if (selected)
-                                    {
-                                        <small>
-                                            Currently assigned
-                                        </small>
-                                    }
-                                    else
-                                    {
-                                        <small>
-                                            Not assigned
-                                        </small>
-                                    }
-
-                                </div>
-
-                            </label>
-
-                        </div>
-
-                    </article>
-                }
-
-            </div>
-        }
-
-    </section>
-
-
-    <!-- ====================================== -->
-    <!-- ACTIONS -->
-    <!-- ====================================== -->
-
-    <div class="user-editor-actions">
-
-        <a class="users-secondary-button"
-           asp-action="Index">
-
-            Cancel
-
-        </a>
-
-
-        <button class="users-primary-button"
-                type="submit">
-
-            <i class="bi bi-check2"></i>
-
-            Save Access
-
-        </button>
-
+    <div class="form-check mb-3">
+        <input asp-for="IsActive" class="form-check-input" />
+        <label asp-for="IsActive" class="form-check-label">
+            Active account
+        </label>
     </div>
 
+    <p class="text-muted">
+        Changing access ends this user's existing sessions.
+    </p>
+
+    <button type="submit" class="btn btn-primary">Save access</button>
+
+    <a asp-action="BranchUsers"
+       asp-route-partnerId="@Model.PartnerId"
+       asp-route-branchId="@Model.BranchId"
+       class="btn btn-outline-secondary">
+        Cancel
+    </a>
 </form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

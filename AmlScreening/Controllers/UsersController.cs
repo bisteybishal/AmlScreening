@@ -5,1668 +5,791 @@ using AmlScreening.Application.Models;
 using AmlScreening.Application.Security;
 using AmlScreening.Domain.Entities;
 using AmlScreening.Portal.ViewModels;
-using AspNetCoreGeneratedDocument;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using static AppPermissions;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
+using AppUser = AmlScreening.Domain.Entities.User;
 
 namespace AmlScreening.Portal.Controllers;
 
-[Authorize(
-    Policy = AppPermissions.Users.Manage)]
+[Authorize(Roles = AppRoles.Admin)]
+[Authorize(Policy = AppPermissions.Users.Manage)]
 public sealed class UsersController : Controller
 {
-    private readonly IUserRepository
-        _userRepository;
-
-    private readonly IPasswordService
-        _passwordService;
-
-    private readonly IErrorLogService
-        _errorLogService;
-
+    private readonly IUserRepository _userRepository;
+    private readonly IPasswordService _passwordService;
+    private readonly IErrorLogService _errorLogService;
 
     public UsersController(
         IUserRepository userRepository,
         IPasswordService passwordService,
         IErrorLogService errorLogService)
     {
-        _userRepository =
-            userRepository;
-
-        _passwordService =
-            passwordService;
-
-        _errorLogService =
-            errorLogService;
+        _userRepository = userRepository;
+        _passwordService = passwordService;
+        _errorLogService = errorLogService;
     }
 
-
-    // =========================================================
-    // USERS LIST
-    // =========================================================
-
     [HttpGet]
-    public async Task<IActionResult> Index(
-        int? partnerId,
-        int? branchId,
-        int page = 1)
+    public async Task<IActionResult> Index(int page = 1)
     {
-        try
+        var result = await _userRepository.GetPartnersAsync(
+            Math.Max(1, page),
+            10);
+
+        return View(new UsersPageViewModel
         {
-            const int pageSize = 10;
-
-
-            page =
-                Math.Max(
-                    1,
-                    page);
-
-
-            var result =
-                await _userRepository
-                    .GetPartnersAsync(
-                        page,
-                        pageSize);
-                       
-            var model =
-                new UsersPageViewModel
-                {
-                    Partners = result.Items,
-
-                    TotalPartners =
-                    result.TotalCount,
-
-                    ActivePartners =
-                    result.Items.Count(x => x.IsActive),
-
-                    IActivePartners =
-                    result.Items.Count(x => !x.IsActive),
-
-                    TotalUsers =
-                    result.Items.Sum(x => x.UserCount),
-
-                    Page =
-                    result.PageNumber,
-
-                    PageSize =
-                    result.PageSize,
-
-                    TotalPages =
-                    result.TotalPages
-                };
-
-
-            return View(model);
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(Index));
-
-
-            return View(
-                new UsersPageViewModel
-                {
-                    ErrorMessage =
-                        errorId.HasValue
-
-                            ? $"Partners could not be loaded. Error reference: {errorId.Value}"
-                        : "Partners could not be loaded."
-                });
-        }
+            Partners = result.Items,
+            TotalPartners = result.TotalCount,
+            TotalUsers = result.TotalUsers,
+            ActivePartners = result.ActiveCount,
+            IActivePartners = result.InactiveCount,
+            Page = result.PageNumber,
+            PageSize = result.PageSize,
+            TotalPages = result.TotalPages
+        });
     }
 
-
-    // =========================================================
-    // CREATE PARTNER - GET
-    // =========================================================
-
     [HttpGet]
-    [Authorize(Policy = AppPermissions.Users.Manage)]
+    [Authorize(Policy = AppPermissions.Partners.Manage)]
     public IActionResult CreatePartner()
     {
-        return View(
-            new CreatePartnerViewModel
-            {
-                IsActive =
-                    true
-            });
+        return View(new CreatePartnerViewModel());
     }
-
-
-    // =========================================================
-    // CREATE PARTNER - POST
-
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = AppPermissions.Users.Manage)]
+    [Authorize(Policy = AppPermissions.Partners.Manage)]
     public async Task<IActionResult> CreatePartner(
         CreatePartnerViewModel model)
     {
-        try
+        model.PartnerCode = model.PartnerCode?.Trim() ?? string.Empty;
+        model.PartnerName = model.PartnerName?.Trim() ?? string.Empty;
+        model.Address = Clean(model.Address);
+        model.Email = Clean(model.Email);
+        model.PhoneNumber = Clean(model.PhoneNumber);
+        model.Country = Clean(model.Country);
+        model.City = Clean(model.City);
+
+        if (!ModelState.IsValid)
+            return View(model);
+
+        if (await _userRepository.PartnerCodeExistsAsync(model.PartnerCode))
         {
-            model.PartnerCode =
-                model.PartnerCode?
-                    .Trim()
-                    .ToUpperInvariant()
-                ?? string.Empty;
+            ModelState.AddModelError(
+                nameof(model.PartnerCode),
+                "This partner code already exists.");
 
+            return View(model);
+        }
 
-            model.PartnerName =
-                model.PartnerName?
-                    .Trim()
-                ?? string.Empty;
+        var partnerId = 0;
 
-
-            model.Address =
-                NullIfWhiteSpace(
-                    model.Address);
-
-
-            model.Email =
-                NullIfWhiteSpace(
-                    model.Email);
-
-
-            model.PhoneNumber =
-                NullIfWhiteSpace(
-                    model.PhoneNumber);
-
-
-            // ---------------------------------------------
-            // Partner Code Duplicate Check
-            // ---------------------------------------------
-
-            if (!string.IsNullOrWhiteSpace(
-                    model.PartnerCode))
-            {
-                var exists =
-                    await _userRepository
-                        .PartnerCodeExistsAsync(
-                            model.PartnerCode);
-
-
-                if (exists)
-                {
-                    ModelState.AddModelError(
-                        nameof(
-                            model.PartnerCode),
-                        "Partner code already exists.");
-                }
-            }
-
-
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
-
-
-            var partner =
+        var saved = await TrySaveAsync(async () =>
+        {
+            partnerId = await _userRepository.CreatePartnerAsync(
                 new Partner
                 {
-                    PartnerCode =
-                        model.PartnerCode,
-
-                    PartnerName =
-                        model.PartnerName,
-
-                    Address =
-                        model.Address,
-
-                    Email =
-                        model.Email,
-
-                    PhoneNumber =
-                        model.PhoneNumber,
-
-                    IsActive =
-                        model.IsActive
-                };
-
-
-            var partnerId =
-                await _userRepository
-                    .CreatePartnerAsync(
-                        partner);
-
-
-            TempData["SuccessMessage"] =
-                "Partner created successfully.";
-
-
-            /*
-             * Flow:
-             *
-             * Partner
-             *   ↓
-             * Branch
-             *   ↓
-             * User
-             */
-
-            return RedirectToAction(
-                nameof(CreatePartner),
-                new
-                {
-                    partnerId
+                    PartnerCode = model.PartnerCode,
+                    PartnerName = model.PartnerName,
+                    Address = model.Address,
+                    Country=model.Country,
+                    City=model.City,
+                    Email = model.Email,
+                    PhoneNumber = model.PhoneNumber,
+                    IsActive = model.IsActive
                 });
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(CreatePartner));
+        }, nameof(CreatePartner));
 
-
-            ModelState.AddModelError(
-                string.Empty,
-                errorId.HasValue
-
-                    ? $"Unable to create partner. Error reference: {errorId.Value}"
-
-                    : "Unable to create partner.");
-
-
+        if (!saved)
             return View(model);
-        }
+
+        TempData["SuccessMessage"] = "Partner created successfully.";
+
+        if (!model.IsActive)
+            return RedirectToAction(nameof(Index));
+
+        return RedirectToAction(
+            nameof(CreateBranch),
+            new { partnerId });
     }
 
-    // edit partner 
     [HttpGet]
-    public async Task<IActionResult> EditPartner(int partnerid)
+    [Authorize(Policy = AppPermissions.Partners.Manage)]
+    public async Task<IActionResult> EditPartner(int partnerId)
     {
-        try
-        {
-            if (partnerid <= 0)
-            {
-                return NotFound();
-            }
-            var partner = await _userRepository.GetPartnerByIdAsync(partnerid);
-            if (partner == null)
-            {
-                return NotFound();
-            }
-            var model = new EditPartnerViewModel
-            {
-                PartnerId = partner.PartnerId,
-                PartnerName = partner.PartnerName,
-                PartnerCode = partner.PartnerCode,
-                Address = partner.Address,
-                Email = partner.Email,
-                PhoneNumber = partner.PhoneNumber,
-                IsActive = partner.IsActive
-            };
-            return View(model);
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-           await LogErrorAsync(
-               ex,
-               nameof(EditPartner));
+        var partner = await _userRepository.GetPartnerByIdAsync(partnerId);
 
-            TempData["ErrorMessage"] =
-                errorId.HasValue
-                    ? $"Partner could not be loaded. Error reference: {errorId.Value}"
-                    : "Partner could not be loaded.";
+        if (partner is null)
+            return NotFound();
 
-            return RedirectToAction(
-                nameof(Index));
-        }
+        return View(new EditPartnerViewModel
+        {
+            PartnerId = partner.PartnerId,
+            PartnerCode = partner.PartnerCode,
+            PartnerName = partner.PartnerName,
+            Address = partner.Address,
+            Country = partner.Country,
+            City = partner.City,
+            Email = partner.Email,
+            PhoneNumber = partner.PhoneNumber,
+            IsActive = partner.IsActive
+        });
     }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> EditPartner(EditPartnerViewModel model)
+    [Authorize(Policy = AppPermissions.Partners.Manage)]
+    public async Task<IActionResult> EditPartner(
+        EditPartnerViewModel model)
     {
-        try
+        var existing = await _userRepository.GetPartnerByIdAsync(
+            model.PartnerId);
+
+        if (existing is null)
+            return NotFound();
+
+        model.PartnerCode = model.PartnerCode?.Trim() ?? string.Empty;
+        model.PartnerName = model.PartnerName?.Trim() ?? string.Empty;
+        model.Address = Clean(model.Address);
+        model.Email = Clean(model.Email);
+        model.PhoneNumber = Clean(model.PhoneNumber);
+        model.Country = Clean(model.Country);
+        model.City = Clean(model.City);
+
+        if (!model.IsActive &&
+            model.PartnerId == CurrentIntClaim(AppClaimTypes.PartnerId))
         {
-            model.PartnerCode = model.PartnerCode?.Trim().ToUpperInvariant() ?? string.Empty;
-            model.PartnerName = model.PartnerName?.Trim() ?? string.Empty;
-            model.Address =
-            NullIfWhiteSpace(
-                model.Address);
-
-            model.Email =
-                NullIfWhiteSpace(
-                    model.Email);
-
-            model.PhoneNumber =
-                NullIfWhiteSpace(
-                    model.PhoneNumber);
-            if (model.PartnerId <= 0)
-            {
-                return NotFound();
-            }
-            var updatedPartner = await _userRepository.GetPartnerByIdAsync(model.PartnerId);
-            if (updatedPartner == null)
-            {
-                return NotFound();
-            }
-            if (!string.IsNullOrWhiteSpace(model.PartnerCode))
-            {
-                var duplicate = await _userRepository.PartnerCodeExistsAsync(model.PartnerCode, model.PartnerId);
-                if (duplicate)
-                {
-                    ModelState.AddModelError(nameof(model.PartnerCode), "Partner code already exists.");
-
-                }
-            }
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
-            var partner = new Partner
-            {
-                PartnerId =
-                    model.PartnerId,
-
-                PartnerCode =
-                    model.PartnerCode,
-
-                PartnerName =
-                    model.PartnerName,
-
-                Address =
-                    model.Address,
-
-                Email =
-                    model.Email,
-
-                PhoneNumber =
-                    model.PhoneNumber,
-
-                IsActive =
-                    model.IsActive
-            };
-            var updated = await _userRepository.UpdatePartnerAsync(partner);
-            if (!updated)
-            {
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Partner could not be updated.");
-
-                return View(model);
-            }
-            TempData["SuccessMessage"] =
-            "Partner updated successfully.";
-
-
-            return RedirectToAction(
-                nameof(Index));
-
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(EditPartner));
-
             ModelState.AddModelError(
-                string.Empty,
-                errorId.HasValue
-                    ? $"Partner could not be updated. Error reference: {errorId.Value}"
-                    : "Partner could not be updated.");
+                nameof(model.IsActive),
+                "You cannot deactivate the partner you are signed in under.");
+        }
+
+        if (!ModelState.IsValid)
+            return View(model);
+
+        if (await _userRepository.PartnerCodeExistsAsync(
+            model.PartnerCode,
+            model.PartnerId))
+        {
+            ModelState.AddModelError(
+                nameof(model.PartnerCode),
+                "This partner code already exists.");
 
             return View(model);
         }
 
+        var saved = await TrySaveAsync(async () =>
+        {
+            existing.PartnerCode = model.PartnerCode;
+            existing.PartnerName = model.PartnerName;
+            existing.Address = model.Address;
+            existing.Country = model.Country;
+            existing.City = model.City;
+            existing.Email = model.Email;
+            existing.PhoneNumber = model.PhoneNumber;
+            existing.IsActive = model.IsActive;
+
+            if (!await _userRepository.UpdatePartnerAsync(existing))
+                throw new InvalidOperationException("Partner was not found.");
+        }, nameof(EditPartner));
+
+        if (!saved)
+            return View(model);
+
+        TempData["SuccessMessage"] = "Partner updated successfully.";
+
+        return RedirectToAction(nameof(Index));
     }
-
-
 
     [HttpGet]
     public async Task<IActionResult> PartnerBranchesDetail(int partnerId)
     {
-        try
+        var partner = await _userRepository.GetPartnerByIdAsync(partnerId);
+
+        if (partner is null)
+            return NotFound();
+
+        return View(new PartnerBranchesViewModel
         {
-
-            if (partnerId <= 0)
-            {
-                return NotFound();
-            }
-            var partner = await _userRepository.GetPartnerByIdAsync(partnerId);
-            if (partner == null)
-            {
-                return NotFound();
-            }
-
-            var branches = await _userRepository.GetBranchesByPartnerAsync(partnerId);
-            var branchModel = new PartnerBranchesViewModel
-            {
-                PartnerId = partnerId,
-                PartnerCode = partner.PartnerCode,
-                PartnerName = partner.PartnerName,
-                IsActive =
-                        partner.IsActive,
-
-                Branches =
-                        branches
-            };
-            return View(branchModel);
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(PartnerBranchesDetail));
-
-
-            TempData["ErrorMessage"] =
-                errorId.HasValue
-                    ? $"Branches could not be loaded. Error reference: {errorId.Value}"
-                    : "Branches could not be loaded.";
-
-
-            return RedirectToAction(
-                nameof(Index));
-        }
-
+            PartnerId = partner.PartnerId,
+            PartnerCode = partner.PartnerCode,
+            PartnerName = partner.PartnerName,
+            IsActive = partner.IsActive,
+            Branches = await _userRepository.GetBranchesByPartnerAsync(
+                partner.PartnerId)
+        });
     }
-
-    // =========================================================
-    // CREATE BRANCH - GET
-    // =========================================================
 
     [HttpGet]
-    [Authorize(Policy = AppPermissions.Users.Manage)]
-    public async Task<IActionResult> CreateBranch(
-        int? partnerId)
+    [Authorize(Policy = AppPermissions.Partners.Manage)]
+    public async Task<IActionResult> CreateBranch(int partnerId)
     {
-        try
+        var partner = await _userRepository.GetPartnerByIdAsync(partnerId);
+
+        if (partner is null)
+            return NotFound();
+
+        if (!partner.IsActive)
+            return BadRequest("Activate the partner before adding a branch.");
+
+        return View(new CreateBranchViewModel
         {
-            var model =
-                new CreateBranchViewModel
-                {
-                    PartnerId =
-                        partnerId
-                        ?? 0,
-
-                    IsActive =
-                        true
-                };
-
-
-            await LoadPartnerOptionsAsync(
-                model);
-
-
-            return View(model);
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(CreateBranch));
-
-
-            TempData["ErrorMessage"] =
-                errorId.HasValue
-
-                    ? $"Unable to load branch form. Error reference: {errorId.Value}"
-
-                    : "Unable to load branch form.";
-
-
-            return RedirectToAction(
-                nameof(Index));
-        }
+            PartnerId = partner.PartnerId
+        });
     }
-
-
-    // =========================================================
-    // CREATE BRANCH - POST
-    // =========================================================
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(
-        Policy =
-            AppPermissions.Users.Manage)]
+    [Authorize(Policy = AppPermissions.Partners.Manage)]
     public async Task<IActionResult> CreateBranch(
         CreateBranchViewModel model)
     {
-        try
+        var partner = await _userRepository.GetPartnerByIdAsync(
+            model.PartnerId);
+
+        if (partner is null)
+            return NotFound();
+
+        model.BranchName = model.BranchName?.Trim() ?? string.Empty;
+        model.Address = Clean(model.Address);
+        model.Email = Clean(model.Email);
+        model.PhoneNumber = Clean(model.PhoneNumber);
+
+        if (!partner.IsActive)
         {
-            model.BranchName =
-                model.BranchName?
-                    .Trim()
-                ?? string.Empty;
+            ModelState.AddModelError(
+                string.Empty,
+                "Activate the partner before adding a branch.");
+        }
 
+        if (!ModelState.IsValid)
+            return View(model);
 
-            model.Address =
-                NullIfWhiteSpace(
-                    model.Address);
+        if (await _userRepository.BranchNameExistsAsync(
+            partner.PartnerId,
+            model.BranchName))
+        {
+            ModelState.AddModelError(
+                nameof(model.BranchName),
+                "This branch name already exists under this partner.");
 
+            return View(model);
+        }
 
-            model.Email =
-                NullIfWhiteSpace(
-                    model.Email);
+        var branchId = 0;
 
-
-            model.PhoneNumber =
-                NullIfWhiteSpace(
-                    model.PhoneNumber);
-
-
-            await LoadPartnerOptionsAsync(
-                model);
-
-
-            // ---------------------------------------------
-            // Partner validation
-            // ---------------------------------------------
-
-            if (model.PartnerId <= 0)
-            {
-                ModelState.AddModelError(
-                    nameof(model.PartnerId),
-                    "Select a partner.");
-            }
-            else
-            {
-                var partnerExists =
-                    model.Partners.Any(
-                        x =>
-                            x.PartnerId ==
-                                model.PartnerId);
-
-
-                if (!partnerExists)
-                {
-                    ModelState.AddModelError(
-                        nameof(model.PartnerId),
-                        "Selected partner is invalid.");
-                }
-            }
-
-
-            // ---------------------------------------------
-            // Duplicate Branch
-            // ---------------------------------------------
-
-            if (model.PartnerId > 0
-                &&
-                !string.IsNullOrWhiteSpace(
-                    model.BranchName))
-            {
-                var exists =
-                    await _userRepository
-                        .BranchNameExistsAsync(
-                            model.PartnerId,
-                            model.BranchName);
-
-
-                if (exists)
-                {
-                    ModelState.AddModelError(
-                        nameof(
-                            model.BranchName),
-                        "This branch already exists for the selected partner.");
-                }
-            }
-
-
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
-
-
-            var branch =
+        var saved = await TrySaveAsync(async () =>
+        {
+            branchId = await _userRepository.CreateBranchAsync(
                 new PartnerBranch
                 {
-                    PartnerId =
-                        model.PartnerId,
-
-                    BranchName =
-                        model.BranchName,
-
-                    Address =
-                        model.Address,
-
-                    Email =
-                        model.Email,
-
-                    PhoneNumber =
-                        model.PhoneNumber,
-
-                    IsActive =
-                        model.IsActive
-                };
-
-
-            var branchId =
-                await _userRepository
-                    .CreateBranchAsync(
-                        branch);
-
-
-            TempData["SuccessMessage"] =
-                "Branch created successfully.";
-
-
-            return RedirectToAction(
-                nameof(Create),
-                new
-                {
-                    partnerId =
-                        model.PartnerId,
-
-                    branchId
+                    PartnerId = partner.PartnerId,
+                    BranchName = model.BranchName,
+                    Address = model.Address,
+                    Email = model.Email,
+                    PhoneNumber = model.PhoneNumber,
+                    IsActive = model.IsActive
                 });
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(CreateBranch));
+        }, nameof(CreateBranch));
 
-
-            ModelState.AddModelError(
-                string.Empty,
-                errorId.HasValue
-
-                    ? $"Unable to create branch. Error reference: {errorId.Value}"
-
-                    : "Unable to create branch.");
-
-
-            await LoadPartnerOptionsAsync(
-                model);
-
-
+        if (!saved)
             return View(model);
-        }
-    }
 
-    //Edit Branch Detail
-    [HttpGet]
-    public async Task<IActionResult> EditBranchDetail(int branchid)
-    {
-        try
+        TempData["SuccessMessage"] = "Branch created successfully.";
+
+        if (!model.IsActive)
         {
-            if (branchid <= 0)
-            {
-                return NotFound();
-            }
-            var branch = await _userRepository.GetBranchByIdAsync(branchid);
-            if (branch == null)
-            {
-                return NotFound();
-            }
-            var branchmodel = new EditBranchViewModel
-            {
-                BranchId = branch.BranchId,
-                PartnerId = branch.PartnerId,
-                BranchName = branch.BranchName,
-                Email = branch.Email,
-                PhoneNumber = branch.PhoneNumber,
-                IsActive = branch.IsActive
-
-            };
-            return View(branchmodel);
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(EditBranchDetail));
-
-            TempData["ErrorMessage"] =
-                errorId.HasValue
-                    ? $"Branch could not be loaded. Error reference: {errorId.Value}"
-                    : "Branch could not be loaded.";
-
-            return RedirectToAction(
-                nameof(Index));
-        }
-    }
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> EditBranchDetail(EditBranchViewModel model)
-    {
-        try
-        {
-            model.BranchName =
-           model.BranchName?
-               .Trim()
-           ?? string.Empty;
-
-            model.Address =
-                NullIfWhiteSpace(
-                    model.Address);
-
-            model.Email =
-                NullIfWhiteSpace(
-                    model.Email);
-
-            model.PhoneNumber =
-                NullIfWhiteSpace(
-                    model.PhoneNumber);
-
-            if (model.BranchId <= 0 ||
-          model.PartnerId <= 0)
-            {
-                return NotFound();
-            }
-            var existing =
-           await _userRepository
-               .GetBranchByIdAsync(
-                   model.BranchId);
-
-            if (existing == null ||
-                existing.PartnerId != model.PartnerId)
-            {
-                return NotFound();
-            }
-            var duplicate =
-           await _userRepository
-               .BranchNameExistsAsync(
-                   model.PartnerId,
-                   model.BranchName,
-                   model.BranchId);
-
-
-            if (duplicate)
-            {
-                ModelState.AddModelError(
-                    nameof(model.BranchName),
-                    "This branch already exists for the selected partner.");
-            }
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
-
-
-            var branch = new PartnerBranch
-            {
-                BranchId = model.BranchId,
-                PartnerId = model.PartnerId,
-                BranchName = model.BranchName,
-                Email = model.Email,
-                PhoneNumber = model.PhoneNumber,
-                Address = model.Address,
-                IsActive = model.IsActive
-            };
-            var updated = await _userRepository.UpdateBranchAsync(branch);
-            if (!updated)
-            {
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Branch could not be updated.");
-
-                return View(model);
-            }
-
-
-            TempData["SuccessMessage"] =
-                "Branch updated successfully.";
-
-
             return RedirectToAction(
                 nameof(PartnerBranchesDetail),
-                new
-                {
-                    partnerId =
-                        model.PartnerId
-                });
+                new { partnerId = partner.PartnerId });
         }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(EditBranchDetail));
 
-            ModelState.AddModelError(
-                string.Empty,
-                errorId.HasValue
-                    ? $"Branch could not be updated. Error reference: {errorId.Value}"
-                    : "Branch could not be updated.");
-
-            return View(model);
-        }
+        return RedirectToAction(
+            nameof(CreateUser),
+            new
+            {
+                partnerId = partner.PartnerId,
+                branchId
+            });
     }
-
-    // =========================================================
-    // CREATE USER - GET
-    // =========================================================
 
     [HttpGet]
-    public async Task<IActionResult> Create(
-        int? partnerId,
-        int? branchId)
+    [Authorize(Policy = AppPermissions.Partners.Manage)]
+    public async Task<IActionResult> EditBranchDetail(int branchId)
     {
-        try
+        var branch = await _userRepository.GetBranchByIdAsync(branchId);
+
+        if (branch is null)
+            return NotFound();
+
+        return View(new EditBranchViewModel
         {
-            var model =
-                new CreateUserViewModel
-                {
-                    PartnerId =
-                        partnerId
-                        ?? 0,
-
-                    BranchId =
-                        branchId
-                        ?? 0,
-
-                    IsActive =
-                        true
-                };
-
-
-            await LoadUserOptionsAsync(
-                model);
-
-
-            return View(model);
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(Create));
-
-
-            TempData["ErrorMessage"] =
-                errorId.HasValue
-
-                    ? $"Unable to load user form. Error reference: {errorId.Value}"
-
-                    : "Unable to load user form.";
-
-
-            return RedirectToAction(
-                nameof(Index));
-        }
+            BranchId = branch.BranchId,
+            PartnerId = branch.PartnerId,
+            BranchName = branch.BranchName,
+            Address = branch.Address,
+            Email = branch.Email,
+            PhoneNumber = branch.PhoneNumber,
+            IsActive = branch.IsActive
+        });
     }
-
-
-    // =========================================================
-    // CREATE USER - POST
-    // =========================================================
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(
-        CreateUserViewModel model)
+    [Authorize(Policy = AppPermissions.Partners.Manage)]
+    public async Task<IActionResult> EditBranchDetail(
+        EditBranchViewModel model)
     {
-        try
+        var existing = await _userRepository.GetBranchByIdAsync(
+            model.BranchId);
+
+        if (existing is null)
+            return NotFound();
+
+        if (existing.PartnerId != model.PartnerId)
+            return BadRequest("The branch does not belong to this partner.");
+
+        model.BranchName = model.BranchName?.Trim() ?? string.Empty;
+        model.Address = Clean(model.Address);
+        model.Email = Clean(model.Email);
+        model.PhoneNumber = Clean(model.PhoneNumber);
+
+        if (!model.IsActive &&
+            model.BranchId == CurrentIntClaim(AppClaimTypes.BranchId))
         {
-            model.Username =
-                model.Username?
-                    .Trim()
-                ?? string.Empty;
-
-
-            model.Email =
-                NullIfWhiteSpace(
-                    model.Email);
-
-
-            model.Address =
-                NullIfWhiteSpace(
-                    model.Address);
-
-
-            model.PhoneNumber =
-                NullIfWhiteSpace(
-                    model.PhoneNumber);
-
-
-            model.SelectedRoleIds ??=
-                [];
-
-
-            await LoadUserOptionsAsync(
-                model);
-
-
-            // ---------------------------------------------
-            // USERNAME
-            // ---------------------------------------------
-
-            if (!string.IsNullOrWhiteSpace(
-                    model.Username))
-            {
-                var usernameExists =
-                    await _userRepository
-                        .UsernameExistsAsync(
-                            model.Username);
-
-
-                if (usernameExists)
-                {
-                    ModelState.AddModelError(
-                        nameof(
-                            model.Username),
-                        "Username already exists.");
-                }
-            }
-
-
-            // ---------------------------------------------
-            // PARTNER
-            // ---------------------------------------------
-
-            if (model.PartnerId <= 0)
-            {
-                ModelState.AddModelError(
-                    nameof(model.PartnerId),
-                    "Select a partner.");
-            }
-            else
-            {
-                var partnerValid =
-                    model.Partners.Any(
-                        x =>
-                            x.PartnerId ==
-                                model.PartnerId);
-
-
-                if (!partnerValid)
-                {
-                    ModelState.AddModelError(
-                        nameof(model.PartnerId),
-                        "Selected partner is invalid.");
-                }
-            }
-
-
-            // ---------------------------------------------
-            // BRANCH
-            // ---------------------------------------------
-
-            if (model.BranchId <= 0)
-            {
-                ModelState.AddModelError(
-                    nameof(model.BranchId),
-                    "Select a branch.");
-            }
-            else if (model.PartnerId > 0)
-            {
-                var validBranch =
-                    model.Branches.Any(
-                        x =>
-                            x.BranchId ==
-                                model.BranchId
-
-                            &&
-
-                            x.PartnerId ==
-                                model.PartnerId);
-
-
-                if (!validBranch)
-                {
-                    ModelState.AddModelError(
-                        nameof(
-                            model.BranchId),
-                        "Select a valid branch for the selected partner.");
-                }
-            }
-
-
-            // ---------------------------------------------
-            // ROLES
-            // ---------------------------------------------
-
-            if (model.SelectedRoleIds.Count == 0)
-            {
-                ModelState.AddModelError(
-                    nameof(
-                        model.SelectedRoleIds),
-                    "Select at least one role.");
-            }
-            else
-            {
-                var validRoleIds =
-                    model.Roles
-                        .Select(
-                            x =>
-                                x.RoleId)
-                        .ToHashSet();
-
-
-                var invalidRole =
-                    model.SelectedRoleIds
-                        .Distinct()
-                        .Any(
-                            roleId =>
-                                !validRoleIds
-                                    .Contains(
-                                        roleId));
-
-
-                if (invalidRole)
-                {
-                    ModelState.AddModelError(
-                        nameof(
-                            model.SelectedRoleIds),
-                        "One or more selected roles are invalid.");
-                }
-            }
-
-
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
-
-
-            var user =
-                new User
-                {
-                    PartnerId =
-                        model.PartnerId,
-
-                    BranchId =
-                        model.BranchId,
-
-                    Username =
-                        model.Username,
-
-                    PasswordHash =
-                        _passwordService
-                            .Hash(
-                                model.Password),
-
-                    Address =
-                        model.Address,
-
-                    Email =
-                        model.Email,
-
-                    PhoneNumber =
-                        model.PhoneNumber,
-
-                    IsActive =
-                        model.IsActive
-                };
-
-
-            await _userRepository
-                .CreateAsync(
-                    user,
-                    model.SelectedRoleIds);
-
-
-            TempData["SuccessMessage"] =
-                $"User {model.Username} created successfully.";
-
-
-            return RedirectToAction(
-                nameof(Index),
-                new
-                {
-                    partnerId =
-                        model.PartnerId,
-
-                    branchId =
-                        model.BranchId
-                });
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(Create));
-
-
             ModelState.AddModelError(
-                string.Empty,
-                errorId.HasValue
+                nameof(model.IsActive),
+                "You cannot deactivate the branch you are signed in under.");
+        }
 
-                    ? $"Unable to create user. Error reference: {errorId.Value}"
-
-                    : "Unable to create user.");
-
-
-            await LoadUserOptionsAsync(
-                model);
-
-
+        if (!ModelState.IsValid)
             return View(model);
-        }
-    }
 
-
-    // =========================================================
-    // USER ACCESS - GET
-    // =========================================================
-
-    [HttpGet]
-    public async Task<IActionResult> Access(
-        long id)
-    {
-        try
+        if (await _userRepository.BranchNameExistsAsync(
+            existing.PartnerId,
+            model.BranchName,
+            existing.BranchId))
         {
-            if (id <= 0)
-            {
-                return NotFound();
-            }
-
-
-            var user =
-                await _userRepository
-                    .GetAccessAsync(
-                        id);
-
-
-            if (user == null)
-            {
-                return NotFound();
-            }
-
-
-            var roles =
-                await _userRepository
-                    .GetActiveRolesAsync();
-
-
-            var selectedRoleIds =
-                await _userRepository
-                    .GetUserRoleIdsAsync(
-                        id);
-
-
-            var model =
-                new UserAccessViewModel
-                {
-                    UserId =
-                        user.UserId,
-
-                    Username =
-                        user.Username,
-
-                    PartnerName =
-                        user.PartnerName,
-
-                    BranchName =
-                        user.BranchName,
-
-                    IsActive =
-                        user.IsActive,
-
-                    SelectedRoleIds =
-                        selectedRoleIds
-                            .ToList(),
-
-                    Roles =
-                        roles
-                };
-
-
-            return View(model);
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(Access));
-
-
-            TempData["ErrorMessage"] =
-                errorId.HasValue
-
-                    ? $"User access could not be loaded. Error reference: {errorId.Value}"
-
-                    : "User access could not be loaded.";
-
-
-            return RedirectToAction(
-                nameof(Index));
-        }
-    }
-
-
-    // =========================================================
-    // USER ACCESS - POST
-    // =========================================================
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Access(
-        UserAccessViewModel model)
-    {
-        try
-        {
-            model.SelectedRoleIds ??=
-                [];
-
-
-            // ---------------------------------------------
-            // Load actual user from DB.
-            //
-            // Never trust Username / Partner / Branch
-            // posted from the browser.
-            // ---------------------------------------------
-
-            var user =
-                await _userRepository
-                    .GetAccessAsync(
-                        model.UserId);
-
-
-            if (user == null)
-            {
-                return NotFound();
-            }
-
-
-            var roles =
-                await _userRepository
-                    .GetActiveRolesAsync();
-
-
-            model.Username =
-                user.Username;
-
-            model.PartnerName =
-                user.PartnerName;
-
-            model.BranchName =
-                user.BranchName;
-
-            model.Roles =
-                roles;
-
-
-            // ---------------------------------------------
-            // ROLE REQUIRED
-            // ---------------------------------------------
-
-            if (model.SelectedRoleIds.Count == 0)
-            {
-                ModelState.AddModelError(
-                    nameof(
-                        model.SelectedRoleIds),
-                    "Select at least one role.");
-            }
-            else
-            {
-                var validRoleIds =
-                    roles
-                        .Select(
-                            x =>
-                                x.RoleId)
-                        .ToHashSet();
-
-
-                var invalidRole =
-                    model.SelectedRoleIds
-                        .Distinct()
-                        .Any(
-                            roleId =>
-                                !validRoleIds
-                                    .Contains(
-                                        roleId));
-
-
-                if (invalidRole)
-                {
-                    ModelState.AddModelError(
-                        nameof(
-                            model.SelectedRoleIds),
-                        "One or more selected roles are invalid.");
-                }
-            }
-
-
-            if (!ModelState.IsValid)
-            {
-                /*
-                 * Keep actual DB status if the
-                 * validation fails.
-                 */
-
-                model.IsActive =
-                    user.IsActive;
-
-
-                return View(model);
-            }
-
-
-            // ---------------------------------------------
-            // UPDATE
-            // ---------------------------------------------
-
-            await _userRepository
-                .UpdateAccessAsync(
-                    model.UserId,
-                    model.IsActive,
-                    model.SelectedRoleIds);
-
-
-            TempData["SuccessMessage"] =
-                $"Access for {user.Username} updated successfully. "
-                +
-                "The user should sign in again to receive the current permissions.";
-
-
-            return RedirectToAction(
-                nameof(Access),
-                new
-                {
-                    id =
-                        model.UserId
-                });
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(Access));
-
-
             ModelState.AddModelError(
-                string.Empty,
-                errorId.HasValue
-
-                    ? $"User access could not be updated. Error reference: {errorId.Value}"
-
-                    : "User access could not be updated.");
-
-
-            // ---------------------------------------------
-            // Reload non-posted display/options data
-            // ---------------------------------------------
-
-            try
-            {
-                var user =
-                    await _userRepository
-                        .GetAccessAsync(
-                            model.UserId);
-
-
-                if (user != null)
-                {
-                    model.Username =
-                        user.Username;
-
-                    model.PartnerName =
-                        user.PartnerName;
-
-                    model.BranchName =
-                        user.BranchName;
-
-                    model.IsActive =
-                        user.IsActive;
-                }
-
-
-                model.Roles =
-                    await _userRepository
-                        .GetActiveRolesAsync();
-            }
-            catch
-            {
-                model.Roles =
-                    Array.Empty<RoleOption>();
-            }
-
+                nameof(model.BranchName),
+                "This branch name already exists under this partner.");
 
             return View(model);
         }
-    }
 
+        var saved = await TrySaveAsync(async () =>
+        {
+            existing.BranchName = model.BranchName;
+            existing.Address = model.Address;
+            existing.Email = model.Email;
+            existing.PhoneNumber = model.PhoneNumber;
+            existing.IsActive = model.IsActive;
+
+            if (!await _userRepository.UpdateBranchAsync(existing))
+                throw new InvalidOperationException("Branch was not found.");
+        }, nameof(EditBranchDetail));
+
+        if (!saved)
+            return View(model);
+
+        TempData["SuccessMessage"] = "Branch updated successfully.";
+
+        return RedirectToAction(
+            nameof(PartnerBranchesDetail),
+            new { partnerId = existing.PartnerId });
+    }
 
     [HttpGet]
     public async Task<IActionResult> BranchUsers(
-    int partnerId,
-    int branchId,
-    int page = 1)
+        int partnerId,
+        int branchId,
+        int page = 1)
     {
-        try
+        var partner = await _userRepository.GetPartnerByIdAsync(partnerId);
+        var branch = await _userRepository.GetBranchByIdAsync(branchId);
+
+        if (partner is null ||
+            branch is null ||
+            branch.PartnerId != partner.PartnerId)
         {
-            if (partnerId <= 0 ||
-                branchId <= 0)
-            {
-                return NotFound();
-            }
+            return NotFound();
+        }
 
+        var result = await _userRepository.GetPageAsync(
+            partner.PartnerId,
+            branch.BranchId,
+            Math.Max(1, page),
+            10);
 
-            var partner =
-                await _userRepository
-                    .GetPartnerByIdAsync(
-                        partnerId);
+        return View(new BranchUsersViewModel
+        {
+            PartnerId = partner.PartnerId,
+            PartnerName = partner.PartnerName,
+            BranchId = branch.BranchId,
+            BranchName = branch.BranchName,
+            Users = result.Items,
+            TotalUsers = result.TotalUsers,
+            ActiveUsers = result.ActiveUsers,
+            InactiveUsers = result.InactiveUsers,
+            Page = result.PageNumber,
+            PageSize = result.PageSize,
+            TotalPages = Math.Max(1, result.TotalPages)
+        });
+    }
 
+    [HttpGet]
+    public async Task<IActionResult> CreateUser(
+        int partnerId,
+        int branchId)
+    {
+        var model = new CreateUserViewModel
+        {
+            PartnerId = partnerId,
+            BranchId = branchId
+        };
 
-            var branch =
-                await _userRepository
-                    .GetBranchByIdAsync(
-                        branchId);
+        await LoadUserOptionsAsync(model);
 
+        if (!HasActiveParents(model))
+        {
+            return BadRequest(
+                "Select an active branch belonging to an active partner.");
+        }
 
-            if (partner == null ||
-                branch == null ||
-                branch.PartnerId != partnerId)
-            {
-                return NotFound();
-            }
+        return View(model);
+    }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateUser(
+        CreateUserViewModel model)
+    {
+        model.Username = model.Username?.Trim() ?? string.Empty;
+        model.Address = Clean(model.Address);
+        model.Email = Clean(model.Email);
+        model.PhoneNumber = Clean(model.PhoneNumber);
+        model.SelectedRoleIds = (model.SelectedRoleIds ?? [])
+            .Distinct()
+            .ToList();
 
-            const int pageSize = 10;
+        await LoadUserOptionsAsync(model);
 
+        if (!HasActiveParents(model))
+        {
+            ModelState.AddModelError(
+                string.Empty,
+                "Select an active branch belonging to an active partner.");
+        }
 
-            var result =
-                await _userRepository
-                    .GetPageAsync(
-                        partnerId,
-                        branchId,
-                        Math.Max(1, page),
-                        pageSize);
+        ValidateRoles(model.SelectedRoleIds, model.Roles);
 
+        if (!ModelState.IsValid)
+            return View(model);
 
-            var model =
-                new BranchUsersViewModel
-                {
-                    PartnerId =
-                        partnerId,
-
-                    PartnerName =
-                        partner.PartnerName,
-
-                    BranchId =
-                        branchId,
-
-                    BranchName =
-                        branch.BranchName,
-
-                    Users =
-                        result.Items,
-
-                    TotalUsers =
-                        result.TotalUsers,
-
-                    ActiveUsers =
-                        result.ActiveUsers,
-
-                    InactiveUsers =
-                        result.InactiveUsers,
-
-                    Page =
-                        result.PageNumber,
-
-                    PageSize =
-                        result.PageSize,
-
-                    TotalPages =
-                        Math.Max(
-                            1,
-                            result.TotalPages)
-        
-                    
-                };
-
+        if (await _userRepository.UsernameExistsAsync(model.Username))
+        {
+            ModelState.AddModelError(
+                nameof(model.Username),
+                "This username already exists.");
 
             return View(model);
         }
-        catch (Exception ex)
+
+        var saved = await TrySaveAsync(async () =>
         {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(BranchUsers));
-
-            TempData["ErrorMessage"] =
-                errorId.HasValue
-                    ? $"Users could not be loaded. Error reference: {errorId.Value}"
-                    : "Users could not be loaded.";
-
-            return RedirectToAction(
-                nameof(PartnerBranchesDetail),
-                new
+            await _userRepository.CreateAsync(
+                new AppUser
                 {
-                    partnerId
-                });
-        }
+                    PartnerId = model.PartnerId,
+                    BranchId = model.BranchId,
+                    Username = model.Username,
+                    PasswordHash = _passwordService.Hash(model.Password),
+                    Address = model.Address,
+                    Email = model.Email,
+                    PhoneNumber = model.PhoneNumber,
+                    IsActive = model.IsActive
+                },
+                model.SelectedRoleIds);
+        }, nameof(CreateUser));
+
+        if (!saved)
+            return View(model);
+
+        TempData["SuccessMessage"] = "User created successfully.";
+
+        return RedirectToAction(
+            nameof(BranchUsers),
+            new
+            {
+                partnerId = model.PartnerId,
+                branchId = model.BranchId
+            });
     }
-
-
-
-    // =========================================================
-    // AJAX - BRANCHES BY PARTNER
-    // =========================================================
 
     [HttpGet]
-    public async Task<IActionResult> GetBranches(
-        int partnerId)
+    public async Task<IActionResult> EditUser(long id)
     {
-        if (partnerId <= 0)
+        var user = await _userRepository.GetUserByIdAsync(id);
+        var access = await _userRepository.GetAccessAsync(id);
+
+        if (user is null || access is null)
+            return NotFound();
+
+        return View(new EditUserViewModel
         {
-            return Json(
-                Array.Empty<object>());
+            UserId = user.UserId,
+            PartnerId = access.PartnerId,
+            BranchId = access.BranchId,
+            Username = access.Username,
+            PartnerName = access.PartnerName,
+            BranchName = access.BranchName,
+            Address = user.Address,
+            Email = user.Email,
+            PhoneNumber = user.PhoneNumber,
+            IsActive = user.IsActive
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditUser(EditUserViewModel model)
+    {
+        var access = await _userRepository.GetAccessAsync(model.UserId);
+
+        if (access is null)
+            return NotFound();
+
+        // Load ownership/display values from the database, not the form.
+        model.PartnerId = access.PartnerId;
+        model.BranchId = access.BranchId;
+        model.Username = access.Username;
+        model.PartnerName = access.PartnerName;
+        model.BranchName = access.BranchName;
+
+        model.Address = Clean(model.Address);
+        model.Email = Clean(model.Email);
+        model.PhoneNumber = Clean(model.PhoneNumber);
+
+        if (model.UserId == CurrentUserId() && !model.IsActive)
+        {
+            ModelState.AddModelError(
+                nameof(model.IsActive),
+                "You cannot deactivate your own account.");
         }
 
+        if (!ModelState.IsValid)
+            return View(model);
 
-        try
+        var saved = await TrySaveAsync(async () =>
         {
-            var branches =
-                await _userRepository
-                    .GetActiveBranchesAsync(
-                        partnerId);
+            var updated = await _userRepository.UpdateUserProfileAsync(
+                model.UserId,
+                model.Address,
+                model.Email,
+                model.PhoneNumber,
+                model.IsActive);
 
+            if (!updated)
+                throw new InvalidOperationException("User was not found.");
+        }, nameof(EditUser));
 
-            return Json(
-                branches.Select(
-                    x =>
-                        new
-                        {
-                            x.BranchId,
-                            x.BranchName
-                        }));
+        if (!saved)
+            return View(model);
+
+        TempData["SuccessMessage"] = "User updated successfully.";
+
+        return RedirectToAction(
+            nameof(BranchUsers),
+            new
+            {
+                partnerId = access.PartnerId,
+                branchId = access.BranchId
+            });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Access(long id)
+    {
+        var user = await _userRepository.GetAccessAsync(id);
+
+        if (user is null)
+            return NotFound();
+
+        return View(new UserAccessViewModel
+        {
+            UserId = user.UserId,
+            PartnerId = user.PartnerId,
+            BranchId = user.BranchId,
+            Username = user.Username,
+            PartnerName = user.PartnerName,
+            BranchName = user.BranchName,
+            IsActive = user.IsActive,
+            SelectedRoleIds = (
+                await _userRepository.GetUserRoleIdsAsync(id)).ToList(),
+            Roles = await _userRepository.GetActiveRolesAsync()
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Access(UserAccessViewModel model)
+    {
+        var user = await _userRepository.GetAccessAsync(model.UserId);
+
+        if (user is null)
+            return NotFound();
+
+        model.PartnerId = user.PartnerId;
+        model.BranchId = user.BranchId;
+        model.Username = user.Username;
+        model.PartnerName = user.PartnerName;
+        model.BranchName = user.BranchName;
+
+        model.Roles = await _userRepository.GetActiveRolesAsync();
+        model.SelectedRoleIds = (model.SelectedRoleIds ?? [])
+            .Distinct()
+            .ToList();
+
+        ValidateRoles(model.SelectedRoleIds, model.Roles);
+
+        if (model.UserId == CurrentUserId())
+        {
+            var currentRoles = (
+                await _userRepository.GetUserRoleIdsAsync(model.UserId))
+                .ToHashSet();
+
+            if (model.IsActive != user.IsActive ||
+                !currentRoles.SetEquals(model.SelectedRoleIds))
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "Another administrator must change your roles or account status.");
+            }
         }
-        catch (Exception ex)
+
+        if (!ModelState.IsValid)
+            return View(model);
+
+        var saved = await TrySaveAsync(
+            () => _userRepository.UpdateAccessAsync(
+                model.UserId,
+                model.IsActive,
+                model.SelectedRoleIds),
+            nameof(Access));
+
+        if (!saved)
+            return View(model);
+
+        TempData["SuccessMessage"] =
+            "Access saved. If access changed, the user must sign in again.";
+
+        return RedirectToAction(
+            nameof(BranchUsers),
+            new
+            {
+                partnerId = user.PartnerId,
+                branchId = user.BranchId
+            });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetBranches(int partnerId)
+    {
+        var partner = await _userRepository.GetPartnerByIdAsync(partnerId);
+
+        if (partner is null || !partner.IsActive)
+            return Json(Array.Empty<BranchOption>());
+
+        var branches = await _userRepository.GetActiveBranchesAsync(
+            partner.PartnerId);
+
+        return Json(branches);
+    }
+
+    private async Task LoadUserOptionsAsync(CreateUserViewModel model)
+    {
+        model.Partners = await _userRepository.GetActivePartnersAsync();
+        model.Roles = await _userRepository.GetActiveRolesAsync();
+
+        model.Branches = model.PartnerId > 0
+            ? await _userRepository.GetActiveBranchesAsync(model.PartnerId)
+            : Array.Empty<BranchOption>();
+    }
+
+    private static bool HasActiveParents(CreateUserViewModel model)
+    {
+        return model.Partners.Any(
+                   partner => partner.PartnerId == model.PartnerId)
+               && model.Branches.Any(
+                   branch => branch.BranchId == model.BranchId
+                             && branch.PartnerId == model.PartnerId);
+    }
+
+    private void ValidateRoles(
+        IReadOnlyCollection<int> selectedRoleIds,
+        IReadOnlyList<RoleOption> roles)
+    {
+        var allowedIds = roles.Select(role => role.RoleId).ToHashSet();
+
+        if (selectedRoleIds.Count == 0 ||
+            selectedRoleIds.Any(id => !allowedIds.Contains(id)))
         {
-            await LogErrorAsync(
-                ex,
-                nameof(GetBranches));
-
-
-            return Json(
-                Array.Empty<object>());
+            ModelState.AddModelError(
+                "SelectedRoleIds",
+                "Select at least one valid active role.");
         }
     }
 
-
-    // =========================================================
-    // LOAD PARTNER OPTIONS
-    // =========================================================
-
-    private async Task LoadPartnerOptionsAsync(
-        CreateBranchViewModel model)
-    {
-        model.Partners =
-            await _userRepository
-                .GetActivePartnersAsync();
-    }
-
-
-    // =========================================================
-    // LOAD USER OPTIONS
-    // =========================================================
-
-    private async Task LoadUserOptionsAsync(
-        CreateUserViewModel model)
-    {
-        model.Partners =
-            await _userRepository
-                .GetActivePartnersAsync();
-
-
-        model.Roles =
-            await _userRepository
-                .GetActiveRolesAsync();
-
-
-        if (model.PartnerId > 0)
-        {
-            model.Branches =
-                await _userRepository
-                    .GetActiveBranchesAsync(
-                        model.PartnerId);
-        }
-        else
-        {
-            model.Branches =
-                Array.Empty<BranchOption>();
-        }
-    }
-
-
-    // =========================================================
-    // EMPTY STRING -> NULL
-    // =========================================================
-
-    private static string? NullIfWhiteSpace(
-        string? value)
-    {
-        return string.IsNullOrWhiteSpace(
-                value)
-
-            ? null
-
-            : value.Trim();
-    }
-
-
-    // =========================================================
-    // ERROR LOGGING
-    // =========================================================
-
-    private Task<long?> LogErrorAsync(
-        Exception exception,
+    private async Task<bool> TrySaveAsync(
+        Func<Task> save,
         string action)
     {
-        return _errorLogService
-            .LogAsync(
+        try
+        {
+            await save();
+            return true;
+        }
+        catch (Exception exception)
+        {
+            var errorId = await _errorLogService.LogAsync(
                 exception,
                 nameof(UsersController),
                 action,
-                User.FindFirstValue(
-                    AppClaimTypes.PartnerCode));
+                User.FindFirstValue(AppClaimTypes.PartnerCode));
+
+            ModelState.AddModelError(
+                string.Empty,
+                errorId.HasValue
+                    ? $"Unable to save. Error reference: {errorId.Value}."
+                    : "Unable to save. Please try again.");
+
+            return false;
+        }
     }
 
+    private long CurrentUserId()
+    {
+        return long.TryParse(
+            User.FindFirstValue(ClaimTypes.NameIdentifier),
+            out var id)
+            ? id
+            : 0;
+    }
 
+    private int CurrentIntClaim(string claimType)
+    {
+        return int.TryParse(
+            User.FindFirstValue(claimType),
+            out var id)
+            ? id
+            : 0;
+    }
+
+    private static string? Clean(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Trim();
+    }
 }

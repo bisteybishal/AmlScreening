@@ -387,7 +387,7 @@ public sealed class RolesController
 
 
             return RedirectToAction(
-                nameof(Permissions),
+                nameof(Index),
                 new
                 {
                     id =

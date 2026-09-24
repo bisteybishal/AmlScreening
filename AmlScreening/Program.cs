@@ -39,7 +39,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.LoginPath = "/Account/Login";
         options.AccessDeniedPath = "/Account/AccessDenied";
-        options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
         options.SlidingExpiration = true;
         options.EventsType = typeof(PortalCookieEvents);
     });
@@ -136,7 +136,7 @@ static void ValidateHostedConfiguration(
     IConfiguration configuration,
     IHostEnvironment environment)
 {
-    var connectionString = configuration.GetConnectionString("Screening");
+    var connectionString = configuration.GetConnectionString("AMLDatabase");
     if (string.IsNullOrWhiteSpace(connectionString))
         throw new InvalidOperationException(
             "ConnectionStrings__AMLDatabase must be supplied by the host secret store.");

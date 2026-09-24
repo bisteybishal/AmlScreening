@@ -41,15 +41,6 @@ public static class AppPermissions
         public const string Manage = "Compliance.Manage";
         public const string Approve = "Compliance.Approve";
     }
-
-    public static class Risk
-    {
-        public const string View = "Risk.View";
-
-        public const string Manage = "Risk.Manage";
-
-        public const string Approve = "Risk.Approve";
-    }
     public static class Customers
     {
         public const string View =
@@ -90,6 +81,33 @@ public static class AppPermissions
         public const string View =
             "Audit.View";
     }
+    public static class RiskScore
+    {
+        public const string View =
+            "RiskScore.View";
+
+        public const string Manage =
+            "RiskScore.Manage";
+
+        public const string Approve =
+            "RiskScore.Approve";
+
+        public const string Calculate =
+            "RiskScore.Calculate";
+    }
+
+    public static class RiskScoreSetup
+    {
+        public const string View =
+            "RiskScoreSetup.View";
+
+        public const string Manage =
+            "RiskScoreSetup.Manage";
+
+        public const string Approve =
+            "RiskScoreSetup.Approve";
+    }
+
 
     public static class Roles
     {
@@ -122,9 +140,14 @@ public static class AppPermissions
         Compliance.Manage,
         Compliance.Approve,
 
-        Risk.View,
-        Risk.Manage,
-        Risk.Approve,
+        RiskScore.View,
+        RiskScore.Manage,
+        RiskScore.Approve,
+        RiskScore.Calculate,
+
+        RiskScoreSetup.View,
+        RiskScoreSetup.Manage,
+        RiskScoreSetup.Approve,
 
         Customers.View,
 
@@ -162,9 +185,14 @@ public static class AppPermissions
     Compliance.Manage,
     Compliance.Approve,
 
-    Risk.View,
-    Risk.Manage,
-    Risk.Approve,
+        RiskScore.View,
+        RiskScore.Manage,
+        RiskScore.Approve,
+        RiskScore.Calculate,
+
+        RiskScoreSetup.View,
+        RiskScoreSetup.Manage,
+        RiskScoreSetup.Approve,
 
     Customers.View,
     Transactions.View,
@@ -174,8 +202,8 @@ public static class AppPermissions
 
     Cases.View,
     Cases.Manage,
-        Screening.View,
-        Roles.View,
+    Screening.View,
+    Roles.View,
 
     Audit.View
 ];

@@ -12,6 +12,7 @@
 <div class="risk-review-notice">
     <strong>Pending · Maker: @(Model.MakerName ?? "Not verified")</strong>
     <p>@(Model.Kind == "Rules" ? "Review this score change only. Other approved scores stay unchanged." : "Review the adjoining ranges together. Approval replaces the active range set.") The maker cannot approve.</p>
+
 </div>
 <div class="risk-review-columns">
     @foreach (var panel in new[] { (Title: "Currently active", Rows: Model.ActiveRows), (Title: "Pending changes", Rows: Model.PendingRows) })

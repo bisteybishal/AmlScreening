@@ -458,6 +458,8 @@ public sealed class UserRepository
                 PartnerCode,
                 PartnerName,
                 Address,
+                     Country,
+            City,
                 Email,
                 PhoneNumber,
                 IsActive,
@@ -469,6 +471,8 @@ public sealed class UserRepository
                 @PartnerCode,
                 @PartnerName,
                 @Address,
+                    @Country,
+            @City,
                 @Email,
                 @PhoneNumber,
                 @IsActive,
@@ -579,6 +583,8 @@ public sealed class UserRepository
 
                 Address =
                     @Address,
+                        Country = @Country,
+            City = @City,
 
                 Email =
                     @Email,
@@ -610,6 +616,8 @@ public sealed class UserRepository
                         partner.PartnerCode,
                         partner.PartnerName,
                         partner.Address,
+                        partner.Country,
+                        partner.City,
                         partner.Email,
                         partner.PhoneNumber,
                         partner.IsActive,
@@ -2008,217 +2016,257 @@ public sealed class UserRepository
     // =========================================================
 
     public async Task UpdateAccessAsync(
-        long userId,
-        bool isActive,
-        IReadOnlyCollection<int> roleIds)
+    long userId,
+    bool isActive,
+    IReadOnlyCollection<int> roleIds)
     {
         EnsureSignedIn();
 
-
         if (userId <= 0)
+            throw new ArgumentException("Invalid user.", nameof(userId));
+
+        var selectedRoleIds = (roleIds ?? Array.Empty<int>())
+            .Distinct()
+            .ToArray();
+
+        if (selectedRoleIds.Length == 0 ||
+            selectedRoleIds.Any(id => id <= 0))
         {
             throw new ArgumentException(
-                "Invalid user.",
-                nameof(userId));
-        }
-
-
-        var selectedRoleIds =
-            (roleIds ??
-             Array.Empty<int>())
-                .Where(
-                    roleId =>
-                        roleId > 0)
-                .Distinct()
-                .ToArray();
-
-
-        if (selectedRoleIds.Length == 0)
-        {
-            throw new ArgumentException(
-                "Select at least one role.",
+                "Select at least one valid role.",
                 nameof(roleIds));
         }
 
+        using var connection = _connectionFactory.CreateConnection();
 
-        using var connection =
-            _connectionFactory
-                .CreateConnection();
-
-
-        if (connection.State !=
-            ConnectionState.Open)
-        {
+        if (connection.State != ConnectionState.Open)
             connection.Open();
-        }
 
+        using var transaction = connection.BeginTransaction();
 
-        using var transaction =
-            connection.BeginTransaction();
+        var existingUser = await connection.QuerySingleOrDefaultAsync<User>(
+            """
+        SELECT UserId, IsActive
+        FROM dbo.Users WITH (UPDLOCK, HOLDLOCK)
+        WHERE UserId = @UserId;
+        """,
+            new { UserId = userId },
+            transaction);
 
+        if (existingUser is null)
+            throw new InvalidOperationException("User was not found.");
 
-        try
+        var existingRoleIds = (
+            await connection.QueryAsync<int>(
+                """
+            SELECT RoleId
+            FROM dbo.UserRoles
+            WHERE UserId = @UserId;
+            """,
+                new { UserId = userId },
+                transaction))
+            .ToHashSet();
+
+        var rolesChanged = !existingRoleIds.SetEquals(selectedRoleIds);
+        var statusChanged = existingUser.IsActive != isActive;
+
+        if (userId == _currentUser.UserId &&
+            (rolesChanged || statusChanged))
         {
-            var userExists =
-                await connection
-                    .ExecuteScalarAsync<bool>(
-                        """
-                        SELECT
-                            CASE
-                                WHEN EXISTS
-                                (
-                                    SELECT 1
-
-                                    FROM dbo.Users
-
-                                    WHERE UserId =
-                                          @UserId
-                                )
-                                THEN 1
-                                ELSE 0
-                            END;
-                        """,
-                        new
-                        {
-                            UserId =
-                                userId
-                        },
-                        transaction);
-
-
-            if (!userExists)
-            {
-                throw new InvalidOperationException(
-                    "User was not found.");
-            }
-
-
-            var validRoleCount =
-                await connection
-                    .ExecuteScalarAsync<int>(
-                        """
-                        SELECT
-                            COUNT(1)
-
-                        FROM dbo.Roles
-
-                        WHERE RoleId
-                              IN @RoleIds
-
-                        AND IsActive = 1;
-                        """,
-                        new
-                        {
-                            RoleIds =
-                                selectedRoleIds
-                        },
-                        transaction);
-
-
-            if (validRoleCount !=
-                selectedRoleIds.Length)
-            {
-                throw new InvalidOperationException(
-                    "One or more selected roles are invalid.");
-            }
-
-
-            await connection
-                .ExecuteAsync(
-                    """
-                    UPDATE dbo.Users
-
-                    SET
-                        IsActive =
-                            @IsActive,
-
-                        UpdatedDate =
-                            SYSUTCDATETIME(),
-
-                        UpdatedBy =
-                            @UpdatedBy
-
-                    WHERE UserId =
-                          @UserId;
-                    """,
-                    new
-                    {
-                        UserId =
-                            userId,
-
-                        IsActive =
-                            isActive,
-
-                        UpdatedBy =
-                            _currentUser.Username
-                    },
-                    transaction);
-
-
-            await connection
-                .ExecuteAsync(
-                    """
-                    DELETE FROM dbo.UserRoles
-
-                    WHERE UserId =
-                          @UserId;
-                    """,
-                    new
-                    {
-                        UserId =
-                            userId
-                    },
-                    transaction);
-
-
-            const string insertRoleSql = """
-                INSERT INTO dbo.UserRoles
-                (
-                    UserId,
-                    RoleId,
-                    CreatedDate,
-                    CreatedBy
-                )
-                VALUES
-                (
-                    @UserId,
-                    @RoleId,
-                    SYSUTCDATETIME(),
-                    @CreatedBy
-                );
-                """;
-
-
-            foreach (var roleId in
-                     selectedRoleIds)
-            {
-                await connection
-                    .ExecuteAsync(
-                        insertRoleSql,
-                        new
-                        {
-                            UserId =
-                                userId,
-
-                            RoleId =
-                                roleId,
-
-                            CreatedBy =
-                                _currentUser.Username
-                        },
-                        transaction);
-            }
-
-
-            transaction.Commit();
+            throw new InvalidOperationException(
+                "Another administrator must change your roles or account status.");
         }
-        catch
+
+        var validRoleCount = await connection.ExecuteScalarAsync<int>(
+            """
+        SELECT COUNT(1)
+        FROM dbo.Roles
+        WHERE RoleId IN @RoleIds
+          AND IsActive = 1;
+        """,
+            new { RoleIds = selectedRoleIds },
+            transaction);
+
+        if (validRoleCount != selectedRoleIds.Length)
+        {
+            throw new InvalidOperationException(
+                "One or more selected roles are invalid or inactive.");
+        }
+
+        if (!rolesChanged && !statusChanged)
+        {
+            transaction.Commit();
+            return;
+        }
+
+        await connection.ExecuteAsync(
+            """
+        UPDATE dbo.Users
+        SET
+            IsActive = @IsActive,
+            UpdatedDate = SYSUTCDATETIME(),
+            UpdatedBy = @UpdatedBy
+        WHERE UserId = @UserId;
+
+        DELETE FROM dbo.UserRoles
+        WHERE UserId = @UserId;
+        """,
+            new
+            {
+                UserId = userId,
+                IsActive = isActive,
+                UpdatedBy = _currentUser.Username
+            },
+            transaction);
+
+        foreach (var roleId in selectedRoleIds)
+        {
+            await connection.ExecuteAsync(
+                """
+            INSERT INTO dbo.UserRoles
+            (
+                UserId,
+                RoleId,
+                CreatedDate,
+                CreatedBy
+            )
+            VALUES
+            (
+                @UserId,
+                @RoleId,
+                SYSUTCDATETIME(),
+                @CreatedBy
+            );
+            """,
+                new
+                {
+                    UserId = userId,
+                    RoleId = roleId,
+                    CreatedBy = _currentUser.Username
+                },
+                transaction);
+        }
+
+        // Existing cookies contain the old role/permission claims.
+        // Ending sessions makes the user sign in with fresh claims.
+        await connection.ExecuteAsync(
+            """
+        UPDATE dbo.UserSessions
+        SET
+            IsActive = 0,
+            EndedAtUtc = SYSUTCDATETIME(),
+            EndReason = 'Access changed'
+        WHERE UserId = @UserId
+          AND IsActive = 1;
+        """,
+            new { UserId = userId },
+            transaction);
+
+        transaction.Commit();
+    }
+
+    public async Task<User?> GetUserByIdAsync(long userId)
+    {
+        EnsureSignedIn();
+
+        if (userId <= 0)
+            return null;
+
+        using var connection = _connectionFactory.CreateConnection();
+
+        const string sql = """
+        SELECT
+            UserId,
+            PartnerId,
+            BranchId,
+            Username,
+            Address,
+            Email,
+            PhoneNumber,
+            IsActive
+        FROM dbo.Users
+        WHERE UserId = @UserId;
+        """;
+
+        return await connection.QuerySingleOrDefaultAsync<User>(
+            sql,
+            new { UserId = userId });
+    }
+
+    public async Task<bool> UpdateUserProfileAsync(
+        long userId,
+        string? address,
+        string? email,
+        string? phoneNumber,
+        bool isActive)
+    {
+        EnsureSignedIn();
+
+        if (userId <= 0)
+            throw new ArgumentException("Invalid user.", nameof(userId));
+
+        if (userId == _currentUser.UserId && !isActive)
+            throw new InvalidOperationException(
+                "You cannot deactivate your own account.");
+
+        using var connection = _connectionFactory.CreateConnection();
+
+        if (connection.State != ConnectionState.Open)
+            connection.Open();
+
+        using var transaction = connection.BeginTransaction();
+
+        const string updateSql = """
+        UPDATE dbo.Users
+        SET
+            Address = @Address,
+            Email = @Email,
+            PhoneNumber = @PhoneNumber,
+            IsActive = @IsActive,
+            UpdatedDate = SYSUTCDATETIME(),
+            UpdatedBy = @UpdatedBy
+        WHERE UserId = @UserId;
+        """;
+
+        var affected = await connection.ExecuteAsync(
+            updateSql,
+            new
+            {
+                UserId = userId,
+                Address = address,
+                Email = email,
+                PhoneNumber = phoneNumber,
+                IsActive = isActive,
+                UpdatedBy = _currentUser.Username
+            },
+            transaction);
+
+        if (affected == 0)
         {
             transaction.Rollback();
-
-            throw;
+            return false;
         }
+
+        if (!isActive)
+        {
+            await connection.ExecuteAsync(
+                """
+            UPDATE dbo.UserSessions
+            SET
+                IsActive = 0,
+                EndedAtUtc = SYSUTCDATETIME(),
+                EndReason = 'Account deactivated'
+            WHERE UserId = @UserId
+              AND IsActive = 1;
+            """,
+                new { UserId = userId },
+                transaction);
+        }
+
+        transaction.Commit();
+        return true;
     }
+
 
 
     // =========================================================

@@ -4,32 +4,34 @@ namespace AmlScreening.Portal.ViewModels;
 
 public sealed class EditPartnerViewModel
 {
-    [Required]
+    [Range(1, int.MaxValue)]
     public int PartnerId { get; set; }
 
     [Required]
-    [StringLength(50)]
-    [Display(Name = "Partner Code")]
-    public string PartnerCode { get; set; }
-        = string.Empty;
+    [StringLength(30, MinimumLength = 2)]
+    [Display(Name = "Partner code")]
+    public string PartnerCode { get; set; } = string.Empty;
 
     [Required]
-    [StringLength(200)]
-    [Display(Name = "Partner Name")]
-    public string PartnerName { get; set; }
-        = string.Empty;
+    [StringLength(150)]
+    [Display(Name = "Partner name")]
+    public string PartnerName { get; set; } = string.Empty;
 
     [StringLength(500)]
     public string? Address { get; set; }
+    [StringLength(50)]
+    public string? Country { get; set; }
+
+    [StringLength(50)]
+    public string? City { get; set; }
 
     [EmailAddress]
-    [StringLength(200)]
+    [StringLength(250)]
     public string? Email { get; set; }
 
     [StringLength(50)]
-    [Display(Name = "Phone Number")]
+    [Display(Name = "Phone number")]
     public string? PhoneNumber { get; set; }
 
-    [Display(Name = "Active Partner")]
     public bool IsActive { get; set; }
 }

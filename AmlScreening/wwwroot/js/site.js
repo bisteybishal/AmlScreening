@@ -55,10 +55,21 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function saveTabs(tabs) {
-        sessionStorage.setItem(storageKey, JSON.stringify(tabs));
+        try { sessionStorage.setItem(storageKey, JSON.stringify(tabs)); } catch { /* Storage may be disabled. */ }
     }
 
-    let tabs = getTabs();
+    // A browser refresh starts a fresh workspace. Normal navigation retains tabs.
+    const navigation = performance.getEntriesByType("navigation")[0];
+    const isReload = navigation?.type === "reload";
+    let tabs = isReload ? [] : getTabs();
+    if (isReload) {
+        saveTabs([]);
+        // Dashboard is the only permanent tab after any browser reload.
+        if (!isDashboard) {
+            window.location.replace(dashboardUrl);
+            return;
+        }
+    }
 
     // Dashboard is permanent. Every other MVC page becomes a closable tab.
     if (!isDashboard) {
@@ -97,7 +108,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const link = document.createElement("a");
             link.className = "workspace-tab-link";
-            link.href =tab.currentTitle || tab.url;
+            link.href = tab.currentUrl || tab.url;
             link.textContent = tab.title;
 
             const closeButton = document.createElement("button");
@@ -129,3 +140,5 @@ document.addEventListener("DOMContentLoaded", function () {
 
     renderTabs();
 });
+
+

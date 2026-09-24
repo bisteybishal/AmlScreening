@@ -31,7 +31,7 @@ public sealed partial class RiskScoringService : IRiskScoringService
         RiskScoringInput input,
         CancellationToken cancellationToken = default)
     {
-        if (_currentUser.PartnerId <= 0)
+        if (!_currentUser.IsAuthenticated || _currentUser.UserId <= 0 || _currentUser.PartnerId <= 0)
         {
             throw new InvalidOperationException(
                 "A partner must be selected before risk can be calculated.");
@@ -103,28 +103,12 @@ public sealed partial class RiskScoringService : IRiskScoringService
         }
 
 
-        // IMPORTANT:
-        // This was missing in your current code.
+      
         var model = activeModels[0];
-
-
-        var modelWeight =
-            model.CustomerWeightPercent +
-            model.TransactionWeightPercent +
-            model.ScreeningWeightPercent;
-
-
-        if (model.CustomerWeightPercent < 0 ||
-            model.CustomerWeightPercent > 100 ||
-            model.TransactionWeightPercent < 0 ||
-            model.TransactionWeightPercent > 100 ||
-            model.ScreeningWeightPercent < 0 ||
-            model.ScreeningWeightPercent > 100 ||
-            modelWeight != 100m)
-        {
-            throw new InvalidOperationException(
-                "Risk model weights must total exactly 100 percent.");
-        }
+        ValidateModel(
+            model.CustomerWeightPercent,
+            model.TransactionWeightPercent,
+            model.ScreeningWeightPercent);
 
 
         // =================================================
@@ -427,7 +411,9 @@ public sealed partial class RiskScoringService : IRiskScoringService
         CancellationToken cancellationToken = default)
     {
         EnsureConfigurationAccess(
-            AppPermissions.Risk.View);
+      _currentUser.HasPermission(AppPermissions.RiskScoreSetup.View)
+          ? AppPermissions.RiskScoreSetup.View
+          : AppPermissions.RiskScore.View);
 
 
         pageSize = 10;
@@ -755,39 +741,31 @@ public sealed partial class RiskScoringService : IRiskScoringService
         // PERMISSIONS
         // =================================================
 
-        var canManage =
+        var canManageRules = _currentUser.HasPermission(
+            AppPermissions.RiskScore.Manage);
+
+        var canManageSetup =
             _currentUser.HasPermission(
-                AppPermissions.Risk.Manage);
+                AppPermissions.RiskScoreSetup.Manage);
 
 
-        var canEditRules =
-            canManage &&
-            (
-                !hasRuleDraft
-                ||
-                (
-                    ruleMakers.Count == 1 &&
-                    ruleMakers[0] ==
-                        _currentUser.UserId
-                )
-            );
+        var canEditRules = canManageRules;
 
 
         var canEditBands =
-            canManage &&
+            canManageSetup &&
             (
                 !hasBandDraft
                 ||
                 (
                     bandMakers.Count == 1 &&
-                    bandMakers[0] ==
-                        _currentUser.UserId
+                    bandMakers[0] == _currentUser.UserId
                 )
             );
 
 
         var canEditModel =
-            canManage &&
+            canManageSetup &&
             (
                 !hasModelDraft
                 ||
@@ -859,7 +837,7 @@ public sealed partial class RiskScoringService : IRiskScoringService
         CancellationToken cancellationToken = default)
     {
         EnsureConfigurationAccess(
-            AppPermissions.Risk.View);
+            AppPermissions.RiskScore.View);
 
 
         return _db.RiskFactorRules
@@ -882,7 +860,7 @@ public sealed partial class RiskScoringService : IRiskScoringService
         CancellationToken cancellationToken = default)
     {
         EnsureConfigurationAccess(
-            AppPermissions.Risk.View);
+            AppPermissions.RiskScoreSetup.View);
 
 
         return _db.RiskBands

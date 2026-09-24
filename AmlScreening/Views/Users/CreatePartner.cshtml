@@ -105,7 +105,7 @@
 
                 <input asp-for="PartnerCode"
                        autocomplete="off"
-                       placeholder="e.g. CITYEXP" />
+                       placeholder="e.g. Test" />
 
 
                 <span asp-validation-for="PartnerCode">
@@ -190,6 +190,18 @@
                 <span asp-validation-for="Address">
                 </span>
 
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Country" class="form-label"></label>
+                <input asp-for="Country" class="form-control" maxlength="50" />
+                <span asp-validation-for="Country" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="City" class="form-label"></label>
+                <input asp-for="City" class="form-control" maxlength="50" />
+                <span asp-validation-for="City" class="text-danger"></span>
             </div>
 
 

@@ -9,223 +9,323 @@ using System.Security.Claims;
 
 namespace AmlScreening.Portal.Controllers;
 
-[Authorize(Policy = AppPermissions.Risk.View)]
+[Authorize(Policy = AppPermissions.RiskScoreSetup.View)]
 public sealed class RiskScoreSetupController : Controller
 {
+    private const string ReviewView =
+        "~/Views/Shared/RiskApprovalReview.cshtml";
+
     private readonly IRiskScoringService _riskScoring;
     private readonly IErrorLogService _errorLogService;
 
-    public RiskScoreSetupController(IRiskScoringService riskScoring, IErrorLogService errorLogService)
+    public RiskScoreSetupController(
+        IRiskScoringService riskScoring,
+        IErrorLogService errorLogService)
     {
         _riskScoring = riskScoring;
         _errorLogService = errorLogService;
     }
 
+    // =====================================================
+    // SETUP PAGE
+    // =====================================================
+
     [HttpGet("/RiskScoreSetup/Index", Order = 0)]
-    [HttpGet("/RiskScoring/Setup", Order = 1)] // Existing menu links still work.
-    public async Task<IActionResult> Index(CancellationToken cancellationToken)
+    [HttpGet("/RiskScoring/Setup", Order = 1)]
+    public async Task<IActionResult> Index(
+        CancellationToken cancellationToken)
     {
         try
         {
-            var result = await _riskScoring.GetSetupAsync(null, null, 1, 10, cancellationToken);
-            return View(RiskScoringPageViewModel.From(result));
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(Index));
-
+            var result = await LoadSetupAsync(cancellationToken);
 
             return View(
+                "Index",
+                RiskScoringPageViewModel.From(result));
+        }
+        catch (RiskConfigurationException ex)
+        {
+            ViewBag.ErrorMessage = ex.Message;
+
+            return View(
+                "Index",
                 new RiskScoringPageViewModel
                 {
-                    ErrorMessage =
-                        errorId.HasValue
-                            ? $"Unable to load risk ranges. Error reference: {errorId}"
-                            : "Risk ranges could not be loaded. Please contact your administrator."
+                    ErrorMessage = ex.Message
                 });
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            var message = await GetErrorMessageAsync(
+                ex,
+                nameof(Index),
+                "Unable to load risk score setup.");
 
+            // The existing workflow partial reads this property.
+            ViewBag.ErrorMessage = message;
 
-
+            return View(
+                "Index",
+                new RiskScoringPageViewModel
+                {
+                    ErrorMessage = message
+                });
+        }
     }
 
-    [HttpGet, Authorize(Policy = AppPermissions.Risk.Manage)]
-    public async Task<IActionResult> Edit(CancellationToken cancellationToken)
+    // =====================================================
+    // RISK RANGES — GET
+    // =====================================================
+
+    [HttpGet]
+    [Authorize(Policy = AppPermissions.RiskScoreSetup.Manage)]
+    public async Task<IActionResult> Edit(
+        CancellationToken cancellationToken)
     {
         try
         {
+            var result = await LoadSetupAsync(cancellationToken);
 
-            var result = await _riskScoring.GetSetupAsync(null, null, 1, 10, cancellationToken);
+            if (!result.CanEditBands)
+            {
+                TempData["ErrorMessage"] =
+                    "You cannot edit these ranges. If a pending set exists, " +
+                    "only its maker can change it.";
+
+                return RedirectToAction(nameof(Index));
+            }
+
             if (result.Bands.Count == 0)
             {
-                return View(new RiskScoreSetupEditViewModel
-                {
-                    Bands =
-                    [
-                        new() { RiskLevel = "LOW", MinimumScore = 0, MaximumScore = 29, Decision = "ALLOW" },
-                    new() { RiskLevel = "MEDIUM", MinimumScore = 30, MaximumScore = 59, Decision = "REVIEW" },
-                    new() { RiskLevel = "HIGH", MinimumScore = 60, MaximumScore = 79, Decision = "REVIEW" },
-                    new() { RiskLevel = "CRITICAL", MinimumScore = 80, MaximumScore = 100, Decision = "BLOCK" }
-                    ]
-                });
+                // Proposed starting values only.
+                // They remain inactive until saved and approved.
+                return View(
+                    "Edit",
+                    new RiskScoreSetupEditViewModel
+                    {
+                        Bands =
+                        [
+                            new RiskBandEditViewModel
+                            {
+                                RiskLevel = "LOW",
+                                MinimumScore = 0,
+                                MaximumScore = 29,
+                                Decision = "ALLOW"
+                            },
+                            new RiskBandEditViewModel
+                            {
+                                RiskLevel = "MEDIUM",
+                                MinimumScore = 30,
+                                MaximumScore = 59,
+                                Decision = "REVIEW"
+                            },
+                            new RiskBandEditViewModel
+                            {
+                                RiskLevel = "HIGH",
+                                MinimumScore = 60,
+                                MaximumScore = 79,
+                                Decision = "REVIEW"
+                            },
+                            new RiskBandEditViewModel
+                            {
+                                RiskLevel = "CRITICAL",
+                                MinimumScore = 80,
+                                MaximumScore = 100,
+                                Decision = "BLOCK"
+                            }
+                        ]
+                    });
             }
-            return View(new RiskScoreSetupEditViewModel
+
+            var model = new RiskScoreSetupEditViewModel
             {
-                Bands = result.Bands.Select(b => new RiskBandEditViewModel
-                {
-                    Id = b.Id,
-                    RiskLevel = b.RiskLevel,
-                    MinimumScore = b.MinimumScore,
-                    MaximumScore = b.MaximumScore,
-                    Decision = b.Decision,
-                    Remarks = b.Remarks,
-                    RowVersion = b.RowVersion
-                }).ToList()
-            });
+                Bands = result.Bands
+                    .OrderBy(band => band.MinimumScore)
+                    .Select(band => new RiskBandEditViewModel
+                    {
+                        Id = band.Id,
+                        RiskLevel = band.RiskLevel,
+                        MinimumScore = band.MinimumScore,
+                        MaximumScore = band.MaximumScore,
+                        Decision = band.Decision,
+                        Remarks = band.Remarks,
+                        RowVersion = band.RowVersion
+                    })
+                    .ToList()
+            };
+
+            return View("Edit", model);
         }
-        catch (Exception ex)
+        catch (RiskConfigurationException ex)
         {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(Index));
+            TempData["ErrorMessage"] = ex.Message;
 
-
-            return View(
-                new RiskScoringPageViewModel
-                {
-                    ErrorMessage =
-                        errorId.HasValue
-                            ? $"Unable to Edit risk ranges. Error reference: {errorId}"
-                            : "Risk ranges could not be Edite. Please contact your administrator."
-                });
-        }
-    }
-
-    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = AppPermissions.Risk.Manage)]
-    public async Task<IActionResult> Edit(RiskScoreSetupEditViewModel model, CancellationToken cancellationToken)
-    {
-        if (!ModelState.IsValid) return View(model);
-        try
-        {
-            // Save all adjoining ranges together, never one half of a boundary change.
-            await _riskScoring.SaveBandRangesAsync(model.Bands.Select(b => new RiskBandInput
-            {
-                Id = b.Id,
-                RiskLevel = b.RiskLevel,
-                Decision = b.Decision,
-                MinimumScore = b.MinimumScore,
-                MaximumScore = b.MaximumScore,
-                Remarks = b.Remarks,
-                RowVersion = b.RowVersion
-            }).ToList(), cancellationToken);
-            TempData["SuccessMessage"] = "Ranges saved as Pending. Another administrator must review and approve.";
             return RedirectToAction(nameof(Index));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(Index));
+            TempData["ErrorMessage"] = await GetErrorMessageAsync(
+                ex,
+                nameof(Edit),
+                "Unable to open the risk range form.");
 
-
-            return View(
-                new RiskScoringPageViewModel
-                {
-                    ErrorMessage =
-                        errorId.HasValue
-                            ? $"Unable to Edit risk ranges. Error reference: {errorId}"
-                            : "Risk ranges could not be Edited. Please contact your administrator."
-                });
+            return RedirectToAction(nameof(Index));
         }
     }
 
-    //[HttpPost, ValidateAntiForgeryToken, Authorize(Policy = AppPermissions.Risk.Approve)]
-    //public async Task<IActionResult> Apply(string reviewToken, CancellationToken cancellationToken)
-    //{
-    //    try
-    //    {
-    //        await _riskScoring.ActivateBandsAsync(reviewToken, cancellationToken);
-    //        TempData["SuccessMessage"] = "Ranges approved. New evaluations use the approved settings.";
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        var errorId =
-    //            await LogErrorAsync(
-    //                ex,
-    //                nameof(Index));
+    // =====================================================
+    // RISK RANGES — POST
+    // =====================================================
 
-
-    //        return View(
-    //            new RiskScoringPageViewModel
-    //            {
-    //                ErrorMessage =
-    //                    errorId.HasValue
-    //                        ? $"Unable to load risk ranges. Error reference: {errorId}"
-    //                        : "Risk ranges could not be loaded. Please contact your administrator."
-    //            });
-    //    }
-    //}
-
-    [HttpGet]
-    public async Task<IActionResult> Review(CancellationToken cancellationToken)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Policy = AppPermissions.RiskScoreSetup.Manage)]
+    public async Task<IActionResult> Edit(
+        RiskScoreSetupEditViewModel model,
+        CancellationToken cancellationToken)
     {
+        model.Bands ??= [];
+
+        ValidateRanges(model);
+
+        if (!ModelState.IsValid)
+            return View("Edit", model);
+
         try
         {
-            var review = await _riskScoring.GetApprovalReviewAsync("Bands", null, cancellationToken);
-            return View("~/Views/Shared/RiskApprovalReview.cshtml", review);
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(Index));
-
-
-            return View(
-                new RiskScoringPageViewModel
+            var ranges = model.Bands
+                .Select(band => new RiskBandInput
                 {
-                    ErrorMessage =
-                        errorId.HasValue
-                            ? $"Unable to load risk ranges. Error reference: {errorId}"
-                            : "Risk ranges could not be loaded. Please contact your administrator."
-                });
+                    Id = band.Id,
+                    RiskLevel = band.RiskLevel.Trim().ToUpperInvariant(),
+                    MinimumScore = band.MinimumScore,
+                    MaximumScore = band.MaximumScore,
+                    Decision = band.Decision.Trim().ToUpperInvariant(),
+                    Remarks = Clean(band.Remarks),
+                    RowVersion = band.RowVersion
+                })
+                .ToList();
+
+            await _riskScoring.SaveBandRangesAsync(
+                ranges,
+                cancellationToken);
+
+            TempData["SuccessMessage"] =
+                "Risk ranges saved as Pending. A different authorized " +
+                "checker must review and approve them.";
+
+            return RedirectToAction(nameof(Index));
+        }
+        catch (RiskConfigurationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+
+            return View("Edit", model);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            ModelState.AddModelError(
+                string.Empty,
+                await GetErrorMessageAsync(
+                    ex,
+                    nameof(Edit),
+                    "Unable to save risk ranges."));
+
+            return View("Edit", model);
         }
     }
+
+    // =====================================================
+    // REVIEW RISK RANGES
+    // =====================================================
+
     [HttpGet]
-    [Authorize(
-  Policy = AppPermissions.Risk.Manage)]
+    public Task<IActionResult> Review(
+        CancellationToken cancellationToken)
+    {
+        return OpenReviewAsync(
+            "Bands",
+            nameof(Review),
+            cancellationToken);
+    }
+
+    // =====================================================
+    // APPROVE RISK RANGES
+    // =====================================================
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Policy = AppPermissions.RiskScoreSetup.Approve)]
+    public async Task<IActionResult> Apply(
+        string? reviewToken,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(reviewToken))
+        {
+            TempData["ErrorMessage"] =
+                "Open the range review again before approving.";
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            await _riskScoring.ActivateBandsAsync(
+                reviewToken,
+                cancellationToken);
+
+            TempData["SuccessMessage"] =
+                "Risk ranges approved. New evaluations use the approved ranges.";
+        }
+        catch (RiskConfigurationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            TempData["ErrorMessage"] = await GetErrorMessageAsync(
+                ex,
+                nameof(Apply),
+                "Unable to approve risk ranges.");
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    // =====================================================
+    // MODEL WEIGHTS — GET
+    // =====================================================
+
+    [HttpGet]
+    [Authorize(Policy = AppPermissions.RiskScoreSetup.Manage)]
     public async Task<IActionResult> EditModel(
-  CancellationToken cancellationToken)
+        CancellationToken cancellationToken)
     {
         try
         {
-            var result =
-                await _riskScoring.GetSetupAsync(
-                    null,
-                    null,
-                    1,
-                    10,
-                    cancellationToken);
+            var result = await LoadSetupAsync(cancellationToken);
 
-            var model =
-                result.PendingModel ??
-                result.ActiveModel;
-
-            if (model == null)
+            if (!result.CanEditModel)
             {
+                TempData["ErrorMessage"] =
+                    "You cannot edit this model. If a pending model exists, " +
+                    "only its maker can change it.";
+
+                return RedirectToAction(nameof(Index));
+            }
+
+            var source = result.PendingModel ?? result.ActiveModel;
+
+            if (source is null)
+            {
+                // Proposed values, not approved production settings.
                 return View(
                     "Model",
                     new RiskModelEditViewModel
                     {
-                        CustomerWeightPercent = 40,
-                        TransactionWeightPercent = 40,
-                        ScreeningWeightPercent = 20
+                        CustomerWeightPercent = 40m,
+                        TransactionWeightPercent = 40m,
+                        ScreeningWeightPercent = 20m
                     });
             }
 
@@ -233,158 +333,147 @@ public sealed class RiskScoreSetupController : Controller
                 "Model",
                 new RiskModelEditViewModel
                 {
-                    Id = model.Id,
-
-                    CustomerWeightPercent =
-                        model.CustomerWeightPercent,
-
-                    TransactionWeightPercent =
-                        model.TransactionWeightPercent,
-
-                    ScreeningWeightPercent =
-                        model.ScreeningWeightPercent,
-
-                    RowVersion =
-                        model.RowVersion
+                    Id = source.Id,
+                    CustomerWeightPercent = source.CustomerWeightPercent,
+                    TransactionWeightPercent = source.TransactionWeightPercent,
+                    ScreeningWeightPercent = source.ScreeningWeightPercent,
+                    RowVersion = source.RowVersion
                 });
         }
-        catch (Exception ex)
+        catch (RiskConfigurationException ex)
         {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(Index));
+            TempData["ErrorMessage"] = ex.Message;
 
+            return RedirectToAction(nameof(Index));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            TempData["ErrorMessage"] = await GetErrorMessageAsync(
+                ex,
+                nameof(EditModel),
+                "Unable to open the risk model form.");
 
-            return View(
-                new RiskScoringPageViewModel
-                {
-                    ErrorMessage =
-                        errorId.HasValue
-                            ? $"Unable to load risk ranges. Error reference: {errorId}"
-                            : "Risk ranges could not be loaded. Please contact your administrator."
-                });
+            return RedirectToAction(nameof(Index));
         }
     }
+
+    // =====================================================
+    // MODEL WEIGHTS — POST
+    // =====================================================
+
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(
-    Policy = AppPermissions.Risk.Manage)]
+    [Authorize(Policy = AppPermissions.RiskScoreSetup.Manage)]
     public async Task<IActionResult> EditModel(
-    RiskModelEditViewModel model,
-    CancellationToken cancellationToken)
+        RiskModelEditViewModel model,
+        CancellationToken cancellationToken)
     {
-        var total =
-            model.CustomerWeightPercent +
-            model.TransactionWeightPercent +
-            model.ScreeningWeightPercent;
+        if (model.Id < 0)
+        {
+            ModelState.AddModelError(
+                nameof(model.Id),
+                "Invalid risk model.");
+        }
 
-        if (total != 100m)
+        if (model.Id > 0 && model.RowVersion is not { Length: 8 })
         {
             ModelState.AddModelError(
                 string.Empty,
-                "Customer, Transaction and Screening weights must total exactly 100%.");
+                "Reload the model form before saving.");
+        }
+
+        // Property annotations validate each weight's 0–100 range.
+        // Avoid arithmetic on malformed/out-of-range posted values.
+        if (ModelState.IsValid)
+        {
+            var total =
+                model.CustomerWeightPercent +
+                model.TransactionWeightPercent +
+                model.ScreeningWeightPercent;
+
+            if (total != 100m)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "Customer, Transaction and Screening weights " +
+                    "must total exactly 100%.");
+            }
         }
 
         if (!ModelState.IsValid)
-        {
-            return View(
-                "Model",
-                model);
-        }
+            return View("Model", model);
 
         try
         {
             await _riskScoring.SaveModelAsync(
                 new RiskModelInput
                 {
-                    Id =
-                        model.Id,
-
-                    CustomerWeightPercent =
-                        model.CustomerWeightPercent,
-
-                    TransactionWeightPercent =
-                        model.TransactionWeightPercent,
-
-                    ScreeningWeightPercent =
-                        model.ScreeningWeightPercent,
-
-                    RowVersion =
-                        model.RowVersion
+                    Id = model.Id,
+                    CustomerWeightPercent = model.CustomerWeightPercent,
+                    TransactionWeightPercent = model.TransactionWeightPercent,
+                    ScreeningWeightPercent = model.ScreeningWeightPercent,
+                    RowVersion = model.RowVersion
                 },
                 cancellationToken);
 
             TempData["SuccessMessage"] =
-                "Risk model saved as Pending. A different authorized checker must approve it.";
+                "Risk model saved as Pending. A different authorized " +
+                "checker must review and approve it.";
 
-            return RedirectToAction(
-                nameof(Index));
+            return RedirectToAction(nameof(Index));
         }
-        catch (Exception ex)
+        catch (RiskConfigurationException ex)
         {
-            var errorId =
-                await LogErrorAsync(
+            ModelState.AddModelError(string.Empty, ex.Message);
+
+            return View("Model", model);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            ModelState.AddModelError(
+                string.Empty,
+                await GetErrorMessageAsync(
                     ex,
-                    nameof(Index));
+                    nameof(EditModel),
+                    "Unable to save the risk model."));
 
-
-            return View(
-                new RiskScoringPageViewModel
-                {
-                    ErrorMessage =
-                        errorId.HasValue
-                            ? $"Unable to load risk ranges. Error reference: {errorId}"
-                            : "Risk ranges could not be loaded. Please contact your administrator."
-                });
+            return View("Model", model);
         }
     }
 
+    // =====================================================
+    // REVIEW MODEL
+    // =====================================================
 
     [HttpGet]
-    public async Task<IActionResult> ReviewModel(
-   CancellationToken cancellationToken)
+    public Task<IActionResult> ReviewModel(
+        CancellationToken cancellationToken)
     {
-        try
-        {
-            var review =
-                await _riskScoring
-                    .GetApprovalReviewAsync(
-                        "Model",
-                        null,
-                        cancellationToken);
-
-            return View(
-                "~/Views/Shared/RiskApprovalReview.cshtml",
-                review);
-        }
-        catch (Exception ex)
-        {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(Index));
-
-
-            return View(
-                new RiskScoringPageViewModel
-                {
-                    ErrorMessage =
-                        errorId.HasValue
-                            ? $"Unable to load risk ranges. Error reference: {errorId}"
-                            : "Risk ranges could not be loaded. Please contact your administrator."
-                });
-        }
+        return OpenReviewAsync(
+            "Model",
+            nameof(ReviewModel),
+            cancellationToken);
     }
+
+    // =====================================================
+    // APPROVE MODEL
+    // =====================================================
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(
-    Policy = AppPermissions.Risk.Approve)]
+    [Authorize(Policy = AppPermissions.RiskScoreSetup.Approve)]
     public async Task<IActionResult> ApplyModel(
-    string reviewToken,
-    CancellationToken cancellationToken)
+        string? reviewToken,
+        CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(reviewToken))
+        {
+            TempData["ErrorMessage"] =
+                "Open the model review again before approving.";
+
+            return RedirectToAction(nameof(Index));
+        }
+
         try
         {
             await _riskScoring.ActivateModelAsync(
@@ -392,44 +481,169 @@ public sealed class RiskScoreSetupController : Controller
                 cancellationToken);
 
             TempData["SuccessMessage"] =
-                "Risk model approved. New evaluations now use the approved model.";
-            return RedirectToAction(
-          nameof(Index));
+                "Risk model approved. New evaluations use the approved model.";
         }
-        catch (Exception ex)
+        catch (RiskConfigurationException ex)
         {
-            var errorId =
-                await LogErrorAsync(
-                    ex,
-                    nameof(Index));
-
-
-            return View(
-                new RiskScoringPageViewModel
-                {
-                    ErrorMessage =
-                        errorId.HasValue
-                            ? $"Unable to load risk ranges. Error reference: {errorId}"
-                            : "Risk ranges could not be loaded. Please contact your administrator."
-                });
+            TempData["ErrorMessage"] = ex.Message;
         }
-      
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            TempData["ErrorMessage"] = await GetErrorMessageAsync(
+                ex,
+                nameof(ApplyModel),
+                "Unable to approve the risk model.");
+        }
+
+        return RedirectToAction(nameof(Index));
     }
 
-    // =========================================================
-    // ERROR LOG
-    // =========================================================
+    // =====================================================
+    // SHARED HELPERS
+    // =====================================================
 
-    private Task<long?> LogErrorAsync(
-        Exception exception,
-        string action)
+    private Task<RiskScoringSetupResult> LoadSetupAsync(
+        CancellationToken cancellationToken)
     {
-        return _errorLogService
-            .LogAsync(
-                exception,
-                nameof(RiskScoresController),
+        return _riskScoring.GetSetupAsync(
+            null,
+            null,
+            1,
+            10,
+            cancellationToken);
+    }
+
+    private async Task<IActionResult> OpenReviewAsync(
+        string kind,
+        string action,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var review = await _riskScoring.GetApprovalReviewAsync(
+                kind,
+                null,
+                cancellationToken);
+
+            return View(ReviewView, review);
+        }
+        catch (RiskConfigurationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            TempData["ErrorMessage"] = await GetErrorMessageAsync(
+                ex,
                 action,
-                User.FindFirstValue(
-                    AppClaimTypes.PartnerCode));
+                "Unable to open the approval review.");
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    private void ValidateRanges(RiskScoreSetupEditViewModel model)
+    {
+        if (model.Bands.Count == 0)
+        {
+            ModelState.AddModelError(
+                nameof(model.Bands),
+                "At least one risk range is required.");
+
+            return;
+        }
+
+        for (var index = 0; index < model.Bands.Count; index++)
+        {
+            var band = model.Bands[index];
+
+            if (band.Id < 0)
+            {
+                ModelState.AddModelError(
+                    $"Bands[{index}].Id",
+                    "Invalid risk range.");
+            }
+
+            if (band.Id > 0 && band.RowVersion is not { Length: 8 })
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "Reload the range form before saving.");
+
+                break;
+            }
+        }
+
+        if (!ModelState.IsValid)
+            return;
+
+        var levels = new HashSet<string>(
+            StringComparer.OrdinalIgnoreCase);
+
+        var nextMinimum = 0;
+
+        foreach (var band in model.Bands.OrderBy(x => x.MinimumScore))
+        {
+            var level = band.RiskLevel.Trim();
+            var decision = band.Decision.Trim().ToUpperInvariant();
+            var maximum = band.MaximumScore ?? 100;
+
+            if (!levels.Add(level))
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "Each risk level must have a unique name.");
+            }
+
+            if (decision is not ("ALLOW" or "REVIEW" or "BLOCK"))
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "Risk decisions must be ALLOW, REVIEW or BLOCK.");
+            }
+
+            if (band.MinimumScore != nextMinimum ||
+                maximum < band.MinimumScore ||
+                maximum > 100)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "Risk ranges must cover 0–100 without gaps or overlaps.");
+
+                return;
+            }
+
+            nextMinimum = maximum + 1;
+        }
+
+        if (nextMinimum != 101)
+        {
+            ModelState.AddModelError(
+                string.Empty,
+                "The final risk range must end at 100.");
+        }
+    }
+
+    private async Task<string> GetErrorMessageAsync(
+        Exception exception,
+        string action,
+        string message)
+    {
+        var errorId = await _errorLogService.LogAsync(
+            exception,
+            nameof(RiskScoreSetupController),
+            action,
+            User.FindFirstValue(AppClaimTypes.PartnerCode));
+
+        return errorId.HasValue
+            ? $"{message} Error reference: {errorId.Value}."
+            : message;
+    }
+
+    private static string? Clean(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Trim();
     }
 }

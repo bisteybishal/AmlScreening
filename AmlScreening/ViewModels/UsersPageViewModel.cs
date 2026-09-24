@@ -13,19 +13,12 @@ public sealed class UsersPageViewModel
 
     public int TotalPartners { get; set; }
     public int TotalUsers { get; set; }
-
     public int ActivePartners { get; set; }
-
     public int IActivePartners { get; set; }
 
-
     public int Page { get; set; } = 1;
-
     public int PageSize { get; set; } = 10;
-
     public int TotalPages { get; set; } = 1;
-
-
     public string? ErrorMessage { get; set; }
 
 
@@ -40,20 +33,14 @@ public sealed class UsersPageViewModel
 public sealed class CreatePartnerViewModel
 {
     [Required]
-    [StringLength(
-        30,
-        MinimumLength = 2)]
-    [Display(Name = "Short code")]
-    public string PartnerCode { get; set; }
-        = string.Empty;
-
+    [StringLength(30, MinimumLength = 2)]
+    [Display(Name = "Partner code")]
+    public string PartnerCode { get; set; } = string.Empty;
 
     [Required]
     [StringLength(150)]
     [Display(Name = "Partner name")]
-    public string PartnerName { get; set; }
-        = string.Empty;
-
+    public string PartnerName { get; set; } = string.Empty;
 
     [StringLength(500)]
     public string? Address { get; set; }
@@ -65,11 +52,16 @@ public sealed class CreatePartnerViewModel
 
 
     [StringLength(50)]
+    public string? Country { get; set; }
+
+    [StringLength(50)]
+    public string? City { get; set; }
+
+    [StringLength(50)]
+    [Display(Name = "Phone number")]
     public string? PhoneNumber { get; set; }
 
-
-    public bool IsActive { get; set; }
-        = true;
+    public bool IsActive { get; set; } = true;
 }
 
 
@@ -79,44 +71,34 @@ public sealed class CreatePartnerViewModel
 
 public sealed class CreateBranchViewModel
 {
-    [Range(
-        1,
-        int.MaxValue,
-        ErrorMessage =
-            "Select a partner.")]
+    [Range(1, int.MaxValue)]
     public int PartnerId { get; set; }
-
 
     [Required]
     [StringLength(150)]
     [Display(Name = "Branch name")]
-    public string BranchName { get; set; }
-        = string.Empty;
-
+    public string BranchName { get; set; } = string.Empty;
 
     [StringLength(500)]
     public string? Address { get; set; }
+    [StringLength(50)]
+    public string? Country { get; set; }
 
+    [StringLength(50)]
+    public string? City { get; set; }
 
     [EmailAddress]
     [StringLength(250)]
     public string? Email { get; set; }
 
-
     [StringLength(50)]
+    [Display(Name = "Phone number")]
     public string? PhoneNumber { get; set; }
 
-
-    public bool IsActive { get; set; }
-        = true;
+    public bool IsActive { get; set; } = true;
 
 
-    [BindNever]
-    [ValidateNever]
-    public IReadOnlyList<PartnerOption>
-        Partners
-    { get; set; }
-        = Array.Empty<PartnerOption>();
+
 }
 
 
@@ -126,91 +108,53 @@ public sealed class CreateBranchViewModel
 
 public sealed class CreateUserViewModel
 {
-    [Range(
-        1,
-        int.MaxValue,
-        ErrorMessage =
-            "Select a partner.")]
+    [Range(1, int.MaxValue)]
     public int PartnerId { get; set; }
 
-
-    [Range(
-        1,
-        int.MaxValue,
-        ErrorMessage =
-            "Select a branch.")]
+    [Range(1, int.MaxValue)]
     public int BranchId { get; set; }
 
-
     [Required]
-    [StringLength(
-        100,
-        MinimumLength = 3)]
-    public string Username { get; set; }
-        = string.Empty;
+    [StringLength(100, MinimumLength = 3)]
+    public string Username { get; set; } = string.Empty;
 
+    [StringLength(500)]
+    public string? Address { get; set; }
 
     [EmailAddress]
     [StringLength(250)]
     public string? Email { get; set; }
 
-
-    [StringLength(500)]
-    public string? Address { get; set; }
-
-
     [StringLength(50)]
+    [Display(Name = "Phone number")]
     public string? PhoneNumber { get; set; }
 
-
     [Required]
-    [StringLength(
-        100,
-        MinimumLength = 8)]
+    [StringLength(100, MinimumLength = 8)]
     [DataType(DataType.Password)]
-    public string Password { get; set; }
-        = string.Empty;
-
+    public string Password { get; set; } = string.Empty;
 
     [Required]
     [DataType(DataType.Password)]
-    [Compare(
-        nameof(Password),
-        ErrorMessage =
-            "Passwords do not match.")]
-    public string ConfirmPassword { get; set; }
-        = string.Empty;
+    [Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]
+    [Display(Name = "Confirm password")]
+    public string ConfirmPassword { get; set; } = string.Empty;
 
+    public bool IsActive { get; set; } = true;
 
-    public bool IsActive { get; set; }
-        = true;
+    [MinLength(1, ErrorMessage = "Select at least one role.")]
+    public List<int> SelectedRoleIds { get; set; } = [];
 
-
-    public List<int> SelectedRoleIds { get; set; }
-        = [];
-
-
-    [BindNever]
-    [ValidateNever]
-    public IReadOnlyList<PartnerOption>
-        Partners
-    { get; set; }
+    [BindNever, ValidateNever]
+    public IReadOnlyList<PartnerOption> Partners { get; set; }
         = Array.Empty<PartnerOption>();
 
-
-    [BindNever]
-    [ValidateNever]
-    public IReadOnlyList<BranchOption>
-        Branches
-    { get; set; }
+    [BindNever, ValidateNever]
+    public IReadOnlyList<BranchOption> Branches { get; set; }
         = Array.Empty<BranchOption>();
 
-
-    [BindNever]
-    [ValidateNever]
-    public IReadOnlyList<RoleOption>
-        Roles
-    { get; set; }
+    [BindNever, ValidateNever]
+    public IReadOnlyList<RoleOption> Roles { get; set; }
         = Array.Empty<RoleOption>();
 }
 // ============================================================
@@ -219,46 +163,30 @@ public sealed class CreateUserViewModel
 
 public sealed class UserAccessViewModel
 {
-    [Range(
-        1,
-        long.MaxValue,
-        ErrorMessage =
-            "Invalid user.")]
-
+    [Range(typeof(long), "1", "9223372036854775807")]
     public long UserId { get; set; }
 
+    [BindNever, ValidateNever]
+    public int PartnerId { get; set; }
 
-    public string Username { get; set; }
-        = string.Empty;
+    [BindNever, ValidateNever]
+    public int BranchId { get; set; }
 
+    [BindNever, ValidateNever]
+    public string Username { get; set; } = string.Empty;
 
-    public string PartnerName { get; set; }
-        = string.Empty;
+    [BindNever, ValidateNever]
+    public string PartnerName { get; set; } = string.Empty;
 
-
-    public string BranchName { get; set; }
-        = string.Empty;
-
+    [BindNever, ValidateNever]
+    public string BranchName { get; set; } = string.Empty;
 
     public bool IsActive { get; set; }
 
+    [MinLength(1, ErrorMessage = "Select at least one role.")]
+    public List<int> SelectedRoleIds { get; set; } = [];
 
-    [MinLength(
-        1,
-        ErrorMessage =
-            "Select at least one role.")]
-
-    public List<int>
-        SelectedRoleIds
-    { get; set; }
-        = [];
-
-
-    [BindNever]
-    [ValidateNever]
-
-    public IReadOnlyList<RoleOption>
-        Roles
-    { get; set; }
+    [BindNever, ValidateNever]
+    public IReadOnlyList<RoleOption> Roles { get; set; }
         = Array.Empty<RoleOption>();
 }

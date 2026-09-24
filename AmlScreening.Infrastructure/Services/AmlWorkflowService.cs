@@ -714,44 +714,61 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
     }
 
     private sealed record TransactionRiskResult(int Score, string HighestAction, string RuleVersions);
-    private async Task<List<AmlRecord>>
-        GetScreeningCandidatesAsync(
-            string name)
+    private async Task<List<AmlRecord>> GetScreeningCandidatesAsync(string name)
     {
-        var prefix =
-            AmlNameNormalizer.GetPrefix(
-                name);
+        if (!_currentUser.IsAuthenticated ||
+            _currentUser.UserId <= 0 ||
+            _currentUser.PartnerId <= 0 ||
+            _currentUser.BranchId <= 0)
+        {
+            throw new UnauthorizedAccessException(
+                "A valid partner, branch and user login is required.");
+        }
 
-        if (string.IsNullOrWhiteSpace(prefix))
+        var normalizedName = AmlNameNormalizer.Normalize(name);
+
+        if (string.IsNullOrWhiteSpace(normalizedName))
         {
             return [];
         }
 
-        // Scan all eligible candidates; a prefix-only search can miss spelling differences.
         var candidates = await _db.AmlRecords
             .AsNoTracking()
             .Where(x =>
-                x.IsActive
-                &&
-                x.DeleteFg == "N"
-                &&
+                x.IsActive &&
+                x.DeleteFg == "N" &&
                 (
-                    
-                    x.PartnerId ==
-                        _currentUser.PartnerId
+                 _currentUser.IsAdmin ||
+                    x.IsGlobal ||
+                    x.PartnerId == _currentUser.PartnerId
                 ))
             .OrderBy(x => x.FullName)
+            .ThenBy(x => x.Id)
             .Take(10001)
             .Select(x => new AmlRecord
             {
-                Id=x.Id,
-                PartnerId = x.PartnerId, FullName=x.FullName,
-                DateOfBirth=x.DateOfBirth, Nationality=x.Nationality, SourceName=x.SourceName,
-                LastSyncDate=x.LastSyncDate, SourceUpdatedDate=x.SourceUpdatedDate
+                Id = x.Id,
+                PartnerId = x.PartnerId,
+                BranchId = x.BranchId,
+                CreatedByUserId = x.CreatedByUserId,
+                IsGlobal = x.IsGlobal,
+                IsActive = x.IsActive,
+                FullName = x.FullName,
+                DateOfBirth = x.DateOfBirth,
+                Nationality = x.Nationality,
+                SourceName = x.SourceName,
+                LastSyncDate = x.LastSyncDate,
+                SourceUpdatedDate = x.SourceUpdatedDate
             })
             .ToListAsync();
+
         if (candidates.Count > 10000)
-            throw new InvalidOperationException("AML candidate limit exceeded. Screening was not completed; do not treat this result as clear.");
+        {
+            throw new InvalidOperationException(
+                "AML candidate limit exceeded. Screening was not completed; " +
+                "do not treat this result as clear.");
+        }
+
         return candidates;
     }
 }

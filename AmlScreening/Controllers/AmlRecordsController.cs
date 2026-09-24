@@ -1,3 +1,4 @@
+using AmlScreening.Application.Interface;
 using AmlScreening.Application.Interface.Repositories;
 using AmlScreening.Application.Interface.Services;
 using AmlScreening.Application.Security;
@@ -17,11 +18,13 @@ public sealed class AmlRecordsController : Controller
 
     private readonly IErrorLogService
         _errorLogService;
+    private readonly ICurrentUserContext _currentUser;
 
-    public AmlRecordsController(IAmlRecordRepository repository, IErrorLogService errorLogService)
+    public AmlRecordsController(IAmlRecordRepository repository, IErrorLogService errorLogService, ICurrentUserContext currentUser)
     {
         _repository = repository;
         _errorLogService = errorLogService;
+        _currentUser = currentUser;
     }
 
     [HttpGet]
@@ -99,6 +102,7 @@ public sealed class AmlRecordsController : Controller
                 SourceName = model.SourceName.Trim(),
                 Remarks = model.Remarks.Trim(),
                 IsActive = model.IsActive,
+                IsGlobal = false
 
             };
             await _repository
@@ -137,7 +141,7 @@ public sealed class AmlRecordsController : Controller
     }
 
     [HttpGet]
-    [Authorize(Policy =AppPermissions.Aml.Manage)]
+    [Authorize(Policy = AppPermissions.Aml.Manage)]
     public async Task<IActionResult>
         Edit(
             int id,
@@ -169,7 +173,10 @@ public sealed class AmlRecordsController : Controller
             {
                 return NotFound();
             }
-
+            if (!CanEditRecord(record))
+            {
+                return Forbid();
+            }
 
             var model =
                 new AmlRecordInputModel
@@ -235,7 +242,7 @@ public sealed class AmlRecordsController : Controller
     }
 
     [HttpPost]
-    [Authorize(Policy =AppPermissions.Aml.Manage)]
+    [Authorize(Policy = AppPermissions.Aml.Manage)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult>
         Edit(
@@ -265,7 +272,10 @@ public sealed class AmlRecordsController : Controller
                 return NotFound();
             }
 
-
+            if (!CanEditRecord(existing))
+            {
+                return Forbid();
+            }
             await ValidateAsync(
                 model,
                 model.Id,
@@ -305,7 +315,7 @@ public sealed class AmlRecordsController : Controller
                     SourceName =
                         model.SourceName.Trim(),
 
-                    Remarks =NullIfWhiteSpace(model.Remarks),
+                    Remarks = NullIfWhiteSpace(model.Remarks),
 
                     IsActive =
                         model.IsActive,
@@ -380,7 +390,7 @@ public sealed class AmlRecordsController : Controller
         }
     }
     [HttpPost]
-    [Authorize(Policy =AppPermissions.Aml.Manage)]
+    [Authorize(Policy = AppPermissions.Aml.Manage)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult>
         Delete(
@@ -392,6 +402,18 @@ public sealed class AmlRecordsController : Controller
             if (id <= 0)
             {
                 return NotFound();
+            }
+
+            var target = await _repository.GetByIdAsync(id, cancellationToken);
+
+            if (target == null)
+            {
+                return NotFound();
+            }
+
+            if (!CanEditRecord(target))
+            {
+                return Forbid();
             }
 
 
@@ -479,7 +501,7 @@ public sealed class AmlRecordsController : Controller
             return NotFound();
         }
     }
-    private async Task<AmlRecordsPageViewModel>BuildPageAsync(
+    private async Task<AmlRecordsPageViewModel> BuildPageAsync(
             AmlRecordInputModel input,
             string? search,
             string? recordType,
@@ -747,5 +769,12 @@ public sealed class AmlRecordsController : Controller
                 action,
                 User.FindFirstValue(
                     AppClaimTypes.PartnerCode));
+    }
+
+    private bool CanEditRecord(AmlRecord record)
+    {
+        return _currentUser.HasPermission(AppPermissions.Aml.Manage)
+            && !record.IsGlobal
+            && record.PartnerId == _currentUser.PartnerId;
     }
 }

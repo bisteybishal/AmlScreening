@@ -40,6 +40,8 @@ public sealed class CurrentUserContext
                 : 0;
         }
     }
+    public bool IsAdmin => IsAuthenticated && User?.IsInRole(AppRoles.Admin)==true;
+    
 
     public int PartnerId
     {

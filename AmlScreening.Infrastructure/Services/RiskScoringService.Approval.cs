@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using AmlScreening.Application.Models;
-using AmlScreening.Application.Security;
 using AmlScreening.Domain.Common;
 using AmlScreening.Domain.Entities.Compliance;
 using Microsoft.EntityFrameworkCore;
@@ -29,21 +28,21 @@ public sealed partial class RiskScoringService
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(snapshot)));
     }
 
-    private string? ApprovalBlock(IEnumerable<long?> makerIds)
+    private string? ApprovalBlock(IEnumerable<long?> makerIds, string requiredPermission)
     {
         var ids = makerIds.Distinct().ToList();
         if (ids.Count != 1 || ids[0] is null or <= 0)
             return "Maker information is missing or inconsistent. Legacy ownership must be verified before approval.";
         if (ids[0] == _currentUser.UserId)
             return "You made these changes. A different administrator must approve them.";
-        if (!_currentUser.HasPermission(AppPermissions.Risk.Approve))
-            return "You need RiskScoring.Approve permission to approve these changes.";
+        if (!_currentUser.HasPermission(requiredPermission))
+            return $"You need {requiredPermission} permission to approve these changes.";
         return null;
     }
 
-    private void EnsureApproval(IEnumerable<long?> makerIds, string suppliedToken, string currentToken)
+    private void EnsureApproval(IEnumerable<long?> makerIds, string suppliedToken, string currentToken, string requiredPermission)
     {
-        var message = ApprovalBlock(makerIds);
+        var message = ApprovalBlock(makerIds, requiredPermission);
         if (message != null) throw new RiskConfigurationException(message);
         if (string.IsNullOrEmpty(suppliedToken) || !string.Equals(suppliedToken, currentToken, StringComparison.Ordinal))
             throw new RiskConfigurationException("These changes were updated after you opened the review. Reload and review them again.");
@@ -51,6 +50,16 @@ public sealed partial class RiskScoringService
 
     public async Task<RiskApprovalReview> GetApprovalReviewAsync(string kind, string? factorCode, CancellationToken cancellationToken = default, int ruleId = 0)
     {
+        var viewPermission = kind switch
+        {
+            "Rules" => AppPermissions.RiskScore.View,
+            "Bands" or "Model" => AppPermissions.RiskScoreSetup.View,
+            _ => throw new RiskConfigurationException("Unknown review type.")
+        };
+        var approvalPermission = kind == "Rules"
+            ? AppPermissions.RiskScore.Approve
+            : AppPermissions.RiskScoreSetup.Approve;
+        factorCode = factorCode?.Trim().ToUpperInvariant();
         RiskApprovalReview? review = null;
         // The same client lock used by writers gives the checker a consistent snapshot.
         await ChangeConfigurationAsync(async () =>
@@ -63,7 +72,7 @@ public sealed partial class RiskScoringService
                 var history = await RuleHistory().AsNoTracking().Where(x => x.RiskFactorId == factor.Id).ToListAsync(cancellationToken);
                 var row = history.SingleOrDefault(x => x.Id == ruleId && IsPending(x.ApprovalStatus))
                     ?? throw new RiskConfigurationException("Select a pending score to review.");
-                var blocked = ApprovalBlock([row.MakerUserId]);
+                var blocked = ApprovalBlock([row.MakerUserId], approvalPermission);
                 review = new RiskApprovalReview
                 {
                     Kind = kind,
@@ -86,7 +95,7 @@ public sealed partial class RiskScoringService
                 var pending = history.Where(x => x.BandVersion == version).ToList();
                 if (pending.Count == 0 || pending.Any(x => !IsPending(x.ApprovalStatus)))
                     throw new RiskConfigurationException("There are no pending ranges to review.");
-                var blocked = ApprovalBlock(pending.Select(x => x.MakerUserId));
+                var blocked = ApprovalBlock(pending.Select(x => x.MakerUserId), approvalPermission);
                 review = new RiskApprovalReview
                 {
                     Kind = kind,
@@ -129,7 +138,7 @@ public sealed partial class RiskScoringService
 
                 var blocked =
                     ApprovalBlock(
-                        [pending.MakerUserId]);
+                        [pending.MakerUserId], approvalPermission);
 
                 review =
                     new RiskApprovalReview
@@ -170,8 +179,8 @@ public sealed partial class RiskScoringService
                 throw new RiskConfigurationException(
                     "Unknown review type.");
             }
-           
-        }, cancellationToken, AppPermissions.Risk.View);
+
+        }, cancellationToken, viewPermission);
         return review!;
     }
 
@@ -192,7 +201,7 @@ public sealed partial class RiskScoringService
             var history = await RuleHistory().Where(x => x.RiskFactorId == factor.Id).ToListAsync(cancellationToken);
             var pending = history.SingleOrDefault(x => x.Id == ruleId && IsPending(x.ApprovalStatus))
                 ?? throw new RiskConfigurationException("This score is not pending.");
-            EnsureApproval([pending.MakerUserId], reviewToken, ReviewToken("Rules", factorCode, [pending]));
+            EnsureApproval([pending.MakerUserId], reviewToken, ReviewToken("Rules", factor.FactorCode, [pending]), AppPermissions.RiskScore.Approve);
 
             var active = history.Where(x => x.ApprovalStatus == "APPROVED" && x.IsActive && x.DeleteFg == "N").ToList();
             RiskFactorRule? original = null;
@@ -222,7 +231,7 @@ public sealed partial class RiskScoringService
             Stamp(pending);
             AddAudit("Approve", "RiskFactorRule", pending.Id,
                 $"Approved score change; original {pending.ReplacesRuleId}; maker {pending.MakerUserId}, checker {_currentUser.UserId}.");
-        }, cancellationToken, AppPermissions.Risk.Approve);
+        }, cancellationToken, AppPermissions.RiskScore.Approve);
 
     public Task ActivateBandsAsync(string reviewToken, CancellationToken cancellationToken = default) =>
         ChangeConfigurationAsync(async () =>
@@ -232,7 +241,7 @@ public sealed partial class RiskScoringService
             var pending = history.Where(x => x.BandVersion == version).ToList();
             if (pending.Count == 0 || pending.Any(x => !IsPending(x.ApprovalStatus)))
                 throw new RiskConfigurationException("There are no pending ranges to approve.");
-            EnsureApproval(pending.Select(x => x.MakerUserId), reviewToken, ReviewToken("Bands", null, pending));
+            EnsureApproval(pending.Select(x => x.MakerUserId), reviewToken, ReviewToken("Bands", null, pending), AppPermissions.RiskScoreSetup.Approve);
             try { ValidateBands(pending.Where(x => x.DeleteFg == "N")); }
             catch (InvalidOperationException ex) { throw new RiskConfigurationException(ex.Message); }
             foreach (var row in history.Where(x => x.BandVersion != version && x.IsActive))
@@ -251,7 +260,7 @@ public sealed partial class RiskScoringService
             }
             AddAudit("Approve", "RiskBand", 0,
                 $"Approved ranges v{version}; maker {pending[0].MakerUserId}, checker {_currentUser.UserId}.");
-        }, cancellationToken, AppPermissions.Risk.Approve);
+        }, cancellationToken, AppPermissions.RiskScoreSetup.Approve);
 
     public Task ActivateModelAsync(
     string reviewToken,
@@ -287,7 +296,7 @@ public sealed partial class RiskScoringService
                 ReviewToken(
                     "Model",
                     null,
-                    [pending]));
+                    [pending]), AppPermissions.RiskScoreSetup.Approve);
 
             ValidateModel(
                 pending.CustomerWeightPercent,
@@ -347,7 +356,7 @@ public sealed partial class RiskScoringService
                 $"checker {_currentUser.UserId}.");
         },
         cancellationToken,
-        AppPermissions.Risk.Approve);
+        AppPermissions.RiskScoreSetup.Approve);
 
     private static IReadOnlyList<RiskReviewRow>
     ModelReviewRows(RiskModel model) =>

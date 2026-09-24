@@ -24,7 +24,7 @@ public interface IUserRepository
     Task<IReadOnlyList<BranchOption>> GetActiveBranchesAsync(int partnerId);
 
     Task<IReadOnlyList<BranchListItem>> GetBranchesByPartnerAsync(int partnerid);
-    Task<PartnerBranch> GetBranchByIdAsync(int branchId);
+    Task<PartnerBranch?> GetBranchByIdAsync(int branchId);
     Task<bool> BranchNameExistsAsync(int partnerId,string branchName);
     Task<bool> BranchNameExistsAsync(int partnerId, string branchName,int excludePartnerid);
 
@@ -69,4 +69,13 @@ public interface IUserRepository
         long userId,
         bool isActive,
         IReadOnlyCollection<int> roleIds);
+
+    Task<User?> GetUserByIdAsync(long userId);
+
+    Task<bool> UpdateUserProfileAsync(
+        long userId,
+        string? address,
+        string? email,
+        string? phoneNumber,
+        bool isActive);
 }

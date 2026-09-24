@@ -135,7 +135,7 @@ public sealed class AmlImportRepository
 
                 .Where(
                     record =>
-                        record.IsGlobal == false
+                        record.IsGlobal 
 
                         &&
 

@@ -8,9 +8,9 @@ namespace AmlScreening.Domain.Entities
 {
     public class AmlRecord : BaseEntity
     {
-        public int? PartnerId { get; set; }
+        public int PartnerId { get; set; }
 
-        public int? BranchId { get; set; }
+        public int BranchId { get; set; }
 
         public long? CreatedByUserId { get; set; }
         public string RecordType { get; set; } = string.Empty;

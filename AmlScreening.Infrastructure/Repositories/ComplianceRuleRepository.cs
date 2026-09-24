@@ -70,9 +70,9 @@ namespace AmlScreening.Infrastructure.Repositories
             var parameters = new
             {
                 PartnerId = _currentUser.PartnerId,
-                RuleCode =NormalizeRequired(rule.RuleCode),
-                RuleName = NormalizeRequired(  rule.RuleName),
-                RuleType =NormalizeRequired( rule.RuleType),
+                RuleCode = NormalizeRequired(rule.RuleCode),
+                RuleName = NormalizeRequired(rule.RuleName),
+                RuleType = NormalizeRequired(rule.RuleType),
                 rule.ThresholdAmount,
                 rule.Currency,
                 rule.LookbackMinutes,
@@ -82,7 +82,7 @@ namespace AmlScreening.Infrastructure.Repositories
                 rule.Priority,
                 MakerUserId = makerUserId,
                 MakerUsername = NormalizeRequired(makerUsername),
-               
+
 
             };
             return await connection.QuerySingleAsync<long>("dbo.spa_ComplianceRules_Create",
@@ -96,7 +96,7 @@ namespace AmlScreening.Infrastructure.Repositories
             EnsureCurrentUser(currentUserId);
             using var connection = _dBConnectionFactory.CreateConnection();
             var updateDetail = await connection.QuerySingleAsync<int>(
-                "dbo.spa_ComplianceRules_UdpatePending", new
+                "dbo.spa_ComplianceRules_UpdatePending", new
                 {
                     rule.Id,
                     PartnerId = _currentUser.PartnerId,
@@ -145,7 +145,7 @@ namespace AmlScreening.Infrastructure.Repositories
             using var connection =
                 _dBConnectionFactory.CreateConnection();
 
-            var UpdateId=await connection
+            var UpdateId = await connection
                 .QuerySingleAsync<long>(
                     "dbo.spa_ComplianceRules_CreatePendingVersion",
                     new
@@ -208,7 +208,7 @@ namespace AmlScreening.Infrastructure.Repositories
                     {
                         Id = id,
 
-                        PrtnerId =
+                        PartnerId =
                             _currentUser.PartnerId
                     },
                     commandType:
@@ -230,7 +230,7 @@ namespace AmlScreening.Infrastructure.Repositories
                         RuleCode = ruleCode,
                         PartnerId = _currentUser.PartnerId
 
-        },
+                    },
                     commandType:
                         CommandType.StoredProcedure);
         }
@@ -278,7 +278,7 @@ namespace AmlScreening.Infrastructure.Repositories
        int id,
        long currentUserId,
        string deletedBy, byte[] rowVersion)
-        
+
         {
             EnsurePartnerContext();
 
@@ -372,3 +372,4 @@ namespace AmlScreening.Infrastructure.Repositories
         }
     }
 }
+

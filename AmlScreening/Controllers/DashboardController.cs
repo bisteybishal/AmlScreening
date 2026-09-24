@@ -57,7 +57,7 @@ public sealed class DashboardController : Controller
             model.OpenCaseCount = complianceSummary.OpenCaseCount;
             return View(model);
         }
-        
+
 
         catch (Exception ex)
         {
@@ -68,14 +68,12 @@ public sealed class DashboardController : Controller
                     nameof(Index),
                     null);
 
-            ModelState.AddModelError(
-                string.Empty,
-                errorId.HasValue
-                    ? $"Unable to load dashboard data for user : {errorId}"
-                    : "Dashboard data could not be loaded. Please refresh the page or try again later.");
+            model.ErrorMessage = errorId.HasValue
+     ? $"Dashboard data could not be loaded. Error reference: {errorId}"
+     : "Dashboard data could not be loaded. Please try again.";
 
             return View(model);
         }
-        
+
     }
 }

@@ -10,6 +10,10 @@ public sealed partial class RiskScoringService
     public Task SaveBandRangesAsync(IReadOnlyList<RiskBandInput> ranges, CancellationToken cancellationToken = default) =>
         ChangeConfigurationAsync(async () =>
         {
+            ArgumentNullException.ThrowIfNull(ranges);
+            if (ranges.Count == 0 || ranges.Any(x => x is null))
+                throw new RiskConfigurationException("At least one valid risk range is required.");
+
             var version = await BandHistory().MaxAsync(x => (int?)x.BandVersion, cancellationToken) ?? 0;
             if (version == 0)
             {
@@ -19,14 +23,15 @@ public sealed partial class RiskScoringService
                 {
                     PartnerId = _currentUser.PartnerId,
                     BandVersion = 1,
-                    RiskLevel = x.RiskLevel.Trim().ToUpperInvariant(),
+                    RiskLevel = (x.RiskLevel ?? string.Empty).Trim().ToUpperInvariant(),
                     MinimumScore = x.MinimumScore,
                     MaximumScore = x.MaximumScore,
-                    Decision = x.Decision.Trim().ToUpperInvariant(),
+                    Decision = (x.Decision ?? string.Empty).Trim().ToUpperInvariant(),
                     Remarks = x.Remarks?.Trim(),
                     MakerUserId = _currentUser.UserId,
                     CreatedBy = _currentUser.Username,
-                    ApprovalStatus = "PENDING"
+                    ApprovalStatus = "PENDING",
+                    IsActive = false
                 }).ToList();
                 if (initial.Any(x => string.IsNullOrWhiteSpace(x.RiskLevel) || x.RiskLevel.Length > 20 || x.Remarks?.Length > 1000) ||
                     initial.Select(x => x.RiskLevel).Distinct().Count() != initial.Count)
@@ -38,7 +43,9 @@ public sealed partial class RiskScoringService
                 return;
             }
             var current = await BandHistory()
-                .Where(x => x.BandVersion == version && x.DeleteFg == "N" && x.IsActive)
+                .Where(x => x.BandVersion == version && x.DeleteFg == "N" &&
+                    (x.ApprovalStatus == "PENDING" || x.ApprovalStatus == "DRAFT" ||
+                     (x.ApprovalStatus == "APPROVED" && x.IsActive)))
                 .ToListAsync(cancellationToken);
             if (current.Count == 0 || ranges.Count != current.Count ||
                 ranges.Select(x => x.Id).Distinct().Count() != current.Count ||
@@ -78,14 +85,16 @@ public sealed partial class RiskScoringService
                 Stamp(row);
             }
             AddAudit("Update", "RiskBand", 0, $"Saved all ranges to draft v{draft.Version}.");
-        }, cancellationToken);
+        }, cancellationToken, AppPermissions.RiskScoreSetup.Manage);
 
     // One SQL transaction saves both the change and its audit record.
     // The transaction-owned lock prevents two editors creating competing drafts.
-    private async Task ChangeConfigurationAsync(Func<Task> change, CancellationToken ct, string requiredPermission = AppPermissions.Risk.Manage)
+    private async Task ChangeConfigurationAsync(Func<Task> change, CancellationToken ct, string requiredPermission = AppPermissions.RiskScore.Manage)
     {
         EnsureConfigurationAccess(requiredPermission);
 
+        var previouslyTracked = _db.ChangeTracker.Entries()
+            .Select(x => x.Entity).ToHashSet(ReferenceEqualityComparer.Instance);
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
         var resource = $"AML-RiskConfiguration-{_currentUser.PartnerId}";
         await _db.Database.ExecuteSqlInterpolatedAsync($"""
@@ -100,9 +109,22 @@ public sealed partial class RiskScoringService
             await _db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
         }
-        catch (DbUpdateConcurrencyException)
+        catch (Exception exception)
         {
-            throw new RiskConfigurationException("This entry changed. Reload the list before editing again.");
+            await transaction.RollbackAsync(CancellationToken.None);
+            // A rollback does not reset EF's change tracker. Discard this
+            // service's failed configuration changes before the context is reused.
+            foreach (var entry in _db.ChangeTracker.Entries().ToList())
+            {
+                if (entry.Entity is RiskFactorRule or RiskBand or RiskModel ||
+                    (entry.Entity is AmlScreening.Domain.Entities.AuditLog &&
+                     !previouslyTracked.Contains(entry.Entity)))
+                    entry.State = EntityState.Detached;
+            }
+            if (exception is DbUpdateConcurrencyException)
+                throw new RiskConfigurationException(
+                    "This entry changed. Reload the list before editing again.");
+            throw;
         }
     }
 
@@ -186,7 +208,8 @@ public sealed partial class RiskScoringService
             RuleVersion = version,
             CreatedBy = _currentUser.Username,
             MakerUserId = _currentUser.UserId,
-            ApprovalStatus = "PENDING"
+            ApprovalStatus = "PENDING",
+            IsActive = false
         };
         _db.RiskFactorRules.Add(copy);
         current.Remove(target);
@@ -197,13 +220,15 @@ public sealed partial class RiskScoringService
     public Task SaveRuleAsync(RiskRuleInput input, CancellationToken cancellationToken = default) =>
         ChangeConfigurationAsync(async () =>
         {
+            ArgumentNullException.ThrowIfNull(input);
+            input.FactorCode = (input.FactorCode ?? string.Empty).Trim().ToUpperInvariant();
             var factor = await _db.RiskFactors.SingleOrDefaultAsync(x =>
                 x.PartnerId == _currentUser.PartnerId && x.IsActive && x.FactorCode == input.FactorCode, cancellationToken)
                 ?? throw new RiskConfigurationException("Select an existing risk factor.");
             if (input.Id < 0 || input.Score is < 0 or > 100 || input.Remarks?.Length > 1000 || input.ValueName?.Length > 200)
                 throw new RiskConfigurationException("Enter a score from 0 to 100 and keep the description within its limit.");
             var code = string.IsNullOrWhiteSpace(input.ValueCode) ? null : NormalizeCode(input.ValueCode);
-            var numeric = factor.ValueType is "NUMBER" or "NUMERIC";
+            var numeric = factor.ValueType.ToUpperInvariant() is "NUMBER" or "NUMERIC";
             if (code?.Length > 100 || (!numeric && string.IsNullOrEmpty(code)))
                 throw new RiskConfigurationException("Enter a value code of at most 100 characters.");
             if (numeric && code != "DEFAULT")
@@ -228,7 +253,8 @@ public sealed partial class RiskScoringService
                 RuleVersion = draft.Version,
                 CreatedBy = _currentUser.Username,
                 MakerUserId = _currentUser.UserId,
-                ApprovalStatus = "PENDING"
+                ApprovalStatus = "PENDING",
+                IsActive = false
             };
             if (draft.Target is null) _db.RiskFactorRules.Add(row);
             row.ValueCode = code;
@@ -262,7 +288,7 @@ public sealed partial class RiskScoringService
         if (rows.Where(x => !string.IsNullOrWhiteSpace(x.ValueCode)).GroupBy(x => NormalizeCode(x.ValueCode)).Any(x => x.Count() > 1))
             throw new RiskConfigurationException("Value codes must be unique.");
         var hasDefault = rows.Any(x => x.ValueCode == "DEFAULT");
-        if (factor.ValueType is "NUMBER" or "NUMERIC")
+        if (factor.ValueType.ToUpperInvariant() is "NUMBER" or "NUMERIC")
         {
             var ranges = rows.Where(x => x.ValueCode != "DEFAULT").OrderBy(x => x.MinimumValue).ToList();
             decimal next = 0;
@@ -316,6 +342,7 @@ public sealed partial class RiskScoringService
                 BandVersion = version + 1,
                 CreatedBy = _currentUser.Username,
                 ApprovalStatus = "PENDING",
+                IsActive = false,
                 MakerUserId = _currentUser.UserId
             };
             _db.RiskBands.Add(copy);
@@ -328,8 +355,8 @@ public sealed partial class RiskScoringService
     public Task SaveBandAsync(RiskBandInput input, CancellationToken cancellationToken = default) =>
         ChangeConfigurationAsync(async () =>
         {
-            var level = input.RiskLevel.Trim().ToUpperInvariant();
-            var decision = input.Decision.Trim().ToUpperInvariant();
+            var level = (input.RiskLevel ?? string.Empty).Trim().ToUpperInvariant();
+            var decision = (input.Decision ?? string.Empty).Trim().ToUpperInvariant();
             if (input.Id < 0 || string.IsNullOrEmpty(level) || level.Length > 20 || input.Remarks?.Length > 1000 ||
                 input.MinimumScore is < 0 or > 100 || input.MaximumScore is < 0 or > 100 ||
                 input.MaximumScore < input.MinimumScore || decision is not ("ALLOW" or "REVIEW" or "BLOCK"))
@@ -343,7 +370,8 @@ public sealed partial class RiskScoringService
                 BandVersion = draft.Version,
                 CreatedBy = _currentUser.Username,
                 MakerUserId = _currentUser.UserId,
-                ApprovalStatus = "PENDING"
+                ApprovalStatus = "PENDING",
+                IsActive = false
             };
             if (draft.Target is null) _db.RiskBands.Add(row);
             row.ApprovalStatus = "PENDING";
@@ -356,7 +384,7 @@ public sealed partial class RiskScoringService
             await _db.SaveChangesAsync(cancellationToken);
             AddAudit(input.Id == 0 ? "Create" : "Update", "RiskBand", row.Id,
                 $"Draft v{draft.Version}: {level}, {row.MinimumScore}–{row.MaximumScore ?? 100}, {decision}.");
-        }, cancellationToken);
+        }, cancellationToken, AppPermissions.RiskScoreSetup.Manage);
 
     public Task DeleteBandAsync(int id, byte[] rowVersion, CancellationToken cancellationToken = default) =>
         ChangeConfigurationAsync(async () =>
@@ -365,7 +393,7 @@ public sealed partial class RiskScoringService
             if (draft.Target is null) throw new RiskConfigurationException("Risk band was not found.");
             SoftDelete(draft.Target);
             AddAudit("Delete", "RiskBand", id, $"Soft-deleted in draft v{draft.Version}; active configuration unchanged.");
-        }, cancellationToken);
+        }, cancellationToken, AppPermissions.RiskScoreSetup.Manage);
 
     private static void ValidateModel(decimal customerWeight, decimal transactionWeight, decimal screeningWeight)
     {
@@ -376,15 +404,15 @@ public sealed partial class RiskScoringService
             throw new RiskConfigurationException(
                 "Every model weight must be between 0 and 100.");
         }
-        var total=customerWeight+transactionWeight+screeningWeight;
+        var total = customerWeight + transactionWeight + screeningWeight;
         if (total != 100m)
         {
             throw new RiskConfigurationException(
            "Customer, Transaction and Screening weights must total exactly 100%.");
         }
-        if(decimal.Round(customerWeight,2)!=customerWeight||
-            decimal.Round(transactionWeight,2)!=transactionWeight||
-           decimal.Round(screeningWeight,2)!=screeningWeight)
+        if (decimal.Round(customerWeight, 2) != customerWeight ||
+            decimal.Round(transactionWeight, 2) != transactionWeight ||
+           decimal.Round(screeningWeight, 2) != screeningWeight)
         {
             throw new RiskConfigurationException(
                 "Risk model weights can contain at most two decimal places.");
@@ -396,6 +424,10 @@ public sealed partial class RiskScoringService
     ChangeConfigurationAsync(
         async () =>
         {
+            ArgumentNullException.ThrowIfNull(input);
+            if (input.Id < 0)
+                throw new RiskConfigurationException("Invalid risk model.");
+
             ValidateModel(
                 input.CustomerWeightPercent,
                 input.TransactionWeightPercent,
@@ -445,6 +477,10 @@ public sealed partial class RiskScoringService
             }
             else
             {
+                if (input.Id == 0 && history.Any(x => x.DeleteFg == "N"))
+                    throw new RiskConfigurationException(
+                        "A risk model already exists. Reload and edit its current version.");
+
                 // Editing an approved model creates a new version.
                 if (input.Id > 0)
                 {
@@ -464,7 +500,7 @@ public sealed partial class RiskScoringService
                         source,
                         input.RowVersion);
 
-                    if (source.ApprovalStatus !=
+                    if (!source.IsActive || source.ApprovalStatus !=
                             "APPROVED")
                     {
                         throw new RiskConfigurationException(
@@ -541,6 +577,7 @@ public sealed partial class RiskScoringService
                 $"Transaction={model.TransactionWeightPercent}%, " +
                 $"Screening={model.ScreeningWeightPercent}%.");
         },
-        cancellationToken);
+        cancellationToken,
+        AppPermissions.RiskScoreSetup.Manage);
 
 }
