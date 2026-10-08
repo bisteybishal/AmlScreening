@@ -16,15 +16,30 @@
 
 @if (Model.Results.Count == 0)
 {
-    <div class="screening-empty">
-        <h3>No matching names found</h3>
+    <section class="screening-no-match">
+        <div class="screening-no-match-icon"
+             aria-hidden="true">
+            <i class="bi bi-search"></i>
+        </div>
 
-        <p>
-            No active records containing “@Model.SearchName”
-            were found within your permitted records.
-            This is not a clearance decision.
-        </p>
-    </div>
+        <div class="screening-no-match-content">
+            <h3>No matching records found</h3>
+
+            <ul class="screening-name-tags"
+                aria-label="Name with no matches">
+                <li>@Model.SearchName</li>
+            </ul>
+
+            <p>
+                No active records matched this name
+                within your permitted records.
+            </p>
+
+            <p class="screening-result-note">
+                This is not a clearance decision.
+            </p>
+        </div>
+    </section>
 }
 else
 {

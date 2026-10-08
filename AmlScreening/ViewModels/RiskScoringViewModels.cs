@@ -96,6 +96,7 @@ public sealed class RiskBandEditViewModel
     public int Id { get; set; }
     [Required, StringLength(20)] public string RiskLevel { get; set; } = string.Empty;
     [Range(0, 100)] public int MinimumScore { get; set; }
+    [Required(ErrorMessage = "Enter the maximum score.")]
     [Range(0, 100)] public int? MaximumScore { get; set; }
     [Required] public string Decision { get; set; } = "ALLOW";
     [StringLength(1000)] public string? Remarks { get; set; }
@@ -107,6 +108,7 @@ public sealed class RiskScoreSetupEditViewModel
     public string? ErrorMessage { get; set; }
     [MinLength(1, ErrorMessage = "At least one risk range is required.")]
     public List<RiskBandEditViewModel> Bands { get; set; } = [];
+   
 }
 
 public sealed class RiskModelEditViewModel

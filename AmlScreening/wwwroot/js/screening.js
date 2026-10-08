@@ -1,4 +1,5 @@
-﻿(() => {
+﻿// Single-name live search and multiple-name button search.
+(() => {
     const form = document.getElementById("screening-search-form");
     const input = document.getElementById("screening-name");
     const results = document.getElementById("screening-results");
@@ -14,32 +15,64 @@
 
     function scheduleSearch(immediate = false) {
         clearTimeout(timer);
-
-        // Cancel the previous request when the typed name changes.
         activeRequest?.abort();
 
-        // Prevent an older response from replacing newer results.
+        // An old response must not replace a newer search.
         const version = ++requestVersion;
         const name = input.value.trim();
+        const isMultiple = name.includes(",");
 
         results.replaceChildren();
         results.setAttribute("aria-busy", "false");
 
-        if (name.length === 0) {
-            status.textContent = "Type at least one character to start.";
+        if (!name) {
+            status.textContent = "Type a name to start.";
             return;
         }
 
-        status.textContent = "Searching…";
+        if (name.length > 5000) {
+            status.textContent =
+                "Enter no more than 5,000 characters.";
+            return;
+        }
+
+        if (!isMultiple && name.length > 200) {
+            status.textContent =
+                "Enter no more than 200 characters for one name.";
+            return;
+        }
+
+        // Wait for a button click when commas are present.
+        if (isMultiple && !immediate) {
+            status.textContent =
+                "Multiple names entered. Click Search to check them.";
+            return;
+        }
+
+        const url = isMultiple
+            ? form.dataset.multipleUrl
+            : form.action;
+
+        if (!url) {
+            status.textContent =
+                "The search address is not configured.";
+            return;
+        }
+
+        status.textContent = isMultiple
+            ? "Searching names…"
+            : "Searching…";
+
         results.setAttribute("aria-busy", "true");
 
+        // Single-name live search waits until typing pauses.
         timer = setTimeout(
-            () => search(name, version),
+            () => search(name, url, version),
             immediate ? 0 : 300
         );
     }
 
-    async function search(name, version) {
+    async function search(name, url, version) {
         const controller = new AbortController();
         activeRequest = controller;
 
@@ -47,7 +80,7 @@
         formData.set("name", name);
 
         try {
-            const response = await fetch(form.action, {
+            const response = await fetch(url, {
                 method: "POST",
                 body: formData,
                 signal: controller.signal,
@@ -59,10 +92,11 @@
                 return;
             }
 
-            // Cookie authentication may redirect expired sessions to login.
-            if (response.redirected ||
+            if (
+                response.redirected ||
                 response.status === 401 ||
-                response.status === 403) {
+                response.status === 403
+            ) {
                 status.textContent =
                     "Your session expired or access was denied. Refresh and sign in again.";
                 return;
@@ -78,20 +112,27 @@
                 return;
             }
 
-            // This is our own server-rendered Razor partial.
-            // Database fields are HTML-encoded by Razor.
+            // Our Razor partial HTML-encodes displayed data.
             results.innerHTML = html;
+
+            if (results.querySelector(".alert-danger")) {
+                status.textContent =
+                    "Search could not be completed. See the message below.";
+                return;
+            }
 
             const count = results.querySelectorAll(
                 ".screening-card"
             ).length;
 
             status.textContent = count > 0
-                ? `${count} records displayed. Select a name to view details.`
+                ? `${count} result cards displayed. Select a record to view details.`
                 : "No matching names found. This is not a clearance decision.";
         } catch (error) {
-            if (error.name === "AbortError" ||
-                version !== requestVersion) {
+            if (
+                error.name === "AbortError" ||
+                version !== requestVersion
+            ) {
                 return;
             }
 
@@ -107,7 +148,6 @@
     }
 
     input.addEventListener("input", event => {
-        // Wait for composition to finish for multilingual input.
         if (!event.isComposing) {
             scheduleSearch();
         }
@@ -122,6 +162,8 @@
         scheduleSearch(true);
     });
 })();
+
+// Open a record's details and restore the search when closed.
 (() => {
     const hero = document.querySelector(".screening-hero");
     const results = document.getElementById("screening-results");
@@ -149,25 +191,23 @@
         }
     }
 
-    // Capture is needed because the details "toggle" event
-    // does not bubble normally.
     results.addEventListener("toggle", event => {
         const card = event.target;
 
-        if (!(card instanceof HTMLDetailsElement) ||
-            !card.classList.contains("screening-card")) {
+        if (
+            !(card instanceof HTMLDetailsElement) ||
+            !card.classList.contains("screening-card")
+        ) {
             return;
         }
 
         if (card.open) {
-            // Save the original position only when entering detail mode.
             if (!activeCard) {
                 previousScrollY = window.scrollY;
             }
 
             activeCard = card;
 
-            // Keep only the selected record expanded.
             results.querySelectorAll(".screening-card[open]")
                 .forEach(otherCard => {
                     if (otherCard !== card) {
@@ -192,7 +232,6 @@
         }
     }, true);
 
-    // If live search replaces the results, restore the search area.
     const observer = new MutationObserver(() => {
         if (activeCard && !results.contains(activeCard)) {
             restoreSearch(false);

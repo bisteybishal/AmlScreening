@@ -50,7 +50,13 @@ public sealed class AmlScreeningDbContext
     public DbSet<AmlRecord> AmlRecords =>
         Set<AmlRecord>();
 
+    public DbSet<KycMatchSetting> KycMatchSettings =>
+    Set<KycMatchSetting>();
 
+    public DbSet<CountryList> CountryLists => Set<CountryList>();
+
+    public DbSet<CustomerKycScreeningLog> CustomerKycScreeningLogs
+    => Set<CustomerKycScreeningLog>();
     // =========================================================
     // COMPLIANCE / WORKFLOW
     // =========================================================
@@ -134,6 +140,15 @@ public sealed class AmlScreeningDbContext
         ConfigureAmlRecord(
             modelBuilder);
 
+        ConfigureCountryList(
+            modelBuilder);
+
+        ConfigureCustomerKyc(
+         modelBuilder);
+
+        ConfigureKycMatchSettings(
+            modelBuilder);
+
 
         ConfigureComplianceRule(
             modelBuilder);
@@ -177,6 +192,9 @@ public sealed class AmlScreeningDbContext
                 .HasMaxLength(200)
                 .IsRequired();
 
+            entity.Property(x => x.Gender)
+              .HasMaxLength(20);
+
             entity.Property(x => x.Country)
                 .HasMaxLength(300);
 
@@ -203,6 +221,25 @@ public sealed class AmlScreeningDbContext
             entity.Property(x => x.IsGlobal)
                 .IsRequired()
                 .HasDefaultValue(false);
+
+
+            entity.Property(x => x.Aliases)
+               .HasMaxLength(1000);
+
+
+            entity.Property(x => x.Occupation)
+                .HasMaxLength(500);
+
+
+            entity.Property(x => x.Position)
+               .HasMaxLength(500);
+
+
+            entity.Property(x => x.PoliticalParties)
+               .HasMaxLength(500);
+            entity.Property(x => x.SocialMediaLinks);
+            entity.Property(x => x.Description);
+
 
             ConfigureCommonFields(entity);
 
@@ -264,7 +301,164 @@ public sealed class AmlScreeningDbContext
                      ));
         });
     }
+    private void ConfigureCountryList(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<CountryList>(entity =>
+{
+    entity.ToTable(
+        "CountryList",
+        "dbo");
 
+    entity.HasKey(x =>
+        x.Id);
+
+    entity.Property(x =>
+            x.CountryName)
+        .HasMaxLength(150)
+        .IsRequired();
+
+    entity.Property(x =>
+            x.Iso2)
+        .HasMaxLength(2)
+        .IsRequired();
+
+    entity.Property(x =>
+            x.Iso3)
+        .HasMaxLength(3)
+        .IsRequired();
+
+    entity.Property(x =>
+            x.Nationality)
+        .HasMaxLength(150);
+
+    entity.HasIndex(x =>
+            x.CountryName)
+        .IsUnique();
+
+    entity.HasIndex(x =>
+            x.Iso2)
+        .IsUnique();
+
+    entity.HasIndex(x =>
+            x.Iso3)
+        .IsUnique();
+});
+    }
+    private static void ConfigureCustomerKyc(
+    ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<CustomerKycScreeningLog>(
+            entity =>
+            {
+                entity.ToTable(
+                    "CustomerKycScreeningLogs",
+                    "dbo");
+
+
+                entity.HasKey(x =>
+                    x.Id);
+
+
+                entity.Property(x =>
+                        x.Username)
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+
+                entity.Property(x =>
+                        x.ScreeningType)
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+
+                entity.Property(x =>
+                        x.HighestMatchPercent)
+                    .HasPrecision(5, 2);
+
+
+                entity.Property(x =>
+                        x.RiskScore)
+                    .HasPrecision(9, 2);
+
+
+                entity.Property(x =>
+                        x.RiskLevel)
+                    .HasMaxLength(20);
+
+
+                entity.Property(x =>
+                        x.Status)
+                    .HasMaxLength(20)
+                    .IsRequired();
+
+
+                entity.HasIndex(x =>
+                        new
+                        {
+                            x.PartnerId,
+                            x.CreatedDate
+                        })
+                    .HasDatabaseName(
+                        "IX_KycLog_Partner_Date");
+
+
+                entity.HasIndex(x =>
+                        new
+                        {
+                            x.UserId,
+                            x.CreatedDate
+                        })
+                    .HasDatabaseName(
+                        "IX_KycLog_User_Date");
+            });
+    }
+
+
+    private static void ConfigureKycMatchSettings(
+        ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<KycMatchSetting>(
+            entity =>
+            {
+                entity.ToTable(
+                    "KycMatchSettings",
+                    "dbo");
+
+
+                entity.HasKey(x =>
+                    x.Id);
+
+
+                entity.Property(x =>
+                        x.NameWeight)
+                    .HasPrecision(5, 2);
+
+
+                entity.Property(x =>
+                        x.DateOfBirthWeight)
+                    .HasPrecision(5, 2);
+
+
+                entity.Property(x =>
+                        x.CountryWeight)
+                    .HasPrecision(5, 2);
+
+
+                entity.Property(x =>
+                        x.GenderWeight)
+                    .HasPrecision(5, 2);
+
+
+                entity.Property(x =>
+                        x.ReviewThreshold)
+                    .HasPrecision(5, 2);
+
+
+                entity.Property(x =>
+                        x.StrongMatchThreshold)
+                    .HasPrecision(5, 2);
+            });
+    }
 
     // =========================================================
     // COMPLIANCE RULE

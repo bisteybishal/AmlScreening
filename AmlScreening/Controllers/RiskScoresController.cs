@@ -29,15 +29,11 @@ public sealed class RiskScoresController : Controller
         _errorLogService = errorLogService;
     }
 
-    // =====================================================
     // LIST RULES
-    // =====================================================
+  
 
     [HttpGet]
-    public async Task<IActionResult> Index(
-        string? factorCode,
-        int page = 1,
-        CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(string? factorCode,int page = 1,CancellationToken cancellationToken = default)
     {
         factorCode = NormalizeFactorCode(factorCode);
 
@@ -50,12 +46,12 @@ public sealed class RiskScoresController : Controller
                 PageSize,
                 cancellationToken);
 
-            // Do not silently display another factor when an
-            // explicitly requested factor does not exist.
+            // If user manually changes URL
+            // to invalid factor code.
             if (!string.IsNullOrEmpty(factorCode) &&
-                !result.Factors.Any(factor =>
+                !result.Factors.Any(x =>
                     string.Equals(
-                        factor.FactorCode,
+                        x.FactorCode,
                         factorCode,
                         StringComparison.OrdinalIgnoreCase)))
             {
@@ -68,7 +64,7 @@ public sealed class RiskScoresController : Controller
         }
         catch (RiskConfigurationException ex)
         {
-            return IndexError(ex.Message);
+            return ShowIndexError(ex.Message);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -77,7 +73,7 @@ public sealed class RiskScoresController : Controller
                 nameof(Index),
                 "Unable to load risk scores.");
 
-            return IndexError(message);
+            return ShowIndexError(message);
         }
     }
 
@@ -102,17 +98,26 @@ public sealed class RiskScoresController : Controller
                 factorCode,
                 cancellationToken);
 
-            if (factor is null)
+            if (factor == null)
                 return NotFound();
 
-            return View(
-                "Form",
+            var model =
                 new RiskRuleEditViewModel
                 {
-                    FactorCode = factor.FactorCode,
-                    ValueType = factor.ValueType.ToUpperInvariant(),
-                    ValueDescription = factor.FactorName
-                });
+                    FactorCode =
+                        factor.FactorCode,
+
+                    ValueType =
+                        factor.ValueType
+                            .ToUpperInvariant(),
+
+                    ValueDescription =
+                        factor.FactorName
+                };
+
+
+            return View("Form", model);
+               
         }
         catch (RiskConfigurationException ex)
         {
@@ -126,7 +131,9 @@ public sealed class RiskScoresController : Controller
                 "Unable to open the risk score form.");
         }
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(
+                 nameof(Index),
+                 new { factorCode });
     }
 
     // =====================================================
@@ -136,11 +143,15 @@ public sealed class RiskScoresController : Controller
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = AppPermissions.RiskScore.Manage)]
-    public Task<IActionResult> Add(
+    public async Task<IActionResult> Add(
         RiskRuleEditViewModel model,
         CancellationToken cancellationToken = default)
     {
-        return SaveRuleAsync(
+        if (model.Id != 0)
+        {
+            return BadRequest("Invalid new risk score.");
+        }
+        return await SaveRuleAsync(
             model,
             isNew: true,
             cancellationToken: cancellationToken);
@@ -166,12 +177,12 @@ public sealed class RiskScoresController : Controller
                 id,
                 cancellationToken);
 
-            if (rule is null)
+            if (rule == null)
                 return NotFound();
 
             var blocked = GetEditBlockReason(rule);
 
-            if (blocked is not null)
+            if (blocked !=null)
             {
                 TempData["ErrorMessage"] = blocked;
                 return RedirectToAction(nameof(Index));
@@ -184,15 +195,12 @@ public sealed class RiskScoresController : Controller
                 PageSize,
                 cancellationToken);
 
-            var factor = setup.Factors.FirstOrDefault(
-                item => item.Id == rule.RiskFactorId);
+            var factor = await FindFactorByRuleAsync(rule, cancellationToken);
 
-            if (factor is null)
+            if (factor == null)
                 return NotFound();
 
-            return View(
-                "Form",
-                new RiskRuleEditViewModel
+            var model= new RiskRuleEditViewModel
                 {
                     Id = rule.Id,
                     FactorCode = factor.FactorCode,
@@ -205,7 +213,10 @@ public sealed class RiskScoresController : Controller
                     Score = rule.Score,
                     Remarks = rule.Remarks,
                     RowVersion = rule.RowVersion
-                });
+                };
+            return View(
+              "Form",
+              model);
         }
         catch (RiskConfigurationException ex)
         {
@@ -229,11 +240,17 @@ public sealed class RiskScoresController : Controller
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = AppPermissions.RiskScore.Manage)]
-    public Task<IActionResult> Edit(
+    public async Task<IActionResult> Edit(
         RiskRuleEditViewModel model,
         CancellationToken cancellationToken = default)
     {
-        return SaveRuleAsync(
+        if (model.Id <= 0)
+        {
+            return BadRequest(
+                "Invalid risk score.");
+        }
+
+        return await SaveRuleAsync(
             model,
             isNew: false,
             cancellationToken: cancellationToken);
@@ -248,135 +265,209 @@ public sealed class RiskScoresController : Controller
         bool isNew,
         CancellationToken cancellationToken)
     {
-        var action = isNew ? nameof(Add) : nameof(Edit);
+        // Clean values.
+        model.FactorCode =
+            NormalizeFactorCode(
+                model.FactorCode);
 
-        // Prevent an Add request from updating an existing rule,
-        // or an Edit request from creating a new rule.
-        if ((isNew && model.Id != 0) ||
-            (!isNew && model.Id <= 0))
+        model.ValueCode =
+            Clean(
+                model.ValueCode);
+
+        model.ValueName =
+            Clean(
+                model.ValueName);
+
+        model.Remarks =
+            Clean(
+                model.Remarks);
+
+
+        if (string.IsNullOrWhiteSpace(
+                model.FactorCode))
         {
-            return BadRequest("Invalid risk score request.");
+            return BadRequest(
+                "Select a risk factor.");
         }
 
-        model.FactorCode = NormalizeFactorCode(model.FactorCode);
-        model.ValueCode = Clean(model.ValueCode);
-        model.ValueName = Clean(model.ValueName);
-        model.Remarks = Clean(model.Remarks);
-
-        // These are display properties. Never trust posted values.
-        model.ValueType = string.Empty;
-        model.ValueDescription = string.Empty;
-
-        ModelState.Remove(nameof(model.ValueType));
-        ModelState.Remove(nameof(model.ValueDescription));
-
-        if (string.IsNullOrEmpty(model.FactorCode))
-            return BadRequest("Select a risk factor.");
-
-        var metadataLoaded = false;
 
         try
         {
-            var factor = await FindFactorAsync(
-                model.FactorCode,
-                cancellationToken);
+            // Never trust Factor information
+            // posted from browser.
+            var factor =
+                await FindFactorAsync(
+                    model.FactorCode,
+                    cancellationToken);
 
-            if (factor is null)
+            if (factor == null)
+            {
                 return NotFound();
+            }
 
-            model.FactorCode = factor.FactorCode;
-            model.ValueType = factor.ValueType.ToUpperInvariant();
-            model.ValueDescription = factor.FactorName;
-            metadataLoaded = true;
+
+            model.FactorCode =
+                factor.FactorCode;
+
+            model.ValueType =
+                factor.ValueType
+                    .ToUpperInvariant();
+
+            model.ValueDescription =
+                factor.FactorName;
+
+
+            // ==================================
+            // EDIT VALIDATION
+            // ==================================
 
             if (!isNew)
             {
-                var existing = await _riskScoring.GetRuleAsync(
-                    model.Id,
-                    cancellationToken);
+                var currentRule =
+                    await _riskScoring
+                        .GetRuleAsync(
+                            model.Id,
+                            cancellationToken);
 
-                if (existing is null)
-                    return NotFound();
-
-                // A rule cannot be moved to another factor by
-                // changing the hidden FactorCode field.
-                if (existing.RiskFactorId != factor.Id)
-                    return BadRequest("The rule belongs to another factor.");
-
-                var blocked = GetEditBlockReason(existing);
-
-                if (blocked is not null)
+                if (currentRule == null)
                 {
-                    TempData["ErrorMessage"] = blocked;
+                    return NotFound();
+                }
+
+
+                // Prevent changing FactorCode
+                // using browser/dev tools.
+                if (currentRule.RiskFactorId !=
+                    factor.Id)
+                {
+                    return BadRequest(
+                        "Risk factor cannot be changed.");
+                }
+
+
+                var blocked =
+                    GetEditBlockReason(
+                        currentRule);
+
+                if (blocked != null)
+                {
+                    TempData["ErrorMessage"] =
+                        blocked;
 
                     return RedirectToAction(
                         nameof(Index),
-                        new { factorCode = factor.FactorCode });
+                        new
+                        {
+                            factorCode =
+                                factor.FactorCode
+                        });
                 }
 
-                if (model.RowVersion is not { Length: 8 })
+
+                if (model.RowVersion is not
+                    { Length: 8 })
                 {
                     ModelState.AddModelError(
                         string.Empty,
-                        "Reload the rule before saving. " +
-                        "Its version is missing or invalid.");
+                        "Reload the score before saving.");
                 }
             }
 
-            if (!ModelState.IsValid)
-                return View("Form", model);
 
-            await _riskScoring.SaveRuleAsync(
+            if (!ModelState.IsValid)
+            {
+                return View(
+                    "Form",
+                    model);
+            }
+
+
+            // ==================================
+            // SAVE AS PENDING
+            // ==================================
+
+            var input =
                 new RiskRuleInput
                 {
-                    Id = model.Id,
-                    FactorCode = factor.FactorCode,
-                    ValueCode = model.ValueCode,
-                    ValueName = model.ValueName,
-                    MinimumValue = model.MinimumValue,
-                    MaximumValue = model.MaximumValue,
-                    Score = model.Score,
-                    Remarks = model.Remarks,
-                    RowVersion = model.RowVersion
-                },
+                    Id =
+                        model.Id,
+
+                    FactorCode =
+                        factor.FactorCode,
+
+                    ValueCode =
+                        model.ValueCode,
+
+                    ValueName =
+                        model.ValueName,
+
+                    MinimumValue =
+                        model.MinimumValue,
+
+                    MaximumValue =
+                        model.MaximumValue,
+
+                    Score =
+                        model.Score,
+
+                    Remarks =
+                        model.Remarks,
+
+                    RowVersion =
+                        model.RowVersion
+                };
+
+
+            await _riskScoring.SaveRuleAsync(
+                input,
                 cancellationToken);
 
-            TempData["SuccessMessage"] = isNew
-                ? "Risk score created as Pending. A different authorized checker must approve it."
-                : "Risk score change saved as Pending. A different authorized checker must approve it.";
+
+            TempData["SuccessMessage"] =
+                isNew
+                    ? "Risk score created as Pending. A different user must approve it."
+                    : "Risk score updated as Pending. A different user must approve it.";
+
 
             return RedirectToAction(
                 nameof(Index),
-                new { factorCode = factor.FactorCode });
+                new
+                {
+                    factorCode =
+                        factor.FactorCode
+                });
         }
         catch (RiskConfigurationException ex)
         {
-            if (!metadataLoaded)
-            {
-                TempData["ErrorMessage"] = ex.Message;
-                return RedirectToAction(nameof(Index));
-            }
+            ModelState.AddModelError(
+                string.Empty,
+                ex.Message);
 
-            ModelState.AddModelError(string.Empty, ex.Message);
-            return View("Form", model);
+            return View(
+                "Form",
+                model);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
+            when (ex is not OperationCanceledException)
         {
-            var message = await GetErrorMessageAsync(
-                ex,
-                action,
-                "Unable to save the risk score.");
+            var message =
+                await GetErrorMessageAsync(
+                    ex,
+                    isNew
+                        ? nameof(Add)
+                        : nameof(Edit),
+                    "Unable to save the risk score.");
 
-            if (!metadataLoaded)
-            {
-                TempData["ErrorMessage"] = message;
-                return RedirectToAction(nameof(Index));
-            }
+            ModelState.AddModelError(
+                string.Empty,
+                message);
 
-            ModelState.AddModelError(string.Empty, message);
-            return View("Form", model);
+            return View(
+                "Form",
+                model);
         }
     }
+
 
     // =====================================================
     // REQUEST DELETION
@@ -384,83 +475,102 @@ public sealed class RiskScoresController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = AppPermissions.RiskScore.Manage)]
+    [Authorize(
+       Policy = AppPermissions.RiskScore.Manage)]
     public async Task<IActionResult> Delete(
-        int id,
-        byte[]? rowVersion,
-        string? factorCode,
-        CancellationToken cancellationToken = default)
+       int id,
+       byte[]? rowVersion,
+       CancellationToken cancellationToken = default)
     {
-        factorCode = NormalizeFactorCode(factorCode);
-
         if (id <= 0)
-            return BadRequest("Invalid risk score.");
+        {
+            return BadRequest(
+                "Invalid risk score.");
+        }
 
-        if (rowVersion is not { Length: 8 })
+
+        if (rowVersion is not
+            { Length: 8 })
         {
             TempData["ErrorMessage"] =
-                "Reload the list before deleting. " +
-                "The record version is missing or invalid.";
+                "Reload the page before deleting.";
 
             return RedirectToAction(
-                nameof(Index),
-                new { factorCode });
+                nameof(Index));
         }
+
+
+        string? factorCode =
+            null;
+
 
         try
         {
-            var rule = await _riskScoring.GetRuleAsync(
-                id,
-                cancellationToken);
+            var rule =
+                await _riskScoring
+                    .GetRuleAsync(
+                        id,
+                        cancellationToken);
 
-            if (rule is null)
-                return NotFound();
-
-            var setup = await _riskScoring.GetSetupAsync(
-                null,
-                null,
-                1,
-                PageSize,
-                cancellationToken);
-
-            var factor = setup.Factors.FirstOrDefault(
-                item => item.Id == rule.RiskFactorId);
-
-            if (factor is null)
-                return NotFound();
-
-            // Use the stored rule's factor for navigation.
-            factorCode = factor.FactorCode;
-
-            var blocked = GetEditBlockReason(rule);
-
-            if (blocked is not null)
+            if (rule == null)
             {
-                TempData["ErrorMessage"] = blocked;
+                return NotFound();
+            }
+
+
+            var factor =
+                await FindFactorByRuleAsync(
+                    rule,
+                    cancellationToken);
+
+            if (factor == null)
+            {
+                return NotFound();
+            }
+
+
+            factorCode =
+                factor.FactorCode;
+
+
+            var blocked =
+                GetEditBlockReason(
+                    rule);
+
+            if (blocked != null)
+            {
+                TempData["ErrorMessage"] =
+                    blocked;
             }
             else
             {
-                await _riskScoring.DeleteRuleAsync(
-                    id,
-                    rowVersion,
-                    cancellationToken);
+                await _riskScoring
+                    .DeleteRuleAsync(
+                        id,
+                        rowVersion,
+                        cancellationToken);
+
 
                 TempData["SuccessMessage"] =
-                    "Deletion saved as Pending. A different authorized " +
-                    "checker must approve it.";
+                    "Deletion saved as Pending. " +
+                    "A different user must approve it.";
             }
         }
         catch (RiskConfigurationException ex)
         {
-            TempData["ErrorMessage"] = ex.Message;
+            TempData["ErrorMessage"] =
+                ex.Message;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
+            when (ex is not OperationCanceledException)
         {
-            TempData["ErrorMessage"] = await GetErrorMessageAsync(
-                ex,
-                nameof(Delete),
-                "Unable to request deletion.");
+            TempData["ErrorMessage"] =
+                await GetErrorMessageAsync(
+                    ex,
+                    nameof(Delete),
+                    "Unable to delete the risk score.");
         }
+
 
         return RedirectToAction(
             nameof(Index),
@@ -473,63 +583,92 @@ public sealed class RiskScoresController : Controller
 
     [HttpGet]
     public async Task<IActionResult> Review(
-        string? factorCode,
-        int ruleId,
-        CancellationToken cancellationToken = default)
+         string? factorCode,
+         int ruleId,
+         CancellationToken cancellationToken = default)
     {
-        factorCode = NormalizeFactorCode(factorCode);
+        factorCode =
+            NormalizeFactorCode(
+                factorCode);
 
-        if (ruleId <= 0 || string.IsNullOrEmpty(factorCode))
+
+        if (string.IsNullOrWhiteSpace(
+                factorCode)
+            ||
+            ruleId <= 0)
+        {
             return NotFound();
+        }
+
 
         try
         {
-            // The review service also handles pending deletions.
-            // Do not replace this with the ordinary GetRuleAsync.
-            var review = await _riskScoring.GetApprovalReviewAsync(
-                "Rules",
-                factorCode,
-                cancellationToken,
-                ruleId);
+            var review =
+                await _riskScoring
+                    .GetApprovalReviewAsync(
+                        "Rules",
+                        factorCode,
+                        cancellationToken,
+                        ruleId);
 
-            return View(ReviewView, review);
+
+            return View(
+                ReviewView,
+                review);
         }
         catch (RiskConfigurationException ex)
         {
-            TempData["ErrorMessage"] = ex.Message;
+            TempData["ErrorMessage"] =
+                ex.Message;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
+            when (ex is not OperationCanceledException)
         {
-            TempData["ErrorMessage"] = await GetErrorMessageAsync(
-                ex,
-                nameof(Review),
-                "Unable to open the approval review.");
+            TempData["ErrorMessage"] =
+                await GetErrorMessageAsync(
+                    ex,
+                    nameof(Review),
+                    "Unable to open the review.");
         }
+
 
         return RedirectToAction(
             nameof(Index),
             new { factorCode });
     }
 
+
     // =====================================================
-    // APPROVE PENDING CHANGE
+    // APPROVE
     // =====================================================
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = AppPermissions.RiskScore.Approve)]
+    [Authorize(
+        Policy = AppPermissions.RiskScore.Approve)]
     public async Task<IActionResult> Apply(
         string? factorCode,
         int ruleId,
         string? reviewToken,
         CancellationToken cancellationToken = default)
     {
-        factorCode = NormalizeFactorCode(factorCode);
+        factorCode =
+            NormalizeFactorCode(
+                factorCode);
 
-        if (ruleId <= 0 || string.IsNullOrEmpty(factorCode))
-            return BadRequest("Invalid risk score approval request.");
 
-        if (string.IsNullOrWhiteSpace(reviewToken))
+        if (string.IsNullOrWhiteSpace(
+                factorCode)
+            ||
+            ruleId <= 0)
+        {
+            return BadRequest(
+                "Invalid approval request.");
+        }
+
+
+        if (string.IsNullOrWhiteSpace(
+                reviewToken))
         {
             TempData["ErrorMessage"] =
                 "Open the review again before approving.";
@@ -539,123 +678,193 @@ public sealed class RiskScoresController : Controller
                 new { factorCode });
         }
 
+
         try
         {
-            // Service checks partner, maker/checker separation,
-            // draft version and the resulting rule configuration.
-            await _riskScoring.ActivateRulesAsync(
-                factorCode,
-                ruleId,
-                reviewToken,
-                cancellationToken);
+            await _riskScoring
+                .ActivateRulesAsync(
+                    factorCode,
+                    ruleId,
+                    reviewToken,
+                    cancellationToken);
+
 
             TempData["SuccessMessage"] =
-                "Risk score change approved successfully.";
+                "Risk score approved successfully.";
         }
         catch (RiskConfigurationException ex)
         {
-            TempData["ErrorMessage"] = ex.Message;
+            TempData["ErrorMessage"] =
+                ex.Message;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
+            when (ex is not OperationCanceledException)
         {
-            TempData["ErrorMessage"] = await GetErrorMessageAsync(
-                ex,
-                nameof(Apply),
-                "Unable to approve the risk score.");
+            TempData["ErrorMessage"] =
+                await GetErrorMessageAsync(
+                    ex,
+                    nameof(Apply),
+                    "Unable to approve the risk score.");
         }
+
 
         return RedirectToAction(
             nameof(Index),
             new { factorCode });
     }
 
+
     // =====================================================
     // HELPERS
     // =====================================================
 
-    private async Task<RiskFactor?> FindFactorAsync(
-        string factorCode,
-        CancellationToken cancellationToken)
+    private async Task<RiskFactor?>
+        FindFactorAsync(
+            string factorCode,
+            CancellationToken cancellationToken)
     {
-        var setup = await _riskScoring.GetSetupAsync(
-            factorCode,
-            null,
-            1,
-            PageSize,
-            cancellationToken);
+        var setup =
+            await _riskScoring
+                .GetSetupAsync(
+                    factorCode,
+                    null,
+                    1,
+                    PageSize,
+                    cancellationToken);
 
-        return setup.Factors.FirstOrDefault(factor =>
-            string.Equals(
-                factor.FactorCode,
-                factorCode,
-                StringComparison.OrdinalIgnoreCase));
+
+        return setup.Factors
+            .FirstOrDefault(x =>
+                string.Equals(
+                    x.FactorCode,
+                    factorCode,
+                    StringComparison.OrdinalIgnoreCase));
     }
 
-    private string? GetEditBlockReason(RiskFactorRule rule)
-    {
-        if (rule.DeleteFg != "N")
-            return "This rule has been deleted or has a pending deletion.";
 
-        if (rule.ApprovalStatus is "PENDING" or "DRAFT")
+    private async Task<RiskFactor?>
+        FindFactorByRuleAsync(
+            RiskFactorRule rule,
+            CancellationToken cancellationToken)
+    {
+        var setup =
+            await _riskScoring
+                .GetSetupAsync(
+                    null,
+                    null,
+                    1,
+                    PageSize,
+                    cancellationToken);
+
+
+        return setup.Factors
+            .FirstOrDefault(x =>
+                x.Id ==
+                rule.RiskFactorId);
+    }
+
+
+    private string? GetEditBlockReason(
+        RiskFactorRule rule)
+    {
+        // Deleted rule cannot be changed.
+        if (rule.DeleteFg != "N")
         {
-            var validUserId = long.TryParse(
-                User.FindFirstValue(ClaimTypes.NameIdentifier),
-                out var userId);
+            return
+                "This risk score has been deleted.";
+        }
+
+
+        // Pending score:
+        // only maker can edit it.
+        if (rule.ApprovalStatus is
+            "PENDING" or "DRAFT")
+        {
+            var validUserId =
+                long.TryParse(
+                    User.FindFirstValue(
+                        ClaimTypes.NameIdentifier),
+                    out var userId);
+
 
             if (!validUserId ||
-                userId <= 0 ||
-                rule.MakerUserId != userId)
+                userId != rule.MakerUserId)
             {
-                return "Only the maker can change this pending rule.";
+                return
+                    "Only the maker can change this pending score.";
             }
+
 
             return null;
         }
 
-        if (rule.ApprovalStatus != "APPROVED" || !rule.IsActive)
-            return "This rule is no longer current. Open its latest version.";
+
+        // Only current approved score
+        // can start another update.
+        if (rule.ApprovalStatus != "APPROVED"
+            ||
+            !rule.IsActive)
+        {
+            return
+                "This risk score is no longer active.";
+        }
+
 
         return null;
     }
 
-    private IActionResult IndexError(string message)
-    {
-        ViewBag.ErrorMessage = message;
 
+    private IActionResult ShowIndexError(
+        string message)
+    {
         return View(
             "Index",
             new RiskScoringPageViewModel
             {
-                ErrorMessage = message
+                ErrorMessage =
+                    message
             });
     }
 
-    private async Task<string> GetErrorMessageAsync(
-        Exception exception,
-        string action,
-        string message)
+
+    private async Task<string>
+        GetErrorMessageAsync(
+            Exception exception,
+            string action,
+            string message)
     {
-        var errorId = await _errorLogService.LogAsync(
-            exception,
-            nameof(RiskScoresController),
-            action,
-            User.FindFirstValue(AppClaimTypes.PartnerCode));
+        var errorId =
+            await _errorLogService.LogAsync(
+                exception,
+                nameof(RiskScoresController),
+                action,
+                User.FindFirstValue(
+                    AppClaimTypes.PartnerCode));
+
 
         return errorId.HasValue
             ? $"{message} Error reference: {errorId.Value}."
             : message;
     }
 
-    private static string NormalizeFactorCode(string? value)
+
+    private static string NormalizeFactorCode(
+        string? value)
     {
-        return string.IsNullOrWhiteSpace(value)
+        return string.IsNullOrWhiteSpace(
+                value)
             ? string.Empty
-            : value.Trim().ToUpperInvariant();
+            : value
+                .Trim()
+                .ToUpperInvariant();
     }
 
-    private static string? Clean(string? value)
+
+    private static string? Clean(
+        string? value)
     {
-        return string.IsNullOrWhiteSpace(value)
+        return string.IsNullOrWhiteSpace(
+                value)
             ? null
             : value.Trim();
     }

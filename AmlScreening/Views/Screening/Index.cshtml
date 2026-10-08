@@ -19,19 +19,20 @@
     </h1>
 
     <p class="screening-intro">
-        Start typing an individual or company name.
-        Matching records appear below.
+        Type one name to see matching records automatically.
+        Separate multiple names with commas and click Search.
     </p>
 
     <form id="screening-search-form"
           asp-controller="Screening"
           asp-action="Search"
+          data-multiple-url="@Url.Action("SearchMultiple", "Screening")"
           method="post"
           class="screening-form"
           role="search">
 
         <label for="screening-name" class="screening-label">
-            Individual or company name
+            Individual or company names
         </label>
 
         <div class="screening-search">
@@ -40,16 +41,21 @@
             <input id="screening-name"
                    name="name"
                    type="search"
-                   placeholder="Type a name…"
+                   placeholder="Type a name, or separate names with commas"
                    autocomplete="off"
-                   maxlength="200"
+                   maxlength="5000"
                    aria-controls="screening-results"
-                   aria-describedby="screening-status" />
+                   aria-describedby="screening-help screening-status" />
 
             <button type="submit">
                 Search
             </button>
         </div>
+
+     @*    <p id="screening-help" class="screening-note">
+            Example: sunil lamsal,bishal bista.
+            Maximum 20 names, with 200 characters per name.
+        </p> *@
     </form>
 
     <p class="screening-note">
@@ -61,7 +67,7 @@
    class="live-search-status"
    role="status"
    aria-live="polite">
-    Type at least one character to start.
+    Type a name to start.
 </p>
 
 <div id="screening-results" aria-busy="false"></div>

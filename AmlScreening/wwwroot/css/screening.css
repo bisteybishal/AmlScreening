@@ -567,3 +567,109 @@
     object-fit: cover;
     display: block;
 }
+/* Multiple search groups reuse the existing record cards. */
+.screening-batch {
+    display: grid;
+    gap: 20px;
+}
+
+.screening-batch-group {
+    min-width: 0;
+}
+
+.screening-query-label {
+    margin: 0 0 8px 4px;
+    color: #607487;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+    .screening-query-label strong {
+        color: #183747;
+        font-weight: 600;
+    }
+
+/* Compact empty-result box for single and multiple searches. */
+.screening-no-match {
+    box-sizing: border-box;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+    max-width: 520px;
+    margin: 16px auto;
+    padding: 18px;
+    background: linear-gradient(135deg, #ffffff, #f5fafb);
+    border: 1px solid #d7e5eb;
+    border-radius: 14px;
+    box-shadow: 0 4px 14px rgb(15 42 58 / 5%);
+}
+
+.screening-no-match-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
+    background: #e9f5f5;
+    color: #21858b;
+    border-radius: 10px;
+    font-size: 16px;
+}
+
+.screening-no-match-content {
+    flex: 1;
+    min-width: 0;
+}
+
+    .screening-no-match-content h3 {
+        margin: 0 0 9px;
+        color: #173747;
+        font-size: 15px;
+        font-weight: 650;
+        line-height: 1.4;
+    }
+
+.screening-name-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 10px;
+    padding: 0;
+    list-style: none;
+}
+
+    .screening-name-tags li {
+        box-sizing: border-box;
+        max-width: 100%;
+        padding: 4px 9px;
+        background: #eef6f8;
+        border: 1px solid #d7e8ed;
+        border-radius: 6px;
+        color: #315a6b;
+        font-size: 12px;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+
+.screening-no-match-content p {
+    margin: 0;
+    color: #526b7c;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+.screening-no-match-content .screening-result-note {
+    margin-top: 5px;
+    color: #627786;
+    font-size: 12px;
+}
+
+@media (max-width: 576px) {
+    .screening-no-match {
+        gap: 10px;
+        padding: 15px;
+        margin: 12px auto;
+    }
+}

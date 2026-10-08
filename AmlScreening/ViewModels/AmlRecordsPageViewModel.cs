@@ -86,44 +86,35 @@ public sealed class AmlRecordInputModel
     [Required]
     [StringLength(50)]
     [Display(Name = "Record type")]
-    public string RecordType { get; set; }
-        = "Individual";
+    public string RecordType { get; set; } = "Individual";
 
 
     [Required]
     [StringLength(200)]
-    [Display(
-        Name =
-            "Full name / Entity name")]
+    [Display(Name = "Full name / Entity name")]
     public string FullName { get; set; }
         = string.Empty;
 
 
     [DataType(DataType.Date)]
-    [Display(
-        Name =
-            "Date of birth / Incorporation")]
+    [Display(Name ="Date of birth / Incorporation")]
     public DateTime? DateOfBirth { get; set; }
 
-
+    [StringLength(20)]
+    public string? Gender { get; set; }
     [Required]
     [StringLength(300)]
-    public string Country { get; set; }
-        = string.Empty;
+    public string Country { get; set; } = string.Empty;
 
 
     [StringLength(100)]
-    public string Nationality { get; set; }
-        = string.Empty;
+    public string Nationality { get; set; } = string.Empty;
 
 
-    [Required]
-    [StringLength(100)]
-    [Display(
-        Name =
-            "Reference number")]
-    public string ReferenceNo { get; set; }
-        = string.Empty;
+    
+    [StringLength(150)]
+    [Display( Name ="Reference number")]
+    public string? ReferenceNo { get; set; }= string.Empty;
 
 
     [Required]
@@ -146,37 +137,32 @@ public sealed class AmlRecordInputModel
     public bool IsActive { get; set; }
         = true;
 
-
-    public IReadOnlyList<string>
-        RecordTypes
-    {
-        get;
-        set;
-    } = AmlRecordOptions.RecordTypes;
+    [StringLength(1000)]
+    public string? Aliases { get; set; }
 
 
-    public IReadOnlyList<string>
-        Countries
-    {
-        get;
-        set;
-    } = AmlRecordOptions.Countries;
+    [StringLength(200)]
+    public string? Occupation { get; set; }
 
 
-    public IReadOnlyList<string>
-        Nationalities
-    {
-        get;
-        set;
-    } = AmlRecordOptions.Nationalities;
+    [StringLength(300)]
+    public string? Position { get; set; }
 
 
-    public IReadOnlyList<string>
-        Sources
-    {
-        get;
-        set;
-    } = AmlRecordOptions.Sources;
+    [StringLength(500)]
+    [Display(Name = "Political parties")]
+    public string? PoliticalParties { get; set; }
+
+
+    [Display(Name = "Social media links")]
+    public string? SocialMediaLinks { get; set; }
+    public string? Description { get; set; }
+    public IReadOnlyList<string> RecordTypes{get; set;} = AmlRecordOptions.RecordTypes;
+    public IReadOnlyList<string> Countries{get;set;} = AmlRecordOptions.Countries;
+
+
+    public IReadOnlyList<string> Nationalities { get; set;} = AmlRecordOptions.Nationalities;
+    public IReadOnlyList<string> Sources{ get; set; } = AmlRecordOptions.Sources;
 }
 
 

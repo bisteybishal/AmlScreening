@@ -5,6 +5,9 @@ namespace AmlScreening.Domain.Entities.Compliance;
 public sealed class Customer : BaseEntity, IPartnerOwnedEntity
 {
     public int PartnerId { get; set; }
+    public int BranchId { get; set; }
+
+    public long? CreatedByUserId { get; set; }
     public string CustomerReference { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
     public DateTime? DateOfBirth { get; set; }

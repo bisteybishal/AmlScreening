@@ -190,48 +190,169 @@ public sealed partial class RiskScoringService
         row.Score.ToString(), row.Remarks, row.DeleteFg != "N");
 
     private static RiskReviewRow BandReviewRow(RiskBand row) => new(
-        row.RiskLevel, $"{row.MinimumScore}–{row.MaximumScore ?? 100} / {row.Decision}", row.Remarks, row.DeleteFg != "N");
+        row.RiskLevel, $"{row.MinimumScore}–{row.MaximumScore?.ToString() ?? "-"} / {row.Decision}", row.Remarks, row.DeleteFg != "N");
 
-    public Task ActivateRulesAsync(string factorCode, int ruleId, string reviewToken, CancellationToken cancellationToken = default) =>
-        ChangeConfigurationAsync(async () =>
-        {
-            var factor = await _db.RiskFactors.SingleOrDefaultAsync(x => x.PartnerId == _currentUser.PartnerId &&
-                x.FactorCode == factorCode && x.IsActive, cancellationToken)
-                ?? throw new RiskConfigurationException("Risk category was not found.");
-            var history = await RuleHistory().Where(x => x.RiskFactorId == factor.Id).ToListAsync(cancellationToken);
-            var pending = history.SingleOrDefault(x => x.Id == ruleId && IsPending(x.ApprovalStatus))
-                ?? throw new RiskConfigurationException("This score is not pending.");
-            EnsureApproval([pending.MakerUserId], reviewToken, ReviewToken("Rules", factor.FactorCode, [pending]), AppPermissions.RiskScore.Approve);
+    public Task ActivateRulesAsync(
+      string factorCode,
+      int ruleId,
+      string reviewToken,
+      CancellationToken cancellationToken = default)
+    {
+        return ChangeConfigurationAsync(
+            async () =>
+            {
+                // 1. Find the factor for current partner.
+                var factor =
+                    await GetRiskFactorAsync(
+                        factorCode,
+                        cancellationToken);
 
-            var active = history.Where(x => x.ApprovalStatus == "APPROVED" && x.IsActive && x.DeleteFg == "N").ToList();
-            RiskFactorRule? original = null;
-            if (pending.ReplacesRuleId.HasValue)
-            {
-                original = active.SingleOrDefault(x => x.Id == pending.ReplacesRuleId)
-                    ?? throw new RiskConfigurationException("The original score is no longer active. Reload and review the change.");
-                active.Remove(original);
-            }
-            if (pending.DeleteFg == "N") active.Add(pending);
-            // Validate the resulting configuration, but approve only this change.
-            ValidateRuleSet(factor, active);
-            var now = DateTime.UtcNow;
-            if (original != null)
-            {
-                original.IsActive = false;
-                original.EffectiveTo = now;
-                Stamp(original);
-            }
-            pending.ApprovalStatus = "APPROVED";
-            pending.ApprovedByUserId = _currentUser.UserId;
-            pending.ApprovedBy = _currentUser.Username;
-            pending.ApprovedDate = now;
-            pending.EffectiveFrom = now;
-            pending.EffectiveTo = null;
-            pending.IsActive = pending.DeleteFg == "N";
-            Stamp(pending);
-            AddAudit("Approve", "RiskFactorRule", pending.Id,
-                $"Approved score change; original {pending.ReplacesRuleId}; maker {pending.MakerUserId}, checker {_currentUser.UserId}.");
-        }, cancellationToken, AppPermissions.RiskScore.Approve);
+
+                // 2. Get complete history for this factor.
+                var history =
+                    await RuleHistory()
+                        .Where(x =>
+                            x.RiskFactorId == factor.Id)
+                        .ToListAsync(
+                            cancellationToken);
+
+
+                // 3. Find requested pending score.
+                var pending =
+                    history.FirstOrDefault(x =>
+                        x.Id == ruleId &&
+                        IsPending(
+                            x.ApprovalStatus));
+
+                if (pending == null)
+                {
+                    throw new RiskConfigurationException(
+                        "This score is not pending.");
+                }
+
+
+                // 4. Maker cannot approve own change.
+                // Also verifies review token.
+                EnsureApproval(
+                    [pending.MakerUserId],
+                    reviewToken,
+                    ReviewToken(
+                        "Rules",
+                        factor.FactorCode,
+                        [pending]),
+                    AppPermissions.RiskScore.Approve);
+
+
+                // 5. Get currently active approved scores.
+                var activeRules =
+                    history
+                        .Where(x =>
+                            x.ApprovalStatus == "APPROVED" &&
+                            x.IsActive &&
+                            x.DeleteFg == "N")
+                        .ToList();
+
+
+                // 6. Find old score if this is an update/delete.
+                RiskFactorRule? oldRule =
+                    null;
+
+                if (pending.ReplacesRuleId.HasValue)
+                {
+                    oldRule =
+                        activeRules.FirstOrDefault(x =>
+                            x.Id ==
+                            pending.ReplacesRuleId.Value);
+
+                    if (oldRule == null)
+                    {
+                        throw new RiskConfigurationException(
+                            "The original score is no longer active. " +
+                            "Reload and review the change.");
+                    }
+
+
+                    // Remove old rule from temporary
+                    // configuration before validation.
+                    activeRules.Remove(
+                        oldRule);
+                }
+
+
+                // 7. Add new rule unless this is deletion.
+                if (pending.DeleteFg == "N")
+                {
+                    activeRules.Add(
+                        pending);
+                }
+
+
+                // 8. Validate final configuration.
+                //
+                // DEFAULT is optional based on
+                // your latest requirement.
+                ValidateRuleSet(
+                    factor,
+                    activeRules);
+
+
+                var now =
+                    DateTime.UtcNow;
+
+
+                // 9. Deactivate old approved score.
+                if (oldRule != null)
+                {
+                    oldRule.IsActive =
+                        false;
+
+                    oldRule.EffectiveTo =
+                        now;
+
+                    Stamp(
+                        oldRule);
+                }
+
+
+                // 10. Approve pending score.
+                pending.ApprovalStatus =
+                    "APPROVED";
+
+                pending.ApprovedByUserId =
+                    _currentUser.UserId;
+
+                pending.ApprovedBy =
+                    _currentUser.Username;
+
+                pending.ApprovedDate =
+                    now;
+
+                pending.EffectiveFrom =
+                    now;
+
+                pending.EffectiveTo =
+                    null;
+
+                pending.IsActive =
+                    pending.DeleteFg == "N";
+
+                Stamp(
+                    pending);
+
+
+                // 11. Audit.
+                AddAudit(
+                    "Approve",
+                    "RiskFactorRule",
+                    pending.Id,
+                    $"Approved score change; " +
+                    $"original {pending.ReplacesRuleId}; " +
+                    $"maker {pending.MakerUserId}; " +
+                    $"checker {_currentUser.UserId}.");
+            },
+            cancellationToken,
+            AppPermissions.RiskScore.Approve);
+    }
 
     public Task ActivateBandsAsync(string reviewToken, CancellationToken cancellationToken = default) =>
         ChangeConfigurationAsync(async () =>
@@ -379,4 +500,31 @@ public sealed partial class RiskScoringService
         $"Model v{model.ModelVersion}",
         false)
 ];
+
+    private async Task<RiskFactor>
+        GetRiskFactorAsync(
+            string factorCode,
+            CancellationToken cancellationToken)
+    {
+        var factor =
+            await _db.RiskFactors
+                .SingleOrDefaultAsync(
+                    x =>
+                        x.PartnerId ==
+                            _currentUser.PartnerId
+                        &&
+                        x.FactorCode ==
+                            factorCode
+                        &&
+                        x.IsActive,
+                    cancellationToken);
+
+        if (factor == null)
+        {
+            throw new RiskConfigurationException(
+                "Risk category was not found.");
+        }
+
+        return factor;
+    }
 }

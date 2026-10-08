@@ -45,6 +45,45 @@
 
         @if (canManage)
         {
+            <a class="records-secondary-button"
+               asp-controller="AmlRecords"
+               asp-action="DownloadImportTemplate">
+
+                <i class="bi bi-download"></i>
+
+                Template
+            </a>
+
+
+            <form asp-controller="AmlRecords"
+                  asp-action="Import"
+                  method="post"
+                  enctype="multipart/form-data">
+
+                @Html.AntiForgeryToken()
+
+
+                <input id="amlImportFile"
+                       type="file"
+                       name="file"
+                       accept=".csv,.xlsx"
+                       hidden
+                       onchange="if(this.files.length > 0) this.form.submit();" />
+
+
+                <button type="button"
+                        class="records-secondary-button"
+                        onclick="document.getElementById('amlImportFile').click();">
+
+                    <i class="bi bi-upload"></i>
+
+                    Import CSV / Excel
+
+                </button>
+
+            </form>
+
+
             <a class="records-primary-button"
                asp-controller="AmlRecords"
                asp-action="Add">

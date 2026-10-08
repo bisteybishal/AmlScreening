@@ -115,6 +115,12 @@ public static class AppPermissions
             "Roles.View";
     }
 
+    public static class CustomerKyc
+    {
+        public const string View =
+            "CustomerKyc.View";
+    }
+
     public static class Api
     {
         public const string Access = "API.Access";
@@ -162,6 +168,7 @@ public static class AppPermissions
         Audit.View,
         Screening.View,
         Roles.View,
+        CustomerKyc.View,
         Api.Access
      ];
 
@@ -205,7 +212,8 @@ public static class AppPermissions
     Screening.View,
     Roles.View,
 
-    Audit.View
+    Audit.View,
+        CustomerKyc.View
 ];
 
     public static readonly string[] ApiUserDefaults =

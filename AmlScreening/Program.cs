@@ -1,6 +1,7 @@
 using AmlScreening.Application;
 using AmlScreening.Infrastructure;
 using AmlScreening.Portal.Extension;
+using AmlScreening.Portal.Helper;
 using AmlScreening.Portal.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc.Controllers;
@@ -25,7 +26,8 @@ builder.Services.AddCustomDataProtection(builder.Configuration, builder.Environm
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
-
+builder.Services.AddScoped<CustomerKycService>();
+builder.Services.AddScoped<DropdownHelper>();
 builder.Services.AddScoped<PortalCookieEvents>();
 
 

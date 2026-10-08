@@ -316,6 +316,7 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
         existing.RecordType = record.RecordType;
         existing.FullName = fullName;
         existing.DateOfBirth = record.DateOfBirth;
+        existing.Gender = record.Gender;
         existing.Country = record.Country;
         existing.Nationality = record.Nationality;
         existing.ReferenceNo = record.ReferenceNo.Trim();
@@ -326,6 +327,12 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
         existing.NamePrefix = AmlNameNormalizer.GetPrefix(fullName);
         existing.UpdatedDate = DateTime.UtcNow;
         existing.UpdatedBy = _currentUser.Username;
+        existing.Aliases = record.Aliases;
+        existing.Occupation = record.Occupation;
+        existing.Position = record.Position;
+        existing.PoliticalParties = record.PoliticalParties;
+        existing.SocialMediaLinks = record.SocialMediaLinks;
+        existing.Description = record.Description;
 
         // Do not change PartnerId, BranchId, CreatedByUserId or IsGlobal.
 
@@ -384,6 +391,60 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
                 PhotoContentType = x.PhotoContentType
             })
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+
+
+    public async Task<IReadOnlyList<AmlRecord>> FindKycCandidatesAsync(
+    string name,
+    string screeningType,
+    CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(screeningType))
+        {
+            return [];
+        }
+        var normalizeName = AmlNameNormalizer.Normalize(name);
+        if (string.IsNullOrWhiteSpace(
+        normalizeName))
+        {
+            return [];
+        }
+
+        if (normalizeName.Length > 250)
+        {
+            throw new ArgumentException(
+                "Search name is too long.");
+        }
+        var source = screeningType.Trim();
+        var originalName = name.Trim();
+        return await PartnerQuery(false)
+            // ScreeningType is only for filtering.
+            .Where(x => x.IsActive && x.SourceName == source)
+              // Find possible name candidates.
+              .Where(x => (x.NormalizedName != null && x.NormalizedName.Contains(normalizeName)) || (x.Aliases != null && x.Aliases.Contains(originalName)))
+
+            .OrderBy(x => x.FullName)
+            .ThenBy(x => x.Id)
+            .Take(51)
+            .Select(x => new AmlRecord
+            {
+                Id = x.Id,
+
+                FullName = x.FullName,
+
+                Aliases = x.Aliases,
+
+                DateOfBirth = x.DateOfBirth,
+
+                Country = x.Country,
+
+                Gender = x.Gender,
+
+                SourceName = x.SourceName,
+
+                ReferenceNo = x.ReferenceNo
+            }).ToListAsync(cancellationToken);
     }
     private IQueryable<AmlRecord> PartnerQuery(bool tracking)
     {

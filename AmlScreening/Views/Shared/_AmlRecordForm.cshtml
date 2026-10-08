@@ -20,10 +20,50 @@
         <input asp-for="FullName" placeholder="Enter the complete name" />
         <span asp-validation-for="FullName"></span>
     </div>
+    <div class="field full">
+        <label asp-for="Aliases"></label>
+        <textarea asp-for="Aliases"
+                  rows="2"
+                  placeholder="Ram Sharma; R B Sharma; Ram B Sharma">
+    </textarea>
+        <span asp-validation-for="Aliases"></span>
+    </div>
     <div class="field">
         <label asp-for="DateOfBirth"></label>
         <input asp-for="DateOfBirth" type="date" />
         <span asp-validation-for="DateOfBirth"></span>
+    </div>
+
+    <div class="field">
+
+        <label asp-for="Gender"></label>
+
+        <select asp-for="Gender">
+
+            <option value="">
+                Select gender
+            </option>
+
+            <option value="Male">
+                Male
+            </option>
+
+            <option value="Female">
+                Female
+            </option>
+
+            <option value="Other">
+                Other
+            </option>
+
+            <option value="Unknown">
+                Unknown
+            </option>
+
+        </select>
+
+        <span asp-validation-for="Gender"></span>
+
     </div>
     <div class="field">
         <label asp-for="Country"></label>
@@ -47,6 +87,45 @@
         </select>
         <span asp-validation-for="Nationality"></span>
     </div>
+    <div class="field">
+        <label asp-for="Occupation"></label>
+        <input asp-for="Occupation"
+               placeholder="e.g. Politician, Businessman" />
+        <span asp-validation-for="Occupation"></span>
+    </div>
+
+    <div class="field">
+        <label asp-for="Position"></label>
+        <input asp-for="Position"
+               placeholder="e.g. Member of Parliament" />
+        <span asp-validation-for="Position"></span>
+    </div>
+
+    <div class="field">
+        <label asp-for="PoliticalParties"></label>
+        <input asp-for="PoliticalParties"
+               placeholder="Separate multiple values with ;" />
+        <span asp-validation-for="PoliticalParties"></span>
+    </div>
+
+    <div class="field full">
+        <label asp-for="SocialMediaLinks"></label>
+        <textarea asp-for="SocialMediaLinks"
+                  rows="2"
+                  placeholder="Separate multiple links with ;">
+    </textarea>
+        <span asp-validation-for="SocialMediaLinks"></span>
+    </div>
+
+    <div class="field full">
+        <label asp-for="Description"></label>
+        <textarea asp-for="Description"
+                  rows="4"
+                  placeholder="AML / PEP description">
+    </textarea>
+        <span asp-validation-for="Description"></span>
+    </div>
+
     <div class="field">
         <label asp-for="ReferenceNo"></label>
         <input asp-for="ReferenceNo" placeholder="e.g. AML-10255" />

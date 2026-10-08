@@ -1,0 +1,1030 @@
+﻿/* =========================================
+   Page layout
+   ========================================= */
+
+.ckyc-page {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 28px 20px 40px;
+    color: #193747;
+}
+
+    .ckyc-page,
+    .ckyc-page * {
+        box-sizing: border-box;
+    }
+
+.ckyc-heading {
+    margin-bottom: 24px;
+}
+
+.ckyc-eyebrow {
+    display: block;
+    margin-bottom: 7px;
+    color: #587383;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+}
+
+.ckyc-heading h1 {
+    margin: 0;
+    color: #142f40;
+    font-size: clamp(25px, 2.5vw, 32px);
+    font-weight: 700;
+    letter-spacing: -0.6px;
+}
+
+.ckyc-heading p {
+    margin: 8px 0 0;
+    color: #627887;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.ckyc-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 20px;
+}
+
+/* =========================================
+   Cards
+   ========================================= */
+
+.ckyc-card {
+    min-width: 0;
+    padding: 26px;
+    border: 1px solid #d8e4ec;
+    border-radius: 15px;
+    background: #fff;
+    box-shadow: 0 5px 20px rgb(26 57 77 / 4%);
+}
+
+.ckyc-form-card,
+.ckyc-result-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.ckyc-card-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 26px;
+}
+
+    .ckyc-card-heading > div {
+        min-width: 0;
+    }
+
+    .ckyc-card-heading h2 {
+        margin: 0;
+        color: #183445;
+        font-size: 20px;
+        font-weight: 650;
+    }
+
+    .ckyc-card-heading p {
+        margin: 7px 0 0;
+        color: #627887;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+    .ckyc-card-heading .ckyc-customer-name {
+        color: #29495c;
+        font-size: 17px;
+        font-weight: 500;
+        overflow-wrap: anywhere;
+    }
+
+.ckyc-badge {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 650;
+    line-height: 1.4;
+}
+
+.ckyc-badge-teal {
+    border-color: #d2ebe7;
+    background: #eef9f7;
+    color: #15766f;
+}
+
+/* =========================================
+   Customer form
+   ========================================= */
+
+.ckyc-form {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+}
+
+.ckyc-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 25px 18px;
+    margin-top: 4px;
+    margin-bottom: 32px;
+}
+
+.ckyc-field {
+    min-width: 0;
+}
+
+    .ckyc-field label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 9px;
+        color: #3c5668;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+.ckyc-required {
+    color: #a53c46;
+}
+
+.ckyc-field label small {
+    margin-left: auto;
+    color: #657b8a;
+    font-size: 11px;
+    font-weight: 400;
+}
+
+.ckyc-input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    padding: 11px 12px;
+    border: 1px solid #ccdae4;
+    border-radius: 8px;
+    background: #fcfdff;
+    color: #203e51;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+select.ckyc-input {
+    cursor: pointer;
+}
+
+.ckyc-input::placeholder {
+    color: #748692;
+}
+
+.ckyc-input:focus {
+    outline: none;
+    border-color: #168e88;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgb(22 142 136 / 12%);
+}
+
+.ckyc-input.input-validation-error {
+    border-color: #b74650;
+}
+
+.ckyc-field-error {
+    display: block;
+    margin-top: 6px;
+    color: #a3313c;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+    .ckyc-field-error:empty,
+    .ckyc-validation.validation-summary-valid {
+        display: none;
+    }
+
+.ckyc-validation.validation-summary-errors {
+    margin-bottom: 20px;
+    padding: 12px 14px;
+    border: 1px solid #eccbd0;
+    border-radius: 8px;
+    background: #fff5f6;
+    color: #9d303b;
+    font-size: 13px;
+}
+
+.ckyc-validation ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+/* =========================================
+   Form footer and buttons
+   ========================================= */
+
+.ckyc-form-footer {
+    margin-top: auto;
+    padding-top: 22px;
+    border-top: 1px solid #e6edf2;
+}
+
+.ckyc-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 0 0 18px;
+    color: #637a8a;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+    .ckyc-note > i,
+    .ckyc-result-notice > i {
+        flex-shrink: 0;
+        margin-top: 1px;
+    }
+
+.ckyc-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.ckyc-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 11px 17px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.4;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.ckyc-button-primary {
+    background: #087f82;
+    color: #fff;
+}
+
+    .ckyc-button-primary:hover {
+        background: #066a6d;
+        color: #fff;
+    }
+
+.ckyc-button-secondary {
+    border-color: #ccdae4;
+    background: #fff;
+    color: #345366;
+}
+
+    .ckyc-button-secondary:hover {
+        border-color: #adbfcc;
+        background: #f3f7f9;
+        color: #193747;
+    }
+
+.ckyc-button:focus-visible {
+    outline: 3px solid #168e88;
+    outline-offset: 3px;
+}
+
+/* =========================================
+   Risk colours from the server's risk level
+   ========================================= */
+
+.ckyc-risk-low {
+    --risk-color: #23734f;
+    --risk-background: #edf8f1;
+    --risk-border: #cbe6d5;
+}
+
+.ckyc-risk-medium {
+    --risk-color: #85600f;
+    --risk-background: #fff8e7;
+    --risk-border: #eddfa9;
+}
+
+.ckyc-risk-high {
+    --risk-color: #a54c18;
+    --risk-background: #fff2e9;
+    --risk-border: #efd2ba;
+}
+
+.ckyc-risk-critical {
+    --risk-color: #b73843;
+    --risk-background: #fff0f2;
+    --risk-border: #efcdd2;
+}
+
+.ckyc-risk-neutral {
+    --risk-color: #496779;
+    --risk-background: #f0f5f8;
+    --risk-border: #d5e2e9;
+}
+
+.ckyc-risk-badge {
+    border-color: var(--risk-border);
+    background: var(--risk-background);
+    color: var(--risk-color);
+}
+
+/* =========================================
+   Result score
+   ========================================= */
+
+.ckyc-result-card .ckyc-card-heading {
+    margin-bottom: 20px;
+}
+
+.ckyc-score-section {
+    padding: 20px 0;
+    border-top: 1px solid #e4ecf1;
+    border-bottom: 1px solid #e4ecf1;
+}
+
+.ckyc-section-label {
+    display: block;
+    color: #607787;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.ckyc-score {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 8px 0 12px;
+}
+
+    .ckyc-score strong {
+        color: var(--risk-color);
+        font-size: 46px;
+        font-weight: 750;
+        line-height: 1.1;
+        letter-spacing: -1px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .ckyc-score > span {
+        color: #677d8c;
+        font-size: 18px;
+    }
+
+.ckyc-meter {
+    display: block;
+    width: 100%;
+    height: 12px;
+    border: 0;
+    background: transparent;
+}
+
+    .ckyc-meter::-webkit-meter-bar {
+        border: 0;
+        border-radius: 20px;
+        background: #e1e8ee;
+    }
+
+    .ckyc-meter::-webkit-meter-optimum-value,
+    .ckyc-meter::-webkit-meter-suboptimum-value,
+    .ckyc-meter::-webkit-meter-even-less-good-value {
+        border-radius: 20px;
+        background: var(--risk-color);
+    }
+
+    .ckyc-meter::-moz-meter-bar {
+        border-radius: 20px;
+        background: var(--risk-color);
+    }
+
+.ckyc-score-caption {
+    margin: 9px 0 0;
+    color: #687e8c;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+/* =========================================
+   AML matches
+   ========================================= */
+
+.ckyc-match-section {
+    padding: 20px 0;
+}
+
+    .ckyc-match-section h3 {
+        margin: 0 0 7px;
+        color: #213e51;
+        font-size: 16px;
+        font-weight: 650;
+    }
+
+    .ckyc-match-section p {
+        margin: 0;
+        color: #607787;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+.ckyc-source-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+    .ckyc-source-list li {
+        max-width: 100%;
+        padding: 5px 10px;
+        border: 1px solid #d7e4eb;
+        border-radius: 7px;
+        background: #f2f7fa;
+        color: #35596d;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+    }
+
+/* =========================================
+   Calculation details
+   ========================================= */
+
+.ckyc-details {
+    margin-bottom: 20px;
+    border: 1px solid #d7e3eb;
+    border-radius: 9px;
+    background: #fff;
+}
+
+    .ckyc-details summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 13px 14px;
+        color: #2d4b5f;
+        font-size: 13px;
+        font-weight: 600;
+        list-style: none;
+        cursor: pointer;
+    }
+
+        .ckyc-details summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .ckyc-details summary:focus-visible {
+            outline: 2px solid #168e88;
+            outline-offset: 2px;
+            border-radius: 8px;
+        }
+
+        .ckyc-details summary i {
+            transition: transform 150ms ease;
+        }
+
+    .ckyc-details[open] summary i {
+        transform: rotate(180deg);
+    }
+
+    .ckyc-details[open] summary {
+        border-bottom: 1px solid #e6edf2;
+    }
+
+    .ckyc-details dl {
+        margin: 0;
+        padding: 4px 14px 10px;
+    }
+
+        .ckyc-details dl > div {
+            display: grid;
+            grid-template-columns: 120px minmax(0, 1fr);
+            gap: 12px;
+            padding: 9px 0;
+            border-bottom: 1px solid #edf2f5;
+        }
+
+            .ckyc-details dl > div:last-child {
+                border-bottom: 0;
+            }
+
+    .ckyc-details dt {
+        color: #637b8b;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .ckyc-details dd {
+        margin: 0;
+        color: #29495c;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+    }
+
+/* =========================================
+   Initial empty result
+   ========================================= */
+
+.ckyc-empty {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 36px 20px;
+    text-align: center;
+}
+
+.ckyc-empty-icon {
+    display: grid;
+    place-items: center;
+    width: 62px;
+    height: 62px;
+    margin-bottom: 18px;
+    border: 1px solid #d5e8eb;
+    border-radius: 18px;
+    background: #edf7f7;
+    color: #38878b;
+    font-size: 28px;
+}
+
+.ckyc-empty h3 {
+    margin: 0 0 9px;
+    color: #29495c;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.ckyc-empty p {
+    max-width: 300px;
+    margin: 0;
+    color: #657d8c;
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+.ckyc-result-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: auto 0 0;
+    padding-top: 17px;
+    border-top: 1px solid #e6edf2;
+    color: #637b8b;
+    font-size: 11px;
+    line-height: 1.7;
+}
+
+/* =========================================
+   Responsive layout
+   ========================================= */
+
+@media (max-width: 1000px) {
+    .ckyc-workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .ckyc-empty {
+        padding: 30px 20px;
+    }
+}
+
+@media (max-width: 576px) {
+    .ckyc-page {
+        padding: 20px 12px 30px;
+    }
+
+    .ckyc-card {
+        padding: 20px 16px;
+    }
+
+    .ckyc-card-heading h2 {
+        font-size: 18px;
+    }
+
+    .ckyc-fields {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .ckyc-buttons {
+        flex-direction: column;
+    }
+
+    .ckyc-button {
+        width: 100%;
+    }
+
+    .ckyc-details dl > div {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+
+    .ckyc-score strong {
+        font-size: 40px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ckyc-input,
+    .ckyc-button,
+    .ckyc-details summary i {
+        transition: none;
+    }
+}
+/* Match the selected side-by-side design more closely. */
+
+.ckyc-page {
+    width: 100%;
+    max-width: 1440px;
+    padding: 40px 28px;
+}
+
+.ckyc-heading {
+    margin-bottom: 28px;
+}
+
+.ckyc-eyebrow {
+    display: none;
+}
+
+.ckyc-heading h1 {
+    font-size: 36px;
+    line-height: 1.2;
+    letter-spacing: -0.8px;
+}
+
+.ckyc-heading p {
+    margin-top: 10px;
+    font-size: 17px;
+}
+
+/* Slightly wider form panel */
+.ckyc-workspace {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 18px;
+}
+
+.ckyc-card {
+    padding: 30px;
+    border-radius: 14px;
+    box-shadow: 0 5px 22px rgb(26 57 77 / 3%);
+}
+
+.ckyc-card-heading {
+    margin-bottom: 42px;
+}
+
+    .ckyc-card-heading h2 {
+        font-size: 25px;
+        line-height: 1.3;
+    }
+
+    .ckyc-card-heading p {
+        font-size: 14px;
+    }
+
+    .ckyc-card-heading .ckyc-customer-name {
+        margin-top: 12px;
+        font-size: 20px;
+    }
+
+.ckyc-badge {
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+/* Larger, easier-to-read form */
+.ckyc-fields {
+    gap: 32px 22px;
+    margin: 0 0 36px;
+}
+
+.ckyc-field label {
+    margin-bottom: 10px;
+    font-size: 15px;
+}
+
+    .ckyc-field label small {
+        font-size: 12px;
+    }
+
+.ckyc-input {
+    min-height: 52px;
+    padding: 12px 14px;
+    font-size: 16px;
+    border-radius: 8px;
+}
+
+.ckyc-field-error {
+    font-size: 13px;
+}
+
+/* Note and buttons share a row when space permits */
+.ckyc-form-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding-top: 24px;
+}
+
+.ckyc-note {
+    flex: 1 1 160px;
+    margin: 0;
+    font-size: 13px;
+}
+
+.ckyc-buttons {
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+}
+
+.ckyc-button {
+    min-height: 48px;
+    padding: 12px 17px;
+    font-size: 14px;
+}
+
+/* Result panel */
+.ckyc-result-card .ckyc-card-heading {
+    margin-bottom: 20px;
+}
+
+.ckyc-score-section {
+    padding: 22px 0;
+}
+
+.ckyc-section-label {
+    font-size: 15px;
+}
+
+.ckyc-score {
+    margin: 10px 0 14px;
+}
+
+    .ckyc-score strong {
+        font-size: 52px;
+    }
+
+    .ckyc-score > span {
+        font-size: 22px;
+    }
+
+.ckyc-meter {
+    height: 14px;
+}
+
+.ckyc-score-caption {
+    font-size: 12px;
+}
+
+.ckyc-match-section {
+    padding: 22px 0;
+}
+
+    .ckyc-match-section h3 {
+        font-size: 18px;
+    }
+
+    .ckyc-match-section p {
+        font-size: 15px;
+    }
+
+.ckyc-source-list li {
+    padding: 6px 12px;
+    font-size: 14px;
+}
+
+.ckyc-details summary {
+    padding: 15px 16px;
+    font-size: 15px;
+}
+
+.ckyc-details dt,
+.ckyc-details dd {
+    font-size: 13px;
+}
+
+.ckyc-result-notice {
+    font-size: 12px;
+    line-height: 1.7;
+}
+
+/* Stack panels before they become cramped */
+@media (max-width: 1100px) {
+    .ckyc-workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .ckyc-card-heading {
+        margin-bottom: 28px;
+    }
+}
+
+@media (max-width: 600px) {
+    .ckyc-page {
+        padding: 24px 12px;
+    }
+
+    .ckyc-heading h1 {
+        font-size: 28px;
+    }
+
+    .ckyc-heading p {
+        font-size: 14px;
+    }
+
+    .ckyc-card {
+        padding: 22px 18px;
+    }
+
+    .ckyc-card-heading h2 {
+        font-size: 21px;
+    }
+
+    .ckyc-fields {
+        grid-template-columns: 1fr;
+        gap: 22px;
+    }
+
+    .ckyc-form-footer {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .ckyc-note {
+        flex: none;
+    }
+
+    .ckyc-buttons {
+        width: 100%;
+        flex-direction: row;
+    }
+
+    .ckyc-button {
+        flex: 1;
+        width: auto;
+    }
+}
+
+.ckyc-evidence-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.ckyc-evidence-card {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid #dbe5ee;
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+    .ckyc-evidence-card h4 {
+        margin: 0 0 10px;
+        color: #16324a;
+        font-size: 14px;
+        font-weight: 600;
+        overflow-wrap: anywhere;
+    }
+
+    .ckyc-evidence-card dl {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+    }
+
+        .ckyc-evidence-card dl > div {
+            display: grid;
+            grid-template-columns: 110px minmax(0, 1fr);
+            gap: 10px;
+        }
+
+    .ckyc-evidence-card dt {
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 400;
+    }
+
+    .ckyc-evidence-card dd {
+        margin: 0;
+        color: #16324a;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+    }
+
+@media (max-width: 480px) {
+    .ckyc-evidence-card dl > div {
+        grid-template-columns: 1fr;
+        gap: 3px;
+    }
+}
+
+.ckyc-workspace {
+    align-items: start;
+}
+
+.ckyc-form-card {
+    height: auto;
+    min-height: 0;
+}
+
+/* Let each card use its own height. */
+.ckyc-workspace {
+    align-items: start;
+}
+
+.ckyc-form-card {
+    height: auto;
+    min-height: 0;
+}
+
+    .ckyc-form-card .ckyc-form {
+        flex: initial;
+        min-height: 0;
+    }
+
+    .ckyc-form-card .ckyc-form-footer {
+        margin-top: 24px;
+    }
+
+.ckyc-card-heading {
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.ckyc-risk-badge {
+    max-width: 100%;
+    white-space: normal;
+}
+
+/* Calculation breakdown */
+.ckyc-breakdown {
+    padding: 12px;
+    overflow-x: auto;
+}
+
+    .ckyc-breakdown table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+    }
+
+    .ckyc-breakdown caption {
+        padding-bottom: 10px;
+        color: #16324a;
+        font-weight: 600;
+        text-align: left;
+        caption-side: top;
+    }
+
+    .ckyc-breakdown th,
+    .ckyc-breakdown td {
+        padding: 9px 7px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: right;
+        vertical-align: top;
+    }
+
+        .ckyc-breakdown th:first-child {
+            text-align: left;
+        }
+
+    .ckyc-breakdown thead th {
+        color: #64748b;
+        font-weight: 500;
+    }
+
+    .ckyc-breakdown tbody th {
+        font-weight: 400;
+    }
+
+    .ckyc-breakdown tfoot {
+        color: #16324a;
+        background: #f8fafc;
+        font-weight: 600;
+    }
+
+    .ckyc-breakdown p {
+        margin: 10px 0 0;
+        color: #64748b;
+        font-size: 12px;
+    }

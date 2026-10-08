@@ -41,6 +41,7 @@ namespace AmlScreening.Infrastructure
             services.AddScoped<IUserSessionRepository, UserSessionRepository>();
             services.AddScoped<IAuthenticationRepository, AuthenticationRepository>();
             services.AddScoped<IErrorLogService,ErrorLogService>();
+            services.AddScoped<IAmlRecordFileImportService, AmlRecordFileImportService>();
 
 
 

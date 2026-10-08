@@ -17,6 +17,13 @@ public sealed class RiskScoreSetupController : Controller
 
     private readonly IRiskScoringService _riskScoring;
     private readonly IErrorLogService _errorLogService;
+    private static readonly string[] Levels =
+  {
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+    };
 
     public RiskScoreSetupController(
         IRiskScoringService riskScoring,
@@ -80,112 +87,79 @@ public sealed class RiskScoreSetupController : Controller
     [HttpGet]
     [Authorize(Policy = AppPermissions.RiskScoreSetup.Manage)]
     public async Task<IActionResult> Edit(
-        CancellationToken cancellationToken)
+     CancellationToken cancellationToken)
     {
         try
         {
-            var result = await LoadSetupAsync(cancellationToken);
+            var setup = await LoadSetupAsync(cancellationToken);
 
-            if (!result.CanEditBands)
+            if (!setup.CanEditBands)
             {
                 TempData["ErrorMessage"] =
-                    "You cannot edit these ranges. If a pending set exists, " +
-                    "only its maker can change it.";
+                    "You cannot edit these ranges. " +
+                    "Only the maker can edit an existing pending change.";
 
                 return RedirectToAction(nameof(Index));
             }
 
-            if (result.Bands.Count == 0)
-            {
-                // Proposed starting values only.
-                // They remain inactive until saved and approved.
-                return View(
-                    "Edit",
-                    new RiskScoreSetupEditViewModel
-                    {
-                        Bands =
-                        [
-                            new RiskBandEditViewModel
-                            {
-                                RiskLevel = "LOW",
-                                MinimumScore = 0,
-                                MaximumScore = 29,
-                                Decision = "ALLOW"
-                            },
-                            new RiskBandEditViewModel
-                            {
-                                RiskLevel = "MEDIUM",
-                                MinimumScore = 30,
-                                MaximumScore = 59,
-                                Decision = "REVIEW"
-                            },
-                            new RiskBandEditViewModel
-                            {
-                                RiskLevel = "HIGH",
-                                MinimumScore = 60,
-                                MaximumScore = 79,
-                                Decision = "REVIEW"
-                            },
-                            new RiskBandEditViewModel
-                            {
-                                RiskLevel = "CRITICAL",
-                                MinimumScore = 80,
-                                MaximumScore = 100,
-                                Decision = "BLOCK"
-                            }
-                        ]
-                    });
-            }
+            var model = new RiskScoreSetupEditViewModel();
 
-            var model = new RiskScoreSetupEditViewModel
+            if (setup.Bands.Count == 0)
             {
-                Bands = result.Bands
+                // Users enter their own boundaries.
+                model.Bands = Levels.Select(level =>
+                    new RiskBandEditViewModel
+                    {
+                        RiskLevel = level,
+                        MaximumScore = null,
+                        Decision = level switch
+                        {
+                            "LOW" => "ALLOW",
+                            "CRITICAL" => "BLOCK",
+                            _ => "REVIEW"
+                        }
+                    }).ToList();
+            }
+            else
+            {
+                model.Bands = setup.Bands
                     .OrderBy(band => band.MinimumScore)
                     .Select(band => new RiskBandEditViewModel
                     {
                         Id = band.Id,
                         RiskLevel = band.RiskLevel,
                         MinimumScore = band.MinimumScore,
-                        MaximumScore = band.MaximumScore,
+                        MaximumScore = band.MaximumScore ,
                         Decision = band.Decision,
                         Remarks = band.Remarks,
                         RowVersion = band.RowVersion
                     })
-                    .ToList()
-            };
+                    .ToList();
+            }
 
             return View("Edit", model);
         }
         catch (RiskConfigurationException ex)
         {
             TempData["ErrorMessage"] = ex.Message;
-
-            return RedirectToAction(nameof(Index));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             TempData["ErrorMessage"] = await GetErrorMessageAsync(
                 ex,
                 nameof(Edit),
-                "Unable to open the risk range form.");
-
-            return RedirectToAction(nameof(Index));
+                "Unable to open risk ranges.");
         }
+
+        return RedirectToAction(nameof(Index));
     }
-
-    // =====================================================
-    // RISK RANGES — POST
-    // =====================================================
-
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = AppPermissions.RiskScoreSetup.Manage)]
     public async Task<IActionResult> Edit(
-        RiskScoreSetupEditViewModel model,
-        CancellationToken cancellationToken)
+    RiskScoreSetupEditViewModel model,
+    CancellationToken cancellationToken)
     {
-        model.Bands ??= [];
-
         ValidateRanges(model);
 
         if (!ModelState.IsValid)
@@ -193,48 +167,43 @@ public sealed class RiskScoreSetupController : Controller
 
         try
         {
-            var ranges = model.Bands
-                .Select(band => new RiskBandInput
-                {
-                    Id = band.Id,
-                    RiskLevel = band.RiskLevel.Trim().ToUpperInvariant(),
-                    MinimumScore = band.MinimumScore,
-                    MaximumScore = band.MaximumScore,
-                    Decision = band.Decision.Trim().ToUpperInvariant(),
-                    Remarks = Clean(band.Remarks),
-                    RowVersion = band.RowVersion
-                })
-                .ToList();
+            var ranges = model.Bands.Select(band => new RiskBandInput
+            {
+                Id = band.Id,
+                RiskLevel = band.RiskLevel,
+                MinimumScore = band.MinimumScore,
+                MaximumScore = band.MaximumScore,
+                Decision = band.Decision,
+                Remarks = Clean(band.Remarks),
+                RowVersion = band.RowVersion
+            }).ToList();
 
             await _riskScoring.SaveBandRangesAsync(
                 ranges,
                 cancellationToken);
 
             TempData["SuccessMessage"] =
-                "Risk ranges saved as Pending. A different authorized " +
-                "checker must review and approve them.";
+                "Ranges saved as Pending. " +
+                "A different authorised user must approve them.";
 
             return RedirectToAction(nameof(Index));
         }
         catch (RiskConfigurationException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
-
-            return View("Edit", model);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            ModelState.AddModelError(
-                string.Empty,
-                await GetErrorMessageAsync(
-                    ex,
-                    nameof(Edit),
-                    "Unable to save risk ranges."));
+            var message = await GetErrorMessageAsync(
+                ex,
+                nameof(Edit),
+                "Unable to save risk ranges.");
 
-            return View("Edit", model);
+            ModelState.AddModelError(string.Empty, message);
         }
-    }
 
+        return View("Edit", model);
+    }
     // =====================================================
     // REVIEW RISK RANGES
     // =====================================================
@@ -541,86 +510,76 @@ public sealed class RiskScoreSetupController : Controller
 
         return RedirectToAction(nameof(Index));
     }
-
     private void ValidateRanges(RiskScoreSetupEditViewModel model)
     {
-        if (model.Bands.Count == 0)
+        if (!ModelState.IsValid)
+        {
+            return;
+        }
+
+        if (model.Bands == null ||
+            model.Bands.Count != 4)
         {
             ModelState.AddModelError(
-                nameof(model.Bands),
-                "At least one risk range is required.");
+                string.Empty,
+                "LOW, MEDIUM, HIGH and CRITICAL ranges are required.");
 
             return;
         }
 
-        for (var index = 0; index < model.Bands.Count; index++)
+        var orderedBands =
+            model.Bands
+                .OrderBy(x => x.MinimumScore)
+                .ToList();
+
+        var expectedMinimum = 0;
+
+
+        foreach (var band in orderedBands)
         {
-            var band = model.Bands[index];
-
-            if (band.Id < 0)
-            {
-                ModelState.AddModelError(
-                    $"Bands[{index}].Id",
-                    "Invalid risk range.");
-            }
-
-            if (band.Id > 0 && band.RowVersion is not { Length: 8 })
+            if (!band.MaximumScore.HasValue)
             {
                 ModelState.AddModelError(
                     string.Empty,
-                    "Reload the range form before saving.");
-
-                break;
-            }
-        }
-
-        if (!ModelState.IsValid)
-            return;
-
-        var levels = new HashSet<string>(
-            StringComparer.OrdinalIgnoreCase);
-
-        var nextMinimum = 0;
-
-        foreach (var band in model.Bands.OrderBy(x => x.MinimumScore))
-        {
-            var level = band.RiskLevel.Trim();
-            var decision = band.Decision.Trim().ToUpperInvariant();
-            var maximum = band.MaximumScore ?? 100;
-
-            if (!levels.Add(level))
-            {
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Each risk level must have a unique name.");
-            }
-
-            if (decision is not ("ALLOW" or "REVIEW" or "BLOCK"))
-            {
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Risk decisions must be ALLOW, REVIEW or BLOCK.");
-            }
-
-            if (band.MinimumScore != nextMinimum ||
-                maximum < band.MinimumScore ||
-                maximum > 100)
-            {
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Risk ranges must cover 0–100 without gaps or overlaps.");
+                    "Enter the maximum score for every range.");
 
                 return;
             }
 
-            nextMinimum = maximum + 1;
+
+            // First range starts 0.
+            // Next range must start previous max + 1.
+            if (band.MinimumScore != expectedMinimum)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "Risk ranges must be continuous without gaps or overlaps.");
+
+                return;
+            }
+
+
+            if (band.MaximumScore.Value <
+                band.MinimumScore)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "Maximum score cannot be less than minimum score.");
+
+                return;
+            }
+
+
+            expectedMinimum =
+                band.MaximumScore.Value + 1;
         }
 
-        if (nextMinimum != 101)
+
+        if (orderedBands.First().MinimumScore != 0)
         {
             ModelState.AddModelError(
                 string.Empty,
-                "The final risk range must end at 100.");
+                "The first risk range must start at 0.");
         }
     }
 
@@ -646,4 +605,6 @@ public sealed class RiskScoreSetupController : Controller
             ? null
             : value.Trim();
     }
+
+
 }

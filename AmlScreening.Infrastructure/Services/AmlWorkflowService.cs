@@ -2,12 +2,10 @@ using AmlScreening.Application.Common;
 using AmlScreening.Application.Interface;
 using AmlScreening.Application.Interface.Repositories;
 using AmlScreening.Application.Models;
-using AmlScreening.Application.Security;
 using AmlScreening.Domain.Entities;
 using AmlScreening.Domain.Entities.Compliance;
 using AmlScreening.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using System.Text;
 
 namespace AmlScreening.Infrastructure.Services;
 
@@ -47,15 +45,22 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
        cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Customer>> GetCustomersAsync() =>
-        await _db.Customers.AsNoTracking()
-            .Where(x => x.PartnerId == _currentUser.PartnerId)
-            .OrderBy(x => x.FullName)
-            .ToListAsync();
+    public async Task<IReadOnlyList<Customer>> GetCustomersAsync()
+    {
+        return await GetpartnerReadQuery()
+         .OrderByDescending(
+             x => x.CreatedDate)
+         .ThenBy(
+             x => x.FullName)
+         .ToListAsync();
+    }
 
-    public Task<Customer?> GetCustomerAsync(int id) =>
-        _db.Customers.AsNoTracking().FirstOrDefaultAsync(x =>
-            x.Id == id && x.PartnerId == _currentUser.PartnerId);
+
+    public Task<Customer?> GetCustomerAsync(int id)
+    {
+        return GetpartnerReadQuery()
+            .FirstOrDefaultAsync(x => x.Id == id);
+    }
 
     public async Task<int> CreateCustomerAsync(Customer customer)
     {
@@ -671,7 +676,7 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
             2);
     }
 
-    
+
     private static int Levenshtein(string left, string right)
     {
         var previous = Enumerable.Range(0, right.Length + 1).ToArray();
@@ -770,5 +775,22 @@ public sealed class AmlWorkflowService : IAmlWorkflowService
         }
 
         return candidates;
+    }
+    private IQueryable<Customer> GetpartnerReadQuery()
+    {
+        // System/Main Admin can view all customers.
+        var canview = _currentUser.IsAdmin;
+        if(canview)
+        {
+            return _db.Customers.AsNoTracking().IgnoreQueryFilters(new[]
+            {
+                "PartnerFilter",
+            });
+        }
+        // Normal user:
+        // same Partner + exact user who created the customer.
+        return _db.Customers.AsNoTracking().Where(x =>
+            x.PartnerId == _currentUser.PartnerId &&
+            x.CreatedByUserId == _currentUser.UserId);
     }
 }

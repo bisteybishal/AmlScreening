@@ -23,5 +23,10 @@ public interface IAmlRecordRepository
 
     Task<AmlRecord?> GetPhotoAsync(int id, CancellationToken cancellationToken = default);
 
-    
+    Task<IReadOnlyList<AmlRecord>> FindKycCandidatesAsync(
+    string name,
+    string screeningType,
+    CancellationToken cancellationToken = default);
+
+
 }

@@ -86,6 +86,62 @@ namespace AmlScreening.Portal.Controllers
                     model);
             }
         }
+
+        [HttpPost, ValidateAntiForgeryToken]
+        public async Task<IActionResult> SearchMultiple(string? name, CancellationToken cancellationToken = default)
+        {
+            var result = new List<ScreeningSearchResultsViewModel>();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                ModelState.AddModelError(string.Empty, "Enter names using no more than 5,000 characters.");
+                return PartialView("_MultipleSearchResults", result);
+            }
+            //split by comma or new line ,never by spaces
+            var names = name.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x.Trim())
+                .Where(x => x.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (names.Length == 0)
+            {
+                ModelState.AddModelError(
+           string.Empty,
+           "Enter between 1 and 20 names.");
+
+                return PartialView("_MultipleSearchResults", result);
+            }
+            try
+            {
+                foreach (var searchname in names)
+                {
+                    var records = await _repository.FindMatchNameAsync(searchname, cancellationToken);
+                    result.Add(new ScreeningSearchResultsViewModel
+                    {
+                        SearchName = searchname,
+                        Results = records.Take(50).ToList(),
+                        HasMore = records.Count > 50
+                    });
+
+                }
+                return PartialView("_MultipleSearchResults", result);
+            }
+           
+            catch (Exception ex)
+            {
+                var errorId = await LogErrorAsync(
+                    ex,
+                    nameof(SearchMultiple));
+
+                ModelState.AddModelError(
+                    string.Empty,
+                    errorId.HasValue
+                        ? $"Search failed. Error reference: {errorId}"
+                        : "Search failed. Please try again.");
+
+                return PartialView("_MultipleSearchResults", result);
+            }
+        }
         [HttpGet]
         public async Task<IActionResult> GetPhoto(int id, CancellationToken cancellationToken = default)
         {

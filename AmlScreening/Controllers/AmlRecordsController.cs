@@ -7,6 +7,7 @@ using AmlScreening.Portal.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Text;
 
 namespace AmlScreening.Portal.Controllers;
 
@@ -19,12 +20,14 @@ public sealed class AmlRecordsController : Controller
     private readonly IErrorLogService
         _errorLogService;
     private readonly ICurrentUserContext _currentUser;
+    private readonly IAmlRecordFileImportService _amlRecordFileImport;
 
-    public AmlRecordsController(IAmlRecordRepository repository, IErrorLogService errorLogService, ICurrentUserContext currentUser)
+    public AmlRecordsController(IAmlRecordRepository repository, IErrorLogService errorLogService, ICurrentUserContext currentUser, IAmlRecordFileImportService amlRecordFileImport)
     {
         _repository = repository;
         _errorLogService = errorLogService;
         _currentUser = currentUser;
+        _amlRecordFileImport = amlRecordFileImport;
     }
 
     [HttpGet]
@@ -96,27 +99,29 @@ public sealed class AmlRecordsController : Controller
                 RecordType = model.RecordType.Trim(),
                 FullName = model.FullName.Trim(),
                 DateOfBirth = model.DateOfBirth,
-                Country = model.Country.Trim(),
+                Gender = NullIfWhiteSpace(model.Gender),
+                Country = NullIfWhiteSpace(model.Country.Trim()),
                 Nationality = model.Nationality.Trim(),
                 ReferenceNo = model.ReferenceNo.Trim(),
                 SourceName = model.SourceName.Trim(),
                 Remarks = model.Remarks.Trim(),
                 IsActive = model.IsActive,
-                IsGlobal = false
+                IsGlobal = false,
+                Occupation = NullIfWhiteSpace(model.Occupation),
+                PoliticalParties = NullIfWhiteSpace(model.PoliticalParties),
+                Description = NullIfWhiteSpace(model.Description),
+                SocialMediaLinks = NullIfWhiteSpace(model.SocialMediaLinks),
+                Aliases = NullIfWhiteSpace(model.Aliases),
+                Position = NullIfWhiteSpace(model.Position)
 
             };
-            await _repository
-               .CreateAsync(
-                   record,
-                   cancellationToken);
+            await _repository.CreateAsync(record,cancellationToken);
 
 
-            TempData["SuccessMessage"] =
-                "AML record added successfully.";
+            TempData["SuccessMessage"] ="AML record added successfully.";
 
 
-            return RedirectToAction(
-                nameof(Index));
+            return RedirectToAction(nameof(Index));
         }
         catch (Exception ex)
         {
@@ -133,8 +138,7 @@ public sealed class AmlRecordsController : Controller
                     : "Unable to add AML record.");
 
 
-            return View(
-                PopulateOptions(model));
+            return View(PopulateOptions(model));
         }
 
 
@@ -142,10 +146,7 @@ public sealed class AmlRecordsController : Controller
 
     [HttpGet]
     [Authorize(Policy = AppPermissions.Aml.Manage)]
-    public async Task<IActionResult>
-        Edit(
-            int id,
-            CancellationToken cancellationToken)
+    public async Task<IActionResult> Edit(int id,CancellationToken cancellationToken)
     {
         try
         {
@@ -201,21 +202,27 @@ public sealed class AmlRecordsController : Controller
                         record.Nationality
                         ?? string.Empty,
 
-                    ReferenceNo =
-                        record.ReferenceNo,
+                    ReferenceNo = record.ReferenceNo,
+                    Gender=record.Gender,
 
-                    SourceName =
-                        record.SourceName,
+                    SourceName = record.SourceName,
 
-                    Remarks =
-                        record.Remarks
-                        ?? string.Empty,
+                    Remarks = record.Remarks ?? string.Empty,
 
-                    IsActive =
-                        record.IsActive,
+                    IsActive = record.IsActive,
 
-                    RowVersion =
-                        record.RowVersion
+                    RowVersion =record.RowVersion,
+                    Aliases = record.Aliases,
+
+                    Occupation = record.Occupation,
+
+                    Position = record.Position,
+
+                    PoliticalParties = record.PoliticalParties,
+
+                    SocialMediaLinks = record.SocialMediaLinks,
+
+                    Description = record.Description,
                 };
 
 
@@ -303,6 +310,7 @@ public sealed class AmlRecordsController : Controller
 
                     DateOfBirth =
                         model.DateOfBirth,
+                    Gender = NullIfWhiteSpace(model.Gender),
 
                     Country =
                         model.Country.Trim(),
@@ -321,7 +329,25 @@ public sealed class AmlRecordsController : Controller
                         model.IsActive,
 
                     RowVersion =
-                        model.RowVersion
+                        model.RowVersion,
+
+                    Aliases =
+                        NullIfWhiteSpace(model.Aliases),
+
+                                        Occupation =
+                        NullIfWhiteSpace(model.Occupation),
+
+                                        Position =
+                        NullIfWhiteSpace(model.Position),
+
+                                        PoliticalParties =
+                        NullIfWhiteSpace(model.PoliticalParties),
+
+                                        SocialMediaLinks =
+                        NullIfWhiteSpace(model.SocialMediaLinks),
+
+                                        Description =
+                        NullIfWhiteSpace(model.Description),
                 };
 
 
@@ -500,6 +526,120 @@ public sealed class AmlRecordsController : Controller
 
             return NotFound();
         }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(
+    Policy = AppPermissions.Aml.Manage)]
+    [RequestSizeLimit(5 * 1024 * 1024)]
+    public async Task<IActionResult> Import(
+    IFormFile? file,
+    CancellationToken cancellationToken = default)
+    {
+        if (file == null ||
+            file.Length == 0)
+        {
+            TempData["ErrorMessage"] =
+                "Select a CSV or Excel file.";
+
+            return RedirectToAction(
+                nameof(Index));
+        }
+
+
+        var extension =
+            Path.GetExtension(
+                file.FileName)
+                .ToLowerInvariant();
+
+
+        if (extension is not
+            (".csv" or ".xlsx"))
+        {
+            TempData["ErrorMessage"] =
+                "Only CSV and XLSX files are allowed.";
+
+            return RedirectToAction(
+                nameof(Index));
+        }
+
+
+        try
+        {
+            await using var stream =
+                file.OpenReadStream();
+
+
+            var result =
+                await _amlRecordFileImport
+                    .ImportAsync(
+                        stream,
+                        file.FileName,
+                        cancellationToken);
+
+
+            if (!result.Success)
+            {
+                TempData["ErrorMessage"] =
+                    $"Import stopped. " +
+                    $"{result.Errors.Count} error(s). " +
+                    string.Join(
+                        " | ",
+                        result.Errors.Take(5));
+
+
+                return RedirectToAction(
+                    nameof(Index));
+            }
+
+
+            TempData["SuccessMessage"] =
+                $"{result.ImportedRows} AML records imported successfully.";
+
+
+            return RedirectToAction(
+                nameof(Index));
+        }
+        catch (Exception ex)
+            when (ex is not OperationCanceledException)
+        {
+            var errorId =
+                await LogErrorAsync(
+                    ex,
+                    nameof(Import));
+
+
+            TempData["ErrorMessage"] =
+                errorId.HasValue
+                    ? $"Unable to import AML records. Error reference: {errorId}"
+                    : "Unable to import AML records.";
+
+
+            return RedirectToAction(
+                nameof(Index));
+        }
+    }
+    [HttpGet]
+    [Authorize(
+    Policy = AppPermissions.Aml.Manage)]
+    public IActionResult DownloadImportTemplate()
+    {
+        const string csv =
+            "RecordType,FullName,Aliases,DateOfBirth,Country,Nationality," +
+            "Occupation,Position,PoliticalParties,SocialMediaLinks,Description," +
+            "ReferenceNo,SourceName,Remarks,IsActive\r\n" +
+
+            "Individual,Ram Sharma,Ram B Sharma;R B Sharma,1985-05-12," +
+            "Nepal,Nepali,Politician,Member of Parliament,ABC Party," +
+            "https://example.com/profile,PEP record,PEP001,PEP Local," +
+            "Example record,true";
+
+
+        return File(
+            Encoding.UTF8.GetBytes(csv),
+            "text/csv",
+            "aml-record-import-template.csv");
     }
     private async Task<AmlRecordsPageViewModel> BuildPageAsync(
             AmlRecordInputModel input,

@@ -1,0 +1,76 @@
+﻿@model List<AmlScreening.Portal.ViewModels.ScreeningSearchResultsViewModel>
+
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger" role="alert">
+        <p>
+            Search could not be completed.
+            This is not a clearance result.
+        </p>
+
+        <div asp-validation-summary="All"></div>
+    </div>
+}
+else
+{
+    var matched = Model
+        .Where(x => x.Results.Count > 0)
+        .ToList();
+
+    var unmatched = Model
+        .Where(x => x.Results.Count == 0)
+        .ToList();
+
+    <div class="screening-batch"
+         data-searched-count="@Model.Count"
+         data-matched-count="@matched.Count"
+         data-unmatched-count="@unmatched.Count">
+
+        @foreach (var item in matched)
+        {
+            <section class="screening-batch-group">
+                <p class="screening-query-label">
+                    Search:
+                    <strong>@item.SearchName</strong>
+                </p>
+
+                <partial name="_SearchResults" model="item" />
+            </section>
+        }
+
+        @if (unmatched.Count > 0)
+        {
+            <section class="screening-no-match">
+                <div class="screening-no-match-icon"
+                     aria-hidden="true">
+                    <i class="bi bi-search"></i>
+                </div>
+
+                <div class="screening-no-match-content">
+                    <h3>
+                        @(matched.Count == 0
+                            ? "No matching records found"
+                            : "No matches for these names")
+                    </h3>
+
+                    <ul class="screening-name-tags"
+                        aria-label="Names with no matches">
+                        @foreach (var item in unmatched)
+                        {
+                            <li>@item.SearchName</li>
+                        }
+                    </ul>
+
+                    <p>
+                        No active records matched these names
+                        within your permitted records.
+                    </p>
+
+                    <p class="screening-result-note">
+                        This is not a clearance decision.
+                    </p>
+                </div>
+            </section>
+        }
+    </div>
+}

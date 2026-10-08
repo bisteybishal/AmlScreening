@@ -1101,35 +1101,78 @@ public sealed partial class RiskScoringService : IRiskScoringService
     // =====================================================
 
     private static void ValidateBands(
-        IEnumerable<RiskBand> bands)
+    IEnumerable<RiskBand> bands)
     {
+        var orderedBands =
+            bands
+                .OrderBy(x => x.MinimumScore)
+                .ToList();
+
+
+        if (orderedBands.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "At least one risk band is required.");
+        }
+
+
         var nextScore = 0;
 
 
-        foreach (
-            var band in
-            bands.OrderBy(
-                item =>
-                    item.MinimumScore))
+        foreach (var band in orderedBands)
         {
-            var maximum =
-                band.MaximumScore
-                ??
-                100;
-
-
-            if (band.MinimumScore != nextScore ||
-                maximum < band.MinimumScore ||
-                maximum > 100 ||
-                band.Decision
-                    .ToUpperInvariant()
-                    is not
-                    ("ALLOW" or
-                     "REVIEW" or
-                     "BLOCK"))
+            if (!band.MaximumScore.HasValue)
             {
                 throw new InvalidOperationException(
-                    "Risk bands must cover every score from 0 to 100 exactly once, with valid decisions.");
+                    "Every risk band must have a maximum score.");
+            }
+
+
+            var maximum =
+                band.MaximumScore.Value;
+
+
+            // Must start at 0 and continue:
+            //
+            // 0-5
+            // 6-10
+            // 11-15
+            // 16-20
+            if (band.MinimumScore != nextScore)
+            {
+                throw new InvalidOperationException(
+                    "Risk bands must start at 0 and continue without gaps or overlaps.");
+            }
+
+
+            if (maximum <
+                band.MinimumScore)
+            {
+                throw new InvalidOperationException(
+                    "Maximum score cannot be less than minimum score.");
+            }
+
+
+            // Keep score values inside 0-100.
+            // Final maximum DOES NOT need to be 100.
+            if (maximum > 100)
+            {
+                throw new InvalidOperationException(
+                    "Risk range values cannot be greater than 100.");
+            }
+
+
+            var decision =
+                band.Decision?
+                    .Trim()
+                    .ToUpperInvariant();
+
+
+            if (decision is not
+                ("ALLOW" or "REVIEW" or "BLOCK"))
+            {
+                throw new InvalidOperationException(
+                    "Risk band decision must be ALLOW, REVIEW or BLOCK.");
             }
 
 
@@ -1138,11 +1181,28 @@ public sealed partial class RiskScoringService : IRiskScoringService
         }
 
 
-        if (nextScore != 101)
+        // Final band must still be CRITICAL.
+        var lastBand =
+            orderedBands.Last();
+
+
+        if (!string.Equals(
+                lastBand.RiskLevel,
+                "CRITICAL",
+                StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "Risk bands must cover every score from 0 to 100.");
+                "CRITICAL must be the final risk range.");
         }
+
+
+        // IMPORTANT:
+        // Do NOT check:
+        //
+        // nextScore == 101
+        //
+        // Partner's last MaximumScore is
+        // automatically its configured maximum.
     }
 
 

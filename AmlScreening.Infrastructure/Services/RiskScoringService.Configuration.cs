@@ -281,110 +281,409 @@ public sealed partial class RiskScoringService
             AddAudit("Delete", "RiskFactorRule", id, $"Soft-deleted in draft v{draft.Version}; active configuration unchanged.");
         }, cancellationToken);
 
-    private static void ValidateRuleSet(RiskFactor factor, List<RiskFactorRule> rows)
+    private static void ValidateRuleSet(
+    RiskFactor factor,
+    List<RiskFactorRule> rows)
     {
-        if (rows.Any(x => x.Score is < 0 or > 100))
-            throw new RiskConfigurationException("All scores must be between 0 and 100.");
-        if (rows.Where(x => !string.IsNullOrWhiteSpace(x.ValueCode)).GroupBy(x => NormalizeCode(x.ValueCode)).Any(x => x.Count() > 1))
-            throw new RiskConfigurationException("Value codes must be unique.");
-        var hasDefault = rows.Any(x => x.ValueCode == "DEFAULT");
-        if (factor.ValueType.ToUpperInvariant() is "NUMBER" or "NUMERIC")
+        if (rows.Count == 0)
         {
-            var ranges = rows.Where(x => x.ValueCode != "DEFAULT").OrderBy(x => x.MinimumValue).ToList();
-            decimal next = 0;
-            var complete = true;
-            var openEnd = false;
-            var step = factor.FactorCode == "RECEIVER_COUNT" ? 1m : 0.01m;
+            throw new RiskConfigurationException(
+                "At least one risk score must be configured.");
+        }
+
+
+        // Score validation.
+        if (rows.Any(x =>
+            x.Score < 0 ||
+            x.Score > 100))
+        {
+            throw new RiskConfigurationException(
+                "All scores must be between 0 and 100.");
+        }
+
+
+        // Duplicate ValueCode validation.
+        var duplicateCode =
+            rows
+                .Where(x =>
+                    !string.IsNullOrWhiteSpace(
+                        x.ValueCode))
+                .GroupBy(x =>
+                    NormalizeCode(
+                        x.ValueCode))
+                .Any(x =>
+                    x.Count() > 1);
+
+
+        if (duplicateCode)
+        {
+            throw new RiskConfigurationException(
+                "Value codes must be unique.");
+        }
+
+
+        var isNumeric =
+            factor.ValueType.Equals(
+                "NUMBER",
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            factor.ValueType.Equals(
+                "NUMERIC",
+                StringComparison.OrdinalIgnoreCase);
+
+
+        // ============================
+        // NUMERIC FACTOR
+        // ============================
+        if (isNumeric)
+        {
+            var ranges =
+                rows
+                    .Where(x =>
+                        !string.Equals(
+                            x.ValueCode,
+                            "DEFAULT",
+                            StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(x =>
+                        x.MinimumValue)
+                    .ToList();
+
+
+            decimal? previousMaximum =
+                null;
+
+
             foreach (var row in ranges)
             {
-                if (openEnd || row.MinimumValue is null || row.MinimumValue < next || row.MaximumValue < row.MinimumValue)
-                    throw new RiskConfigurationException("Numeric ranges overlap or are invalid. Correct the draft before activation.");
-                if (row.MinimumValue != next) complete = false;
-                openEnd = row.MaximumValue is null;
-                next = (row.MaximumValue ?? 0) + step;
+                if (!row.MinimumValue.HasValue)
+                {
+                    throw new RiskConfigurationException(
+                        "Enter a minimum value for every numeric range.");
+                }
+
+
+                if (row.MinimumValue.Value < 0)
+                {
+                    throw new RiskConfigurationException(
+                        "Minimum value cannot be negative.");
+                }
+
+
+                if (row.MaximumValue.HasValue &&
+                    row.MaximumValue.Value <
+                    row.MinimumValue.Value)
+                {
+                    throw new RiskConfigurationException(
+                        "Maximum value cannot be less than minimum value.");
+                }
+
+
+                if (previousMaximum.HasValue &&
+                    row.MinimumValue.Value <=
+                    previousMaximum.Value)
+                {
+                    throw new RiskConfigurationException(
+                        "Numeric ranges must not overlap.");
+                }
+
+
+                previousMaximum =
+                    row.MaximumValue;
             }
-            if (!hasDefault && (!complete || !openEnd))
-                throw new RiskConfigurationException("Cover all non-negative amounts/counts or add a DEFAULT rule for unmatched values.");
+
+
+            // DEFAULT is optional.
+            return;
         }
-        else if (!hasDefault && !(factor.FactorCode == "CUSTOMER_PEP" &&
-                 rows.Any(x => x.ValueCode == "YES") && rows.Any(x => x.ValueCode == "NO")))
-            throw new RiskConfigurationException("Add a DEFAULT rule to handle values not listed here.");
+
+
+        // ============================
+        // PEP
+        // ============================
+        if (string.Equals(
+            factor.FactorCode,
+            "CUSTOMER_PEP",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            var hasYes =
+                rows.Any(x =>
+                    NormalizeCode(
+                        x.ValueCode)
+                    == "YES");
+
+
+            var hasNo =
+                rows.Any(x =>
+                    NormalizeCode(
+                        x.ValueCode)
+                    == "NO");
+
+
+            if (!hasYes || !hasNo)
+            {
+                throw new RiskConfigurationException(
+                    "PEP scoring must contain both YES and NO.");
+            }
+        }
+
+
+        // ============================
+        // TEXT FACTORS
+        // ============================
+        //
+        // OCCUPATION
+        // SOURCE_OF_FUNDS
+        // PURPOSE
+        // RECEIVING_COUNTRY
+        // RELATIONSHIP
+        //
+        // DEFAULT IS OPTIONAL.
     }
 
-    private async Task<(List<RiskBand> Rows, RiskBand? Target, int Version)> BandDraftAsync(
-        int id, byte[] token, CancellationToken ct)
+    private async Task<(
+      List<RiskBand> Rows,
+      RiskBand? Target,
+      int Version)>
+      BandDraftAsync(
+          int id,
+          byte[] token,
+          CancellationToken cancellationToken)
     {
-        var version = await BandHistory().MaxAsync(x => (int?)x.BandVersion, ct) ?? 0;
-        var rows = await BandHistory().Where(x => x.BandVersion == version).ToListAsync(ct);
-        var target = rows.SingleOrDefault(x => x.Id == id && x.DeleteFg == "N");
-        if (id != 0)
+        // 1. Get latest band version.
+        var version =
+            await BandHistory()
+                .MaxAsync(
+                    x => (int?)x.BandVersion,
+                    cancellationToken)
+            ?? 0;
+
+
+        // 2. Get bands from latest version.
+        var rows =
+            await BandHistory()
+                .Where(x =>
+                    x.BandVersion == version)
+                .ToListAsync(
+                    cancellationToken);
+
+
+        // 3. Find requested band when editing.
+        var target =
+            id > 0
+                ? rows.FirstOrDefault(x =>
+                    x.Id == id &&
+                    x.DeleteFg == "N")
+                : null;
+
+
+        if (id > 0)
         {
-            if (target is null) throw new RiskConfigurationException("This band is no longer current. Reload the list.");
-            CheckToken(target, token);
-        }
-        if (rows.Count > 0 && rows.All(x => x.ApprovalStatus is "DRAFT" or "PENDING"))
-        {
-            EnsureDraftMaker(rows.Select(x => x.MakerUserId));
-            return (rows, target, version);
-        }
-        var copies = new List<RiskBand>();
-        RiskBand? copyTarget = null;
-        foreach (var row in rows.Where(x => x.DeleteFg == "N" && x.IsActive))
-        {
-            var copy = new RiskBand
+            if (target == null)
             {
-                PartnerId = _currentUser.PartnerId,
-                RiskLevel = row.RiskLevel,
-                MinimumScore = row.MinimumScore,
-                MaximumScore = row.MaximumScore,
-                Decision = row.Decision,
-                Remarks = row.Remarks,
-                BandVersion = version + 1,
-                CreatedBy = _currentUser.Username,
-                ApprovalStatus = "PENDING",
-                IsActive = false,
-                MakerUserId = _currentUser.UserId
-            };
-            _db.RiskBands.Add(copy);
-            copies.Add(copy);
-            if (row == target) copyTarget = copy;
+                throw new RiskConfigurationException(
+                    "This band is no longer current. Reload the list.");
+            }
+
+            CheckToken(
+                target,
+                token);
         }
-        return (copies, copyTarget, version + 1);
+
+
+        // 4. If latest version is already pending,
+        // continue editing the same pending version.
+        var hasPendingDraft =
+            rows.Count > 0 &&
+            rows.All(x =>
+                IsPending(
+                    x.ApprovalStatus));
+
+
+        if (hasPendingDraft)
+        {
+            EnsureDraftMaker(
+                rows.Select(x =>
+                    x.MakerUserId));
+
+            return (
+                rows,
+                target,
+                version);
+        }
+
+
+        // 5. Otherwise create next pending version
+        // from currently active approved bands.
+        var newVersion =
+            version + 1;
+
+        var copies =
+            new List<RiskBand>();
+
+        RiskBand? copyTarget =
+            null;
+
+
+        foreach (var current in rows.Where(x =>
+                     x.DeleteFg == "N" &&
+                     x.IsActive))
+        {
+            var copy =
+                CreateBandCopy(
+                    current,
+                    newVersion);
+
+            _db.RiskBands.Add(
+                copy);
+
+            copies.Add(
+                copy);
+
+
+            if (current.Id == id)
+            {
+                copyTarget =
+                    copy;
+            }
+        }
+
+
+        return (
+            copies,
+            copyTarget,
+            newVersion);
     }
 
-    public Task SaveBandAsync(RiskBandInput input, CancellationToken cancellationToken = default) =>
-        ChangeConfigurationAsync(async () =>
-        {
-            var level = (input.RiskLevel ?? string.Empty).Trim().ToUpperInvariant();
-            var decision = (input.Decision ?? string.Empty).Trim().ToUpperInvariant();
-            if (input.Id < 0 || string.IsNullOrEmpty(level) || level.Length > 20 || input.Remarks?.Length > 1000 ||
-                input.MinimumScore is < 0 or > 100 || input.MaximumScore is < 0 or > 100 ||
-                input.MaximumScore < input.MinimumScore || decision is not ("ALLOW" or "REVIEW" or "BLOCK"))
-                throw new RiskConfigurationException("Enter a risk level, a range within 0–100, and ALLOW, REVIEW or BLOCK.");
-            var draft = await BandDraftAsync(input.Id, input.RowVersion, cancellationToken);
-            if (draft.Rows.Any(x => x != draft.Target && x.DeleteFg == "N" && x.RiskLevel.Equals(level, StringComparison.OrdinalIgnoreCase)))
-                throw new RiskConfigurationException("This risk level already exists in the draft.");
-            var row = draft.Target ?? new RiskBand
+    public async Task SaveBandAsync(
+     RiskBandInput input,
+     CancellationToken cancellationToken = default)
+    {
+        await ChangeConfigurationAsync(
+            async () =>
             {
-                PartnerId = _currentUser.PartnerId,
-                BandVersion = draft.Version,
-                CreatedBy = _currentUser.Username,
-                MakerUserId = _currentUser.UserId,
-                ApprovalStatus = "PENDING",
-                IsActive = false
-            };
-            if (draft.Target is null) _db.RiskBands.Add(row);
-            row.ApprovalStatus = "PENDING";
-            row.RiskLevel = level;
-            row.MinimumScore = input.MinimumScore;
-            row.MaximumScore = input.MaximumScore;
-            row.Decision = decision;
-            row.Remarks = input.Remarks?.Trim();
-            Stamp(row);
-            await _db.SaveChangesAsync(cancellationToken);
-            AddAudit(input.Id == 0 ? "Create" : "Update", "RiskBand", row.Id,
-                $"Draft v{draft.Version}: {level}, {row.MinimumScore}–{row.MaximumScore ?? 100}, {decision}.");
-        }, cancellationToken, AppPermissions.RiskScoreSetup.Manage);
+                var level =
+                    (input.RiskLevel ?? string.Empty)
+                        .Trim()
+                        .ToUpperInvariant();
+
+                var decision =
+                    (input.Decision ?? string.Empty)
+                        .Trim()
+                        .ToUpperInvariant();
+
+
+                // 1. Validate input.
+                ValidateBandInput(
+                    input,
+                    level,
+                    decision);
+
+
+                // 2. Get/create pending version.
+                var draft =
+                    await BandDraftAsync(
+                        input.Id,
+                        input.RowVersion,
+                        cancellationToken);
+
+
+                // 3. Prevent duplicate risk level.
+                var duplicate =
+                    draft.Rows.Any(x =>
+                        x != draft.Target &&
+                        x.DeleteFg == "N" &&
+                        x.RiskLevel.Equals(
+                            level,
+                            StringComparison.OrdinalIgnoreCase));
+
+
+                if (duplicate)
+                {
+                    throw new RiskConfigurationException(
+                        "This risk level already exists in the draft.");
+                }
+
+
+                // 4. Update existing pending band
+                // or create new pending band.
+                var row =
+                    draft.Target
+                    ?? new RiskBand
+                    {
+                        PartnerId =
+                            _currentUser.PartnerId,
+
+                        BandVersion =
+                            draft.Version,
+
+                        CreatedBy =
+                            _currentUser.Username,
+
+                        MakerUserId =
+                            _currentUser.UserId,
+
+                        ApprovalStatus =
+                            "PENDING",
+
+                        IsActive =
+                            false
+                    };
+
+
+                if (draft.Target == null)
+                {
+                    _db.RiskBands.Add(
+                        row);
+                }
+
+
+                // 5. Set values.
+                row.RiskLevel =
+                    level;
+
+                row.MinimumScore =
+                    input.MinimumScore;
+
+                row.MaximumScore =
+                    input.MaximumScore;
+
+                row.Decision =
+                    decision;
+
+                row.Remarks =
+                    input.Remarks?.Trim();
+
+                row.ApprovalStatus =
+                    "PENDING";
+
+                row.IsActive =
+                    false;
+
+
+                Stamp(
+                    row);
+
+
+                // 6. Save.
+                await _db.SaveChangesAsync(
+                    cancellationToken);
+
+
+                // 7. Audit.
+                AddAudit(
+                    input.Id == 0
+                        ? "Create"
+                        : "Update",
+                    "RiskBand",
+                    row.Id,
+                    $"Draft v{draft.Version}: " +
+                    $"{level}, " +
+                    $"{row.MinimumScore}–{row.MaximumScore}, " +
+                    $"{decision}.");
+            },
+            cancellationToken,
+            AppPermissions.RiskScoreSetup.Manage);
+    }
 
     public Task DeleteBandAsync(int id, byte[] rowVersion, CancellationToken cancellationToken = default) =>
         ChangeConfigurationAsync(async () =>
@@ -579,5 +878,106 @@ public sealed partial class RiskScoringService
         },
         cancellationToken,
         AppPermissions.RiskScoreSetup.Manage);
+
+    private RiskBand CreateBandCopy(
+    RiskBand source,
+    int version)
+    {
+        return new RiskBand
+        {
+            PartnerId =
+                _currentUser.PartnerId,
+
+            RiskLevel =
+                source.RiskLevel,
+
+            MinimumScore =
+                source.MinimumScore,
+
+            MaximumScore =
+                source.MaximumScore,
+
+            Decision =
+                source.Decision,
+
+            Remarks =
+                source.Remarks,
+
+            BandVersion =
+                version,
+
+            CreatedBy =
+                _currentUser.Username,
+
+            MakerUserId =
+                _currentUser.UserId,
+
+            ApprovalStatus =
+                "PENDING",
+
+            IsActive =
+                false
+        };
+    }
+    private static void ValidateBandInput(
+    RiskBandInput input,
+    string level,
+    string decision)
+    {
+        if (input.Id < 0)
+        {
+            throw new RiskConfigurationException(
+                "Invalid risk band.");
+        }
+
+
+        if (string.IsNullOrWhiteSpace(level) ||
+            level.Length > 20)
+        {
+            throw new RiskConfigurationException(
+                "Enter a valid risk level.");
+        }
+
+
+        if (input.Remarks?.Length > 1000)
+        {
+            throw new RiskConfigurationException(
+                "Remarks cannot exceed 1000 characters.");
+        }
+
+
+        if (input.MinimumScore < 0 ||
+            input.MinimumScore > 100)
+        {
+            throw new RiskConfigurationException(
+                "Minimum score must be between 0 and 100.");
+        }
+
+
+        if (input.MaximumScore.HasValue &&
+            (input.MaximumScore < 0 ||
+             input.MaximumScore > 100))
+        {
+            throw new RiskConfigurationException(
+                "Maximum score must be between 0 and 100.");
+        }
+
+
+        if (input.MaximumScore.HasValue &&
+            input.MaximumScore <
+            input.MinimumScore)
+        {
+            throw new RiskConfigurationException(
+                "Maximum score cannot be less than minimum score.");
+        }
+
+
+        if (decision is not
+            ("ALLOW" or "REVIEW" or "BLOCK"))
+        {
+            throw new RiskConfigurationException(
+                "Decision must be ALLOW, REVIEW or BLOCK.");
+        }
+    }
 
 }

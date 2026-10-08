@@ -1,8 +1,5 @@
 ﻿using AmlScreening.Domain.Common;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Text;
 
 namespace AmlScreening.Domain.Entities
 {
@@ -41,6 +38,19 @@ namespace AmlScreening.Domain.Entities
 
         public DateTime? SourceUpdatedDate { get; set; }
         public bool IsGlobal { get; set; }
+
+        public string? Aliases { get; set; }
+
+        public string? Occupation { get; set; }
+
+        public string? Position { get; set; }
+
+        public string? PoliticalParties { get; set; }
+
+        public string? SocialMediaLinks { get; set; }
+
+        public string? Description { get; set; }
+        public string? Gender { get; set; }
 
         public void Activate()
         {

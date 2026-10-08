@@ -1,47 +1,139 @@
 @model AmlScreening.Portal.ViewModels.RiskScoreSetupEditViewModel
-@{ ViewData["Title"] = "Edit Risk Ranges"; }
-@section Styles {
-    <link rel="stylesheet" href="~/css/workflow.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/risk-scoring.css" asp-append-version="true" />
+
+@{
+    ViewData["Title"] = "Edit Risk Ranges";
 }
+
+@section Styles {
+    <link rel="stylesheet"
+          href="~/css/workflow.css"
+          asp-append-version="true" />
+
+    <link rel="stylesheet"
+          href="~/css/risk-scoring.css"
+          asp-append-version="true" />
+}
+
 <section class="workflow-heading">
-    <div><h1>Edit risk ranges</h1><p>Cover 0–100 without gaps or overlaps. Changes remain Pending until another administrator approves.</p></div>
+    <div>
+        <h1>Define risk ranges</h1>
+        <p>
+            Set the score boundaries for each risk level.
+            The total score scale is 0–100.
+        </p>
+    </div>
 </section>
+
 <section class="workflow-panel">
-    @if (Model.Bands.All(x => x.Id == 0))
-    {
-        <p class="risk-review-notice">Initial proposed ranges are shown for review, not active settings. Confirm the boundaries and decisions before saving.</p>
-    }
-    <form asp-controller="RiskScoreSetup" asp-action="Edit" method="post">
+    <p class="risk-review-notice">
+        Start the first range at <strong>0</strong>.
+        Each next range starts immediately after the previous one.
+        End the final range at <strong>100</strong>.
+    </p>
+
+    <form asp-controller="RiskScoreSetup"
+          asp-action="Edit"
+          method="post">
+
         @Html.AntiForgeryToken()
-        <div asp-validation-summary="All" class="workflow-message error"></div>
+
+        <div asp-validation-summary="All"
+             class="workflow-message error"
+             role="alert"></div>
+
         <div class="table-responsive">
             <table class="workflow-table risk-simple-table risk-range-form">
-                <thead><tr><th>Risk type</th><th>From</th><th>To</th><th>Decision</th><th>Remarks</th></tr></thead>
-                <tbody>
-                @for (var i = 0; i < Model.Bands.Count; i++)
-                {
+                <thead>
                     <tr>
-                        <td>
-                            @Model.Bands[i].RiskLevel
-                            <input asp-for="Bands[i].Id" type="hidden" />
-                            <input asp-for="Bands[i].RiskLevel" type="hidden" />
-                            <input asp-for="Bands[i].Decision" type="hidden" />
-                            <input asp-for="Bands[i].RowVersion" type="hidden" />
-                        </td>
-                        <td><input asp-for="Bands[i].MinimumScore" type="number" min="0" max="100" aria-label="Minimum score" /></td>
-                        <td><input asp-for="Bands[i].MaximumScore" type="number" min="0" max="100" placeholder="100" aria-label="Maximum score" /></td>
-                        <td>@Model.Bands[i].Decision</td>
-                        <td><input asp-for="Bands[i].Remarks" maxlength="1000" aria-label="Remarks" /></td>
+                        <th>Risk level</th>
+                        <th>From</th>
+                        <th>To</th>
+                        <th>Decision</th>
+                        <th>Remarks</th>
                     </tr>
-                }
+                </thead>
+
+                <tbody>
+                    @for (var i = 0; i < Model.Bands.Count; i++)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@Model.Bands[i].RiskLevel</strong>
+
+                                <input asp-for="Bands[i].Id"
+                                       type="hidden" />
+
+                                <input asp-for="Bands[i].RiskLevel"
+                                       type="hidden" />
+
+                                <input asp-for="Bands[i].Decision"
+                                       type="hidden" />
+
+                                <input asp-for="Bands[i].RowVersion"
+                                       type="hidden" />
+                            </td>
+
+                            <td>
+                                <input asp-for="Bands[i].MinimumScore"
+                                       type="number"
+                                       min="0"
+                                       max="100"
+                                       step="1"
+                                       aria-label="@($"{Model.Bands[i].RiskLevel} from score")"
+                                       required />
+
+                                <span asp-validation-for="Bands[i].MinimumScore"
+                                      class="text-danger"></span>
+                            </td>
+
+                            <td>
+                                <input asp-for="Bands[i].MaximumScore"
+                                       type="number"
+                                       min="0"
+                                       max="100"
+                                       step="1"
+                                       aria-label="@($"{Model.Bands[i].RiskLevel} to score")"
+                                       required />
+
+                                <span asp-validation-for="Bands[i].MaximumScore"
+                                      class="text-danger"></span>
+                            </td>
+
+                            <td>@Model.Bands[i].Decision</td>
+
+                            <td>
+                                <input asp-for="Bands[i].Remarks"
+                                       maxlength="1000"
+                                       placeholder="Optional"
+                                       aria-label="@($"{Model.Bands[i].RiskLevel} remarks")" />
+
+                                <span asp-validation-for="Bands[i].Remarks"
+                                      class="text-danger"></span>
+                            </td>
+                        </tr>
+                    }
                 </tbody>
             </table>
         </div>
+
+        <p>
+            Changes remain pending until a different authorised
+            user approves them.
+        </p>
+
         <div class="workflow-form-actions">
-            <a asp-controller="RiskScoreSetup" asp-action="Index">Cancel</a>
-            <button class="workflow-primary" type="submit">Save pending ranges</button>
+            <a asp-controller="RiskScoreSetup"
+               asp-action="Index">
+                Cancel
+            </a>
+
+            <button type="submit" class="workflow-primary">
+                Save pending ranges
+            </button>
         </div>
     </form>
 </section>
-@section Scripts { <partial name="_ValidationScriptsPartial" /> }
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
