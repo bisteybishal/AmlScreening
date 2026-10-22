@@ -33,12 +33,12 @@ public class CustomerKycViewModel : IValidatableObject
     public string ScreeningType { get; set; } = string.Empty;
 
 
-    [Required]
+    //[Required]
     [StringLength(150)]
     public string Occupation { get; set; } = string.Empty;
 
 
-    [Required]
+    //[Required]
     [StringLength(150)]
     [Display(Name = "Source of funds")]
     public string SourceOfFunds { get; set; } = string.Empty;
@@ -56,6 +56,7 @@ public class CustomerKycViewModel : IValidatableObject
 
 
     public CustomerKycResult? Result { get; set; }
+    public string? ScreeningMessage { get; set; }
 
 
     public IEnumerable<ValidationResult> Validate(
@@ -147,6 +148,6 @@ public class KycMatchEvidence
 
     public decimal MatchPercent { get; set; }
 
-    public string MatchStatus { get; set; }
-        = string.Empty;
+    public string MatchStatus { get; set; }= string.Empty;
+    public string NameMatchStatus { get; set; }= string.Empty;
 }

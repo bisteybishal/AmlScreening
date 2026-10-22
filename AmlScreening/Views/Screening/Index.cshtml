@@ -2,77 +2,133 @@
     ViewData["Title"] = "Screening";
 }
 
-@section Styles {
+@section Styles
+{
     <link rel="stylesheet"
           href="~/css/screening.css"
           asp-append-version="true" />
 }
 
-<section class="screening-hero">
-    <div class="screening-eyebrow">
-        AML NAME LOOKUP
-    </div>
 
-    <h1>
-        Start with a name.<br />
-        <span>Search your AML records.</span>
-    </h1>
+<div class="screening-page">
 
-    <p class="screening-intro">
-        Type one name to see matching records automatically.
-        Separate multiple names with commas and click Search.
-    </p>
+    <section class="screening-shell">
 
-    <form id="screening-search-form"
-          asp-controller="Screening"
-          asp-action="Search"
-          data-multiple-url="@Url.Action("SearchMultiple", "Screening")"
-          method="post"
-          class="screening-form"
-          role="search">
+        <!-- =========================================
+             SEARCH AREA
+             ========================================= -->
 
-        <label for="screening-name" class="screening-label">
-            Individual or company names
-        </label>
+        <div class="screening-hero">
 
-        <div class="screening-search">
-            <i class="bi bi-search" aria-hidden="true"></i>
+            <div class="screening-eyebrow">
+                AML SCREENING
+            </div>
 
-            <input id="screening-name"
-                   name="name"
-                   type="search"
-                   placeholder="Type a name, or separate names with commas"
-                   autocomplete="off"
-                   maxlength="5000"
-                   aria-controls="screening-results"
-                   aria-describedby="screening-help screening-status" />
 
-            <button type="submit">
-                Search
-            </button>
+            <h1>
+                Start with a name.
+                <span>
+                    Search your AML records.
+                </span>
+            </h1>
+
+
+            <p class="screening-intro">
+                Type one name to see matching records automatically.
+                <br />
+                Separate multiple names with commas and click Search.
+            </p>
+
+
+            <form id="screening-search-form"
+                  asp-controller="Screening"
+                  asp-action="Search"
+                  data-multiple-url="@Url.Action("SearchMultiple", "Screening")"
+                  method="post"
+                  class="screening-form"
+                  role="search">
+
+                @Html.AntiForgeryToken()
+
+
+                <label for="screening-name"
+                       class="screening-label">
+
+                    Individual or company names
+
+                </label>
+
+
+                <div class="screening-search">
+
+                    <i class="bi bi-search"
+                       aria-hidden="true">
+                    </i>
+
+
+                    <input id="screening-name"
+                           name="name"
+                           type="search"
+                           placeholder="Search name"
+                           autocomplete="off"
+                           maxlength="5000"
+                           aria-controls="screening-results"
+                           aria-describedby="screening-status" />
+
+
+                    <button type="submit">
+
+                        Search
+
+                        <i class="bi bi-arrow-right"
+                           aria-hidden="true">
+                        </i>
+
+                    </button>
+
+                </div>
+
+            </form>
+
+
+            <p class="screening-note">
+                Name matches require review and do not confirm identity.
+            </p>
+
         </div>
 
-     @*    <p id="screening-help" class="screening-note">
-            Example: sunil lamsal,bishal bista.
-            Maximum 20 names, with 200 characters per name.
-        </p> *@
-    </form>
 
-    <p class="screening-note">
-        Name matches require review and do not confirm identity.
-    </p>
-</section>
+        <!-- =========================================
+             STATUS
+             ========================================= -->
 
-<p id="screening-status"
-   class="live-search-status"
-   role="status"
-   aria-live="polite">
-    Type a name to start.
-</p>
+        <p id="screening-status"
+           class="live-search-status"
+           role="status"
+           aria-live="polite">
 
-<div id="screening-results" aria-busy="false"></div>
+            Type a name to start.
 
-@section Scripts {
+        </p>
+
+
+        <!-- =========================================
+             RESULT
+             ========================================= -->
+
+        <div id="screening-results"
+             class="screening-results-area"
+             aria-busy="false">
+        </div>
+
+    </section>
+
+</div>
+
+
+@section Scripts
+{
     <script src="~/js/screening.js"
-            asp-append-version="true"></script>
+            asp-append-version="true">
+    </script>
 }

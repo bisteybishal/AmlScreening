@@ -127,31 +127,69 @@ public class CustomerKycService
                     "Too many matches. Enter a more complete name.");
             }
 
+            // =================================================
+            // 4. FIRST CHECK NAME SIMILARITY
+            // =================================================
+
+            var nameCandidates = candidates.Select(candidate =>
+            new
+            {
+                candidate = candidate,
+                NamePercent = GetNamePercent(model.FullName, candidate)
+            }).ToList();
+
+            // =====================================================
+            // 5. NAME MUST PASS CONFIGURED THRESHOLD
+            // =====================================================
+
+            var passedNameCandidates = nameCandidates.Where(x => x.NamePercent >= settings.NameMatchPercent).ToList();
+            if (passedNameCandidates.Count == 0)
+            {
+                log.MatchCount =
+                    0;
+
+                log.HighestMatchPercent =
+                    nameCandidates.Count == 0
+                        ? 0
+                        : nameCandidates.Max(
+                            x => x.NamePercent);
+
+                log.Status =
+                    "COMPLETED_NO_NAME";
+
+                log.CompletedDate =
+                    DateTime.UtcNow;
+
+
+                await _dbContext.SaveChangesAsync(
+                    cancellationToken);
+
+
+                throw new ArgumentException(
+                    $"No AML name matched the minimum " +
+                    $"{settings.NameMatchPercent:0.##}% " +
+                    "name similarity. " +
+                    "Risk score was not calculated.");
+            }
+
+
 
             // =================================================
-            // 4. CALCULATE MATCH PERCENT
-            // =================================================
-
-            var allEvidence =
-                candidates
-                    .Select(x =>
-                        CalculateMatch(
-                            model,
-                            x,
-                            settings))
-                    .ToList();
-
-
-            // =================================================
-            // 5. KEEP ONLY RECORDS ABOVE REVIEW THRESHOLD
+            // 6. NAME PASSED - CALCULATE OTHER FIELDS
             // =================================================
 
             var matchedEvidence =
-                allEvidence
-                    .Where(x =>
-                        x.MatchPercent >=
-                        settings.ReviewThreshold)
+                passedNameCandidates
+                    .Select(x =>
+                        CalculateMatch(
+                            model,
+                            x.candidate,
+                            settings,
+                            x.NamePercent))
                     .ToList();
+
+
+
 
 
             var matchedIds =
@@ -167,6 +205,7 @@ public class CustomerKycService
                         matchedIds.Contains(
                             x.Id))
                     .ToList();
+
 
 
             // =================================================
@@ -300,9 +339,9 @@ public class CustomerKycService
 
 
             log.HighestMatchPercent =
-                allEvidence.Count == 0
+                matchedEvidence.Count == 0
                     ? 0
-                    : allEvidence.Max(
+                    : matchedEvidence.Max(
                         x => x.MatchPercent);
 
 
@@ -384,26 +423,20 @@ public class CustomerKycService
         }
         catch
         {
-            // =================================================
-            // KYC PROCESSING FAILED
-            // =================================================
-
-            log.Status =
-                "FAILED";
-
-
-            log.CompletedDate =
-                DateTime.UtcNow;
-
-
-            try
+            if (log.Status == "PROCESSING")
             {
-                await _dbContext.SaveChangesAsync(
-                    CancellationToken.None);
-            }
-            catch
-            {
-                // Do not hide the original KYC exception.
+                log.Status = "FAILED";
+                log.CompletedDate = DateTime.UtcNow;
+
+
+                try
+                {
+                    await _dbContext.SaveChangesAsync(CancellationToken.None);
+                }
+                catch
+                {
+                    // Keep original exception.
+                }
             }
 
 
@@ -507,11 +540,11 @@ public class CustomerKycService
         }
 
 
-        if (settings.ReviewThreshold < 0 ||
-            settings.ReviewThreshold > 100)
+        if (settings.NameMatchPercent < 0 ||
+            settings.NameMatchPercent > 100)
         {
             throw new InvalidOperationException(
-                "KYC review threshold is invalid.");
+               "Name match threshold must be between 0 and 100.");
         }
 
 
@@ -542,22 +575,17 @@ public class CustomerKycService
     private static KycMatchEvidence CalculateMatch(
         CustomerKycViewModel customer,
         AmlRecord aml,
-        KycMatchSetting settings)
+        KycMatchSetting settings,
+        decimal namePercent)
     {
-        var namePercent =
-            GetNamePercent(
-                customer.FullName,
-                aml);
-
-
         var dobMatched =
-            customer.DateOfBirth.HasValue
-            &&
-            aml.DateOfBirth.HasValue
-            &&
-            customer.DateOfBirth.Value.Date
-            ==
-            aml.DateOfBirth.Value.Date;
+      customer.DateOfBirth.HasValue
+      &&
+      aml.DateOfBirth.HasValue
+      &&
+      customer.DateOfBirth.Value.Date
+      ==
+      aml.DateOfBirth.Value.Date;
 
 
         var countryMatched =
@@ -659,8 +687,12 @@ public class CustomerKycService
             MatchPercent =
                 matchPercent,
 
-            MatchStatus =
-                matchStatus
+            MatchStatus = matchStatus,
+            NameMatchStatus =
+        namePercent >= 100
+            ? "EXACT_NAME"
+            : "FUZZY_NAME"
+
         };
     }
 
@@ -673,58 +705,24 @@ public class CustomerKycService
         string customerName,
         AmlRecord aml)
     {
-        var customer =
-            AmlNameNormalizer.Normalize(
-                customerName);
+        string customer = AmlNameNormalizer.Normalize(customerName);
+        string amlName = AmlNameNormalizer.Normalize(aml.FullName);
 
-
-        var amlName =
-            AmlNameNormalizer.Normalize(
-                aml.FullName);
-
-
-        // Exact full name
+        if (customer.Length == 0 || amlName.Length == 0)
+        {
+            return 0;
+        }
+        // Exact
         if (customer == amlName)
         {
             return 100;
         }
+        // Fuzzy
+        var distance = GetLevenshteinDistance(customer, amlName);
+        var totalLength = customer.Length + amlName.Length;
 
-
-        // Exact alias
-        if (!string.IsNullOrWhiteSpace(
-                aml.Aliases))
-        {
-            var aliases =
-                aml.Aliases.Split(
-                    ';',
-                    StringSplitOptions.RemoveEmptyEntries);
-
-
-            foreach (var alias in aliases)
-            {
-                var normalizedAlias =
-                    AmlNameNormalizer.Normalize(
-                        alias);
-
-
-                if (customer ==
-                    normalizedAlias)
-                {
-                    return 100;
-                }
-            }
-        }
-
-
-        // Simple partial name match
-        if (amlName.Contains(customer) ||
-            customer.Contains(amlName))
-        {
-            return 80;
-        }
-
-
-        return 0;
+        decimal percentage = ((decimal)(totalLength - distance) / totalLength) * 100;
+        return Math.Round(percentage, 2);
     }
 
 
@@ -732,9 +730,7 @@ public class CustomerKycService
     // TEXT COMPARISON
     // =========================================================
 
-    private static bool Same(
-        string? first,
-        string? second)
+    private static bool Same(string? first, string? second)
     {
         if (string.IsNullOrWhiteSpace(first) ||
             string.IsNullOrWhiteSpace(second))
@@ -748,9 +744,63 @@ public class CustomerKycService
             second.Trim(),
             StringComparison.OrdinalIgnoreCase);
     }
+
+    private static int GetLevenshteinDistance(
+        string first,
+        string second)
+    {
+        var matrix =
+            new int[
+                first.Length + 1,
+                second.Length + 1];
+
+
+        for (var i = 0;
+             i <= first.Length;
+             i++)
+        {
+            matrix[i, 0] = i;
+        }
+
+
+        for (var j = 0;
+             j <= second.Length;
+             j++)
+        {
+            matrix[0, j] = j;
+        }
+
+
+        for (var i = 1;
+             i <= first.Length;
+             i++)
+        {
+            for (var j = 1;
+                 j <= second.Length;
+                 j++)
+            {
+                var cost =
+                    first[i - 1] ==
+                    second[j - 1]
+                        ? 0
+                        : 1;
+
+
+                matrix[i, j] =
+                    Math.Min(
+                        Math.Min(
+                            matrix[i - 1, j] + 1,
+                            matrix[i, j - 1] + 1),
+                        matrix[i - 1, j - 1] + cost);
+            }
+        }
+
+
+        return matrix[
+            first.Length,
+            second.Length];
+    }
 }
-
-
 // =============================================================
 // RISK SP RESULT
 // =============================================================

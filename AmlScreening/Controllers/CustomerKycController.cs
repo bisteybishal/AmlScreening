@@ -52,6 +52,13 @@ namespace AmlScreening.Portal.Controllers
                 return View(model);
             }
         }
+
+        [HttpGet]
+        public IActionResult Screen()
+        {
+            return RedirectToAction(nameof(Index));
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Screen(
@@ -124,34 +131,34 @@ namespace AmlScreening.Portal.Controllers
                 // VALIDATE OCCUPATION
                 // ==========================================
 
-                if (!model.OccupationOptions.Any(
-                        x =>
-                            string.Equals(
-                                x.Value,
-                                model.Occupation,
-                                StringComparison.OrdinalIgnoreCase)))
-                {
-                    ModelState.AddModelError(
-                        nameof(model.Occupation),
-                        "Select a valid occupation.");
-                }
+                        //if (!model.OccupationOptions.Any(
+                        //        x =>
+                        //            string.Equals(
+                        //                x.Value,
+                        //                model.Occupation,
+                        //                StringComparison.OrdinalIgnoreCase)))
+                        //{
+                        //    ModelState.AddModelError(
+                        //        nameof(model.Occupation),
+                        //        "Select a valid occupation.");
+                        //}
 
 
                 // ==========================================
                 // VALIDATE SOURCE OF FUNDS
                 // ==========================================
 
-                if (!model.SourceOfFundsOptions.Any(
-                        x =>
-                            string.Equals(
-                                x.Value,
-                                model.SourceOfFunds,
-                                StringComparison.OrdinalIgnoreCase)))
-                {
-                    ModelState.AddModelError(
-                        nameof(model.SourceOfFunds),
-                        "Select a valid source of funds.");
-                }
+                            //if (!model.SourceOfFundsOptions.Any(
+                            //        x =>
+                            //            string.Equals(
+                            //                x.Value,
+                            //                model.SourceOfFunds,
+                            //                StringComparison.OrdinalIgnoreCase)))
+                            //{
+                            //    ModelState.AddModelError(
+                            //        nameof(model.SourceOfFunds),
+                            //        "Select a valid source of funds.");
+                            //}
 
 
                 if (!ModelState.IsValid)
@@ -167,17 +174,18 @@ namespace AmlScreening.Portal.Controllers
                         model,
                         cancellationToken);
             }
+
+            catch (ArgumentException ex)
+            {
+                model.Result = null;
+                model.ScreeningMessage = ex.Message;
+            }
             catch (OperationCanceledException)
                 when (cancellationToken.IsCancellationRequested)
             {
                 return new EmptyResult();
             }
-            catch (ArgumentException ex)
-            {
-                ModelState.AddModelError(
-                    string.Empty,
-                    ex.Message);
-            }
+          
             catch (Exception ex)
             {
                 model.Result =

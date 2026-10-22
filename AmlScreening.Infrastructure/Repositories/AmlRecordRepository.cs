@@ -245,12 +245,7 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
             throw new ArgumentException("AML record name is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(record.ReferenceNo) ||
-            string.IsNullOrWhiteSpace(record.SourceName))
-        {
-            throw new ArgumentException(
-                "Source and reference number are required.");
-        }
+        record.ReferenceNo= $"{record.SourceName.Trim().Replace(" ", "_").ToUpperInvariant()}- {DateTime.UtcNow.ToString("yyyyMMddHHmmssfff")}";
 
         // Ownership comes from the authenticated user.
         record.PartnerId = _currentUser.PartnerId;
@@ -422,7 +417,7 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
             // ScreeningType is only for filtering.
             .Where(x => x.IsActive && x.SourceName == source)
               // Find possible name candidates.
-              .Where(x => (x.NormalizedName != null && x.NormalizedName.Contains(normalizeName)) || (x.Aliases != null && x.Aliases.Contains(originalName)))
+              .Where(x => (x.NormalizedName != null && x.NormalizedName.Contains(normalizeName)) ||(x.FullName !=null && x.FullName.Contains(name)))
 
             .OrderBy(x => x.FullName)
             .ThenBy(x => x.Id)

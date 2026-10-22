@@ -1,1191 +1,549 @@
 ﻿@model AmlScreening.Portal.ViewModels.CustomerKycViewModel
-
 @using System.Globalization
-@using System.Linq
 
 @{
-    ViewData["Title"] = "Customer KYC";
+    ViewData["Title"] = "Customer Screening";
 
     var result = Model.Result;
+    var hasErrors = !ViewData.ModelState.IsValid;
+    var hasscreeingErrors = !string.IsNullOrWhiteSpace(Model.ScreeningMessage);
 
-
-    var riskClass =
-        result?.RiskLevel?
-            .Trim()
-            .ToUpperInvariant()
-        switch
-        {
-            "LOW" =>
-                "ckyc-risk-low",
-
-            "MEDIUM" =>
-                "ckyc-risk-medium",
-
-            "HIGH" =>
-                "ckyc-risk-high",
-
-            "CRITICAL" =>
-                "ckyc-risk-critical",
-
-            _ =>
-                "ckyc-risk-neutral"
-        };
-
-
-    var countryName =
-        Model.CountryOptions
-            .FirstOrDefault(
-                x => x.Value == Model.Country)
-            ?.Text
-        ?? Model.Country;
-
-
-    var genderName =
-        Model.GenderOptions
-            .FirstOrDefault(
-                x => x.Value == Model.Gender)
-            ?.Text
-        ?? Model.Gender;
-
-
-    var screeningTypeName =
-        Model.ScreeningTypeOptions
-            .FirstOrDefault(
-                x => x.Value == Model.ScreeningType)
-            ?.Text
-        ?? Model.ScreeningType;
-
-
-    var occupationName =
-        Model.OccupationOptions
-            .FirstOrDefault(
-                x => x.Value == Model.Occupation)
-            ?.Text
-        ?? Model.Occupation;
-
-
-    var sourceOfFundsName =
-        Model.SourceOfFundsOptions
-            .FirstOrDefault(
-                x => x.Value == Model.SourceOfFunds)
-            ?.Text
-        ?? Model.SourceOfFunds;
+    var riskClass = result?.RiskLevel?.Trim().ToUpperInvariant() switch
+    {
+        "LOW" => "risk-low",
+        "MEDIUM" => "risk-medium",
+        "HIGH" => "risk-high",
+        "CRITICAL" => "risk-critical",
+        _ => ""
+    };
 }
 
 
-@section Styles
-{
-    <link rel="stylesheet"
-          href="~/css/customer-kyc.css"
-          asp-append-version="true" />
-}
+        
+        <link rel="stylesheet" href="~/css/customer-kyc.css" asp-append-version="true" / >
 
 
-<div class="ckyc-page">
+<div class="screening-page">
 
-    <!-- ===================================================
-         PAGE HEADING
-         =================================================== -->
-
-    <header class="ckyc-heading">
-
-        <span class="ckyc-eyebrow">
-            CUSTOMER SCREENING
-        </span>
-
-        <h1>
-            Customer KYC
-        </h1>
-
-        <p>
-            Check AML records and assess customer risk.
-        </p>
-
+    <header class="screening-header">
+        <span class="screening-eyebrow">Customer Screening</span>
+       
     </header>
 
+    <div class="screening-layout">
 
-    <div class="ckyc-workspace">
-
-
-        <!-- ===================================================
-             LEFT SIDE - CUSTOMER FORM
-             =================================================== -->
-
-        <section class="ckyc-card ckyc-form-card"
-                 aria-labelledby="ckyc-form-title">
-
-
-            <div class="ckyc-card-heading">
-
-                <div>
-
-                    <h2 id="ckyc-form-title">
-                        Customer details
-                    </h2>
-
-                    <p>
-                        Enter the details below to run a check.
-                    </p>
-
-                </div>
-
-
-                <span class="ckyc-badge ckyc-badge-teal">
-                    KYC Check
+        <!-- CUSTOMER FORM -->
+        <section class="screening-card">
+            <div class="screening-card-heading">
+                <span class="screening-icon" aria-hidden="true">
+                    <i class="bi bi-person-vcard"></i>
                 </span>
-
+                <div>
+                    <h2>Customer Details</h2>
+                </div>
             </div>
 
-
-            <form asp-controller="CustomerKyc"
+            <form id="customerScreeningForm"
+                  asp-controller="CustomerKyc"
                   asp-action="Screen"
                   method="post"
-                  class="ckyc-form">
-
-
-                @Html.AntiForgeryToken()
-
+                  asp-antiforgery="true">
 
                 <div asp-validation-summary="ModelOnly"
-                     class="ckyc-validation"
-                     role="alert">
-                </div>
+                     class="screening-errors"
+                     role="alert"></div>
 
+                <div class="screening-fields">
 
-                <div class="ckyc-fields">
-
-
-                    <!-- =================================================
-                         FULL NAME
-                         ================================================= -->
-
-                    <div class="ckyc-field">
-
-                        <label asp-for="FullName">
-
-                            Full name
-
-                            <span class="ckyc-required">
-                                *
+                    <div class="screening-field">
+                        <label asp-for="FullName"
+                               class="screening-label">
+                            <span>
+                                Full name
+                                <span class="screening-required">*</span>
                             </span>
-
                         </label>
-
-
                         <input asp-for="FullName"
-                               class="ckyc-input"
-                               maxlength="200"
+                               class="screening-input"
                                placeholder="Enter full name"
-                               autocomplete="off"
+                               autocomplete="name"
                                required />
-
-
-                        <span asp-validation-for="FullName"
-                              class="ckyc-field-error">
-                        </span>
-
+                        <span asp-validation-for="FullName"></span>
                     </div>
 
-
-                    <!-- =================================================
-                         DATE OF BIRTH
-                         ================================================= -->
-
-                    <div class="ckyc-field">
-
-                        <label asp-for="DateOfBirth">
-
-                            Date of birth
-
-                            <small>
-                                Optional
-                            </small>
-
+                    <div class="screening-field">
+                        <label asp-for="DateOfBirth"
+                               class="screening-label">
+                            <span>Date of birth</span>
+                            <span class="screening-optional">Optional</span>
                         </label>
-
-
                         <input asp-for="DateOfBirth"
                                type="date"
-                               class="ckyc-input" />
-
-
-                        <span asp-validation-for="DateOfBirth"
-                              class="ckyc-field-error">
-                        </span>
-
+                               class="screening-input" />
+                        <span asp-validation-for="DateOfBirth"></span>
                     </div>
 
-
-                    <!-- =================================================
-                         COUNTRY
-                         ================================================= -->
-
-                    <div class="ckyc-field">
-
-                        <label asp-for="Country">
-
-                            Country
-
-                            <span class="ckyc-required">
-                                *
+                    <div class="screening-field">
+                        <label asp-for="Country"
+                               class="screening-label">
+                            <span>
+                                Country
+                                <span class="screening-required">*</span>
                             </span>
-
                         </label>
-
-
                         <select asp-for="Country"
                                 asp-items="Model.CountryOptions"
-                                class="ckyc-input"
+                                class="screening-input"
                                 required>
-
-                            <option value="">
-                                Select country
-                            </option>
-
+                            <option value="">Select country</option>
                         </select>
-
-
-                        <span asp-validation-for="Country"
-                              class="ckyc-field-error">
-                        </span>
-
+                        <span asp-validation-for="Country"></span>
                     </div>
 
-
-                    <!-- =================================================
-                         GENDER
-                         ================================================= -->
-
-                    <div class="ckyc-field">
-
-                        <label asp-for="Gender">
-
-                            Gender
-
-                            <span class="ckyc-required">
-                                *
+                    <div class="screening-field">
+                        <label asp-for="Gender"
+                               class="screening-label">
+                            <span>
+                                Gender
+                                <span class="screening-required">*</span>
                             </span>
-
                         </label>
-
-
                         <select asp-for="Gender"
                                 asp-items="Model.GenderOptions"
-                                class="ckyc-input"
+                                class="screening-input"
                                 required>
-
-                            <option value="">
-                                Select gender
-                            </option>
-
+                            <option value="">Select gender</option>
                         </select>
-
-
-                        <span asp-validation-for="Gender"
-                              class="ckyc-field-error">
-                        </span>
-
+                        <span asp-validation-for="Gender"></span>
                     </div>
 
-
-                    <!-- =================================================
-                         SCREENING TYPE
-                         ================================================= -->
-
-                    <div class="ckyc-field">
-
-                        <label asp-for="ScreeningType">
-
-                            Screening type
-
-                            <span class="ckyc-required">
-                                *
+                    <div class="screening-field">
+                        <label asp-for="ScreeningType"
+                               class="screening-label">
+                            <span>
+                                Screening type
+                                <span class="screening-required">*</span>
                             </span>
-
                         </label>
-
-
                         <select asp-for="ScreeningType"
                                 asp-items="Model.ScreeningTypeOptions"
-                                class="ckyc-input"
+                                class="screening-input"
                                 required>
-
-                            <option value="">
-                                Select screening type
-                            </option>
-
+                            <option value="">Select screening type</option>
                         </select>
-
-
-                        <span asp-validation-for="ScreeningType"
-                              class="ckyc-field-error">
-                        </span>
-
+                        <span asp-validation-for="ScreeningType"></span>
                     </div>
 
-
-                    <!-- =================================================
-                         OCCUPATION
-                         ================================================= -->
-
-                    <div class="ckyc-field">
-
-                        <label asp-for="Occupation">
-
-                            Occupation
-
-                            <span class="ckyc-required">
-                                *
+                    <div class="screening-field">
+                        <label asp-for="Occupation"
+                               class="screening-label">
+                            <span>
+                                Occupation
+                                <span class="screening-required"></span>
                             </span>
-
                         </label>
-
-
                         <select asp-for="Occupation"
                                 asp-items="Model.OccupationOptions"
-                                class="ckyc-input"
-                                required>
-
-                            <option value="">
-                                Select occupation
-                            </option>
-
+                                class="screening-input"
+                                >
+                            <option value="">Select occupation</option>
                         </select>
-
-
-                        <span asp-validation-for="Occupation"
-                              class="ckyc-field-error">
-                        </span>
-
+                        <span asp-validation-for="Occupation"></span>
                     </div>
 
-
-                    <!-- =================================================
-                         SOURCE OF FUNDS
-                         ================================================= -->
-
-                    <div class="ckyc-field">
-
-                        <label asp-for="SourceOfFunds">
-
-                            Source of funds
-
-                            <span class="ckyc-required">
-                                *
+                    <div class="screening-field">
+                        <label asp-for="SourceOfFunds"
+                               class="screening-label">
+                            <span>
+                                Source of funds
+                                <span class="screening-required"></span>
                             </span>
-
                         </label>
-
-
                         <select asp-for="SourceOfFunds"
                                 asp-items="Model.SourceOfFundsOptions"
-                                class="ckyc-input"
-                                required>
-
-                            <option value="">
-                                Select source of funds
-                            </option>
-
+                                class="screening-input"
+                                >
+                            <option value="">Select source of funds</option>
                         </select>
-
-
-                        <span asp-validation-for="SourceOfFunds"
-                              class="ckyc-field-error">
-                        </span>
-
+                        <span asp-validation-for="SourceOfFunds"></span>
                     </div>
 
                 </div>
 
-
-                <!-- =================================================
-                     FORM FOOTER
-                     ================================================= -->
-
-                <div class="ckyc-form-footer">
-
-
-                    <p class="ckyc-note">
-
-                        <i class="bi bi-info-circle"
-                           aria-hidden="true">
-                        </i>
-
-                        <span>
-                            Screening activity is recorded
-                            for audit and usage tracking.
+                <div class="screening-actions">
+                    <button id="screeningSubmit"
+                            type="submit"
+                            class="screening-submit">
+                        <i class="bi bi-search screening-search-icon"
+                           aria-hidden="true"></i>
+                        <span class="screening-busy-icon"
+                              aria-hidden="true"></span>
+                        <span id="screeningButtonText">
+                            Check PEP/Sanction
                         </span>
+                    </button>
 
-                    </p>
-
-
-                    <div class="ckyc-buttons">
-
-
-                        <button type="submit"
-                                class="ckyc-button ckyc-button-primary">
-
-                            <i class="bi bi-search"
-                               aria-hidden="true">
-                            </i>
-
-                            Check AML and Risk
-
-                        </button>
-
-
-                        <a asp-controller="CustomerKyc"
-                           asp-action="Index"
-                           class="ckyc-button ckyc-button-secondary">
-
-                            Clear
-
-                        </a>
-
-                    </div>
-
+                    <a asp-controller="CustomerKyc"
+                       asp-action="Index"
+                       class="screening-clear">
+                        Clear
+                    </a>
                 </div>
 
+                @* <p class="screening-note">
+                    <i class="bi bi-info-circle" aria-hidden="true"></i>
+                    <span>
+                        Screening activity is recorded for audit  and usage tracking.
+                    </span>
+                </p> *@
             </form>
-
         </section>
 
+        <!-- SCREENING RESULT -->
+        <section class="screening-card"
+                 id="screeningResult"
+                 aria-labelledby="screeningResultTitle">
 
-        <!-- ===================================================
-             RIGHT SIDE - RESULT
-             =================================================== -->
-
-        <section class="ckyc-card ckyc-result-card @riskClass"
-                 aria-labelledby="ckyc-result-title">
-
-
-            @if (result == null)
-            {
-                <!-- ===============================================
-                     NO RESULT YET
-                     =============================================== -->
-
-                <div class="ckyc-card-heading">
-
-                    <div>
-
-                        <h2 id="ckyc-result-title">
-                            Screening result
-                        </h2>
-
-                        <p>
-                            Your result will appear here.
-                        </p>
-
-                    </div>
-
-                </div>
-
-
-                <div class="ckyc-empty">
-
-                    <span class="ckyc-empty-icon">
-
-                        <i class="bi bi-person-check">
-                        </i>
-
-                    </span>
-
-
-                    @if (!ViewData.ModelState.IsValid)
-                    {
-                        <h3>
-                            Check not completed
-                        </h3>
-
-                        <p>
-                            Review the messages in the form
-                            and submit again.
-                        </p>
-                    }
-                    else
-                    {
-                        <h3>
-                            Ready when you are
-                        </h3>
-
-                        <p>
-                            Enter the customer details and select
-                            <strong>
-                                Check AML and Risk
-                            </strong>.
-                        </p>
-                    }
-
-                </div>
-
-
-                <p class="ckyc-result-notice">
-
-                    <i class="bi bi-info-circle">
-                    </i>
-
-                    <span>
-                        Results support compliance review.
-                        They do not confirm identity
-                        or provide clearance.
-                    </span>
-
-                </p>
-            }
-            else
-            {
-                var hasMatches =
-                    result.Matches.Count > 0;
-
-
-                <!-- ===============================================
-                     RESULT HEADING
-                     =============================================== -->
-
-                <div class="ckyc-card-heading">
-
-                    <div>
-
-                        <h2 id="ckyc-result-title">
-                            Screening result
-                        </h2>
-
-                        <p class="ckyc-customer-name">
-                            @Model.FullName
-                        </p>
-
-                    </div>
-
-
-                    <span class="ckyc-badge ckyc-risk-badge">
-
-                        Risk:
-                        @result.RiskLevel
-
-                    </span>
-
-                </div>
-
-
-                <!-- ===============================================
-                     RISK SCORE
-                     =============================================== -->
-
-                <div class="ckyc-score-section">
-
-                    <span class="ckyc-section-label">
-                        Calculated risk score
-                    </span>
-
-
-                    <div class="ckyc-score">
-
-                        <strong>
-                            @result.RiskScore.ToString("0.##")
-                        </strong>
-
-                    </div>
-
-
-                    <p class="ckyc-score-caption">
-
-                        Calculated using the configured
-                        AML risk model.
-
+            <div class="screening-card-heading">
+                <span class="screening-icon" aria-hidden="true">
+                    <i class="bi bi-shield-check"></i>
+                </span>
+                <div>
+                    <h2 id="screeningResultTitle">Screening Result</h2>
+                    <p>
+                        @(result == null
+                            ? "Your result will appear here."
+                            : Model.FullName)
                     </p>
-
                 </div>
+            </div>
+
+            <div id="screeningStatus" role="status" aria-live="polite">
+                @if (result == null)
+                {
+                    <div class="screening-empty">
+
+                        <span class="screening-empty-icon"
+                              aria-hidden="true">
+
+                            @if (hasscreeingErrors)
+                            {
+                                <i class="bi bi-exclamation-circle"></i>
+                            }
+                            else if (hasErrors)
+                            {
+                                <i class="bi bi-exclamation-circle"></i>
+                            }
+                            else
+                            {
+                                <i class="bi bi-shield-check"></i>
+                            }
+
+                        </span>
 
 
-                <!-- ===============================================
-                     AML MATCH RESULT
-                     =============================================== -->
-
-                <div class="ckyc-match-section">
-
-
-                    <h3>
-
-                        @if (hasMatches)
+                        @if (hasscreeingErrors)
                         {
-                            <text>
-                                Potential AML matches
-                            </text>
+                            <h3 id="screeningEmptyTitle">
+                                No AML name match
+                            </h3>
+
+                            <p id="screeningEmptyMessage">
+                                @Model.ScreeningMessage
+                            </p>
+                        }
+                        else if (hasErrors)
+                        {
+                            <h3 id="screeningEmptyTitle">
+                                Check not completed
+                            </h3>
+
+                            <p id="screeningEmptyMessage">
+                                Complete the required customer details
+                                and submit again.
+                            </p>
                         }
                         else
                         {
-                            <text>
-                                No AML match found
-                            </text>
+                            <h3 id="screeningEmptyTitle">
+                                Ready when you are
+                            </h3>
+
+                            <p id="screeningEmptyMessage">
+                                Enter customer details and select
+                                Check PEP/Sanction to start screening.
+                            </p>
                         }
 
-                    </h3>
+                    </div>
+                }
+            </div>
 
-
-                    @if (hasMatches)
-                    {
-                        <p>
-
-                            @result.Matches.Count
-
-                            @(result.Matches.Count == 1
-                                ? "potential match"
-                                : "potential matches")
-
-                            found.
-
-                            Review the match percentage
-                            and customer details below.
-
+            @if (result != null)
+            {
+                <div class="screening-risk">
+                    <div>
+                        <p class="screening-risk-label">
+                            Calculated risk score
                         </p>
-                    }
-                    else
-                    {
-                        <p>
-                            No AML record met the configured
-                            match threshold for this screening.
-                        </p>
-                    }
-
-
-                    <!-- ===========================================
-                         MATCHED SOURCES
-                         =========================================== -->
-                    @if (result.Sources.Count > 0)
-                    {
-                        <ul class="ckyc-source-list">
-
-                            @foreach (var source in result.Sources)
-                            {
-                                <li>
-                                    @source
-                                </li>
-                            }
-
-                        </ul>
-                    }
-
-
-                    <!-- ===========================================
-                         MATCH EVIDENCE
-                         =========================================== -->
-                    @if (result.MatchEvidence.Count > 0)
-                    {
-                        <div class="ckyc-evidence-list">
-
-
-                            @foreach (var evidence
-                                in result.MatchEvidence)
-                            {
-                                <article class="ckyc-evidence-card">
-
-
-                                    <h4>
-                                        @evidence.MatchedName
-                                    </h4>
-
-
-                                    <!-- MATCH PERCENT -->
-
-                                    <div class="ckyc-score-section">
-
-                                        <span class="ckyc-section-label">
-                                            Match percentage
-                                        </span>
-
-
-                                        <div class="ckyc-score">
-
-                                            <strong>
-                                                @evidence.MatchPercent.ToString("0.##")%
-                                            </strong>
-
-                                        </div>
-
-                                    </div>
-
-
-                                    <dl>
-
-
-                                        <!-- STATUS -->
-
-                                        <div>
-
-                                            <dt>
-                                                Match status
-                                            </dt>
-
-                                            <dd>
-                                                @evidence.MatchStatus
-                                            </dd>
-
-                                        </div>
-
-
-                                        <!-- SOURCE -->
-
-                                        <div>
-
-                                            <dt>
-                                                Source
-                                            </dt>
-
-                                            <dd>
-                                                @evidence.SourceName
-                                            </dd>
-
-                                        </div>
-
-
-                                        <!-- REFERENCE -->
-
-                                        <div>
-
-                                            <dt>
-                                                Reference
-                                            </dt>
-
-                                            <dd>
-
-                                                @(string.IsNullOrWhiteSpace(
-                                                    evidence.ReferenceNo)
-
-                                                    ? "Not provided"
-
-                                                    : evidence.ReferenceNo)
-
-                                            </dd>
-
-                                        </div>
-
-
-                                        <!-- NAME PERCENT -->
-
-                                        <div>
-
-                                            <dt>
-                                                Name match
-                                            </dt>
-
-                                            <dd>
-                                                @evidence.NameMatchPercent.ToString("0.##")%
-                                            </dd>
-
-                                        </div>
-
-
-                                        <!-- DOB -->
-
-                                        <div>
-
-                                            <dt>
-                                                Date of birth
-                                            </dt>
-
-                                            <dd>
-
-                                                @(evidence.DateOfBirthMatched
-
-                                                    ? "Matched"
-
-                                                    : "Not matched")
-
-                                            </dd>
-
-                                        </div>
-
-
-                                        <!-- COUNTRY -->
-
-                                        <div>
-
-                                            <dt>
-                                                Country
-                                            </dt>
-
-                                            <dd>
-
-                                                @(evidence.CountryMatched
-
-                                                    ? "Matched"
-
-                                                    : "Not matched")
-
-                                            </dd>
-
-                                        </div>
-
-
-                                        <!-- GENDER -->
-
-                                        <div>
-
-                                            <dt>
-                                                Gender
-                                            </dt>
-
-                                            <dd>
-
-                                                @(evidence.GenderMatched
-
-                                                    ? "Matched"
-
-                                                    : "Not matched")
-
-                                            </dd>
-
-                                        </div>
-
-                                    </dl>
-
-                                </article>
-                            }
-
+                        <div class="screening-risk-score">
+                            @result.RiskScore.ToString("0.##")
                         </div>
-                    }
+                        <p class="screening-risk-caption">
+                            Based on the configured risk model
+                        </p>
+                    </div>
 
+                    <span class="screening-badge @riskClass">
+                        @result.RiskLevel
+                    </span>
                 </div>
 
+                <h3 class="screening-section-title">
+                    @(result.Matches.Count > 0
+                        ? "Potential AML matches"
+                        : "No AML match found")
+                </h3>
 
-                <!-- ===============================================
-                     RISK CALCULATION DETAILS
-                     =============================================== -->
-
-                <details class="ckyc-details">
-
-
-                    <summary>
-
-                        <span>
-                            Calculation details
-                        </span>
-
-                        <i class="bi bi-chevron-down">
-                        </i>
-
-                    </summary>
-
-
-                    @if (
-                        result.AmlRuleScore.HasValue &&
-                        result.AmlWeight.HasValue &&
-                        result.AmlContribution.HasValue &&
-
-                        result.OccupationRuleScore.HasValue &&
-                        result.OccupationWeight.HasValue &&
-                        result.OccupationContribution.HasValue &&
-
-                        result.SourceOfFundsRuleScore.HasValue &&
-                        result.SourceOfFundsWeight.HasValue &&
-                        result.SourceOfFundsContribution.HasValue)
+                <p class="screening-description">
+                    @if (result.Matches.Count > 0)
                     {
-                        <div class="ckyc-breakdown">
-
-
-                            <table>
-
-
-                                <caption>
-                                    Risk score contributions
-                                </caption>
-
-
-                                <thead>
-
-                                    <tr>
-
-                                        <th scope="col">
-                                            Factor
-                                        </th>
-
-                                        <th scope="col">
-                                            Rule score
-                                        </th>
-
-                                        <th scope="col">
-                                            Weight
-                                        </th>
-
-                                        <th scope="col">
-                                            Points
-                                        </th>
-
-                                    </tr>
-
-                                </thead>
-
-
-                                <tbody>
-
-
-                                    <!-- AML -->
-
-                                    <tr>
-
-                                        <th scope="row">
-                                            AML source
-                                        </th>
-
-                                        <td>
-                                            @result.AmlRuleScore.Value.ToString("0.##")
-                                        </td>
-
-                                        <td>
-                                            @result.AmlWeight.Value.ToString("0.##")%
-                                        </td>
-
-                                        <td>
-                                            @result.AmlContribution.Value.ToString("0.##")
-                                        </td>
-
-                                    </tr>
-
-
-                                    <!-- OCCUPATION -->
-
-                                    <tr>
-
-                                        <th scope="row">
-                                            Occupation
-                                        </th>
-
-                                        <td>
-                                            @result.OccupationRuleScore.Value.ToString("0.##")
-                                        </td>
-
-                                        <td>
-                                            @result.OccupationWeight.Value.ToString("0.##")%
-                                        </td>
-
-                                        <td>
-                                            @result.OccupationContribution.Value.ToString("0.##")
-                                        </td>
-
-                                    </tr>
-
-
-                                    <!-- SOURCE OF FUNDS -->
-
-                                    <tr>
-
-                                        <th scope="row">
-                                            Source of funds
-                                        </th>
-
-                                        <td>
-                                            @result.SourceOfFundsRuleScore.Value.ToString("0.##")
-                                        </td>
-
-                                        <td>
-                                            @result.SourceOfFundsWeight.Value.ToString("0.##")%
-                                        </td>
-
-                                        <td>
-                                            @result.SourceOfFundsContribution.Value.ToString("0.##")
-                                        </td>
-
-                                    </tr>
-
-                                </tbody>
-
-
-                                <tfoot>
-
-                                    <tr>
-
-                                        <th scope="row"
-                                            colspan="3">
-
-                                            Final risk score
-
-                                        </th>
-
-                                        <td>
-                                            @result.RiskScore.ToString("0.##")
-                                        </td>
-
-                                    </tr>
-
-                                </tfoot>
-
-                            </table>
-
-
-                            <p>
-
-                                Points =
-                                rule score × weight ÷ 100.
-
-                            </p>
-
-                        </div>
+                        <text>
+                            @result.Matches.Count potential
+                            @(result.Matches.Count == 1 ? "match" : "matches")
+                            found. Review the details below.
+                        </text>
                     }
                     else
                     {
-                        <p class="ckyc-score-caption">
-
-                            Risk calculation breakdown
-                            is unavailable.
-
-                        </p>
+                        <text>
+                            No AML record met the configured
+                            match threshold for this screening.
+                        </text>
                     }
-
-
-                    <!-- ===========================================
-                         CUSTOMER INPUT DETAILS
-                         =========================================== -->
-
-                    <dl>
-
-
-                        <!-- COUNTRY -->
-
-                        <div>
-
-                            <dt>
-                                Country
-                            </dt>
-
-                            <dd>
-                                @countryName
-                            </dd>
-
-                        </div>
-
-
-                        <!-- GENDER -->
-
-                        <div>
-
-                            <dt>
-                                Gender
-                            </dt>
-
-                            <dd>
-                                @genderName
-                            </dd>
-
-                        </div>
-
-
-                        <!-- SCREENING TYPE -->
-
-                        <div>
-
-                            <dt>
-                                Screening type
-                            </dt>
-
-                            <dd>
-                                @screeningTypeName
-                            </dd>
-
-                        </div>
-
-
-                        <!-- OCCUPATION -->
-
-                        <div>
-
-                            <dt>
-                                Occupation
-                            </dt>
-
-                            <dd>
-                                @occupationName
-                            </dd>
-
-                        </div>
-
-
-                        <!-- SOURCE OF FUNDS -->
-
-                        <div>
-
-                            <dt>
-                                Source of funds
-                            </dt>
-
-                            <dd>
-                                @sourceOfFundsName
-                            </dd>
-
-                        </div>
-
-
-                        <!-- DOB -->
-
-                        <div>
-
-                            <dt>
-                                Date of birth
-                            </dt>
-
-                            <dd>
-
-                                @(Model.DateOfBirth.HasValue
-
-                                    ? Model.DateOfBirth.Value
-                                        .ToString(
-                                            "dd MMM yyyy",
-                                            CultureInfo.InvariantCulture)
-
-                                    : "Not provided")
-
-                            </dd>
-
-                        </div>
-
-
-                        <!-- MODEL VERSION -->
-
-                        <div>
-
-                            <dt>
-                                Risk model version
-                            </dt>
-
-                            <dd>
-                                @(result.ModelVersion
-                                    ?? "Not provided")
-                            </dd>
-
-                        </div>
-
-                    </dl>
-
-                </details>
-
-
-                <!-- ===============================================
-                     DISCLAIMER
-                     =============================================== -->
-
-                <p class="ckyc-result-notice">
-
-                    <i class="bi bi-info-circle">
-                    </i>
-
-                    <span>
-                        Potential matches require review.
-                        Match percentage shows data similarity.
-                        Risk score is calculated separately
-                        using the configured risk model.
-                    </span>
-
                 </p>
+
+                @foreach (var evidence in result.MatchEvidence)
+                {
+                    <article class="screening-match">
+                        <div class="screening-match-heading">
+                            <h4>@evidence.MatchedName</h4>
+                            <span class="screening-badge">
+                                @evidence.SourceName
+                            </span>
+                        </div>
+
+                        <div class="screening-match-percent">
+                            <span>Name similarity</span>
+                            <strong>
+                                @evidence.NameMatchPercent.ToString("0.##")%
+                            </strong>
+                        </div>
+
+                        <dl class="screening-evidence">
+                            <div>
+                                <dt>Match status</dt>
+                                <dd>@evidence.MatchStatus</dd>
+                            </div>
+
+                            <div>
+                                <dt>Overall match</dt>
+                                <dd>
+                                    @evidence.MatchPercent.ToString("0.##")%
+                                </dd>
+                            </div>
+
+                            <div>
+                                <dt>Reference</dt>
+                                <dd>
+                                    @(string.IsNullOrWhiteSpace(evidence.ReferenceNo)
+                                        ? "Not provided"
+                                        : evidence.ReferenceNo)
+                                </dd>
+                            </div>
+
+                            <div>
+                                <dt>Date of birth</dt>
+                                <dd>
+                                    @(evidence.DateOfBirthMatched
+                                        ? "Matched"
+                                        : "Not matched or unavailable")
+                                </dd>
+                            </div>
+
+                            <div>
+                                <dt>Country</dt>
+                                <dd>
+                                    @(evidence.CountryMatched
+                                        ? "Matched"
+                                        : "Not matched or unavailable")
+                                </dd>
+                            </div>
+
+                            <div>
+                                <dt>Gender</dt>
+                                <dd>
+                                    @(evidence.GenderMatched
+                                        ? "Matched"
+                                        : "Not matched or unavailable")
+                                </dd>
+                            </div>
+                        </dl>
+                    </article>
+                }
+
+                <details class="screening-details">
+                    <summary>Risk calculation details</summary>
+
+                    <div class="screening-table-wrap">
+                        <table class="screening-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Factor</th>
+                                    <th scope="col">Rule score</th>
+                                    <th scope="col">Weight</th>
+                                    <th scope="col">Points</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <th scope="row">AML source</th>
+                                    <td>
+                                        @(result.AmlRuleScore?.ToString("0.##") ?? "—")
+                                    </td>
+                                    <td>
+                                        @(result.AmlWeight.HasValue
+                                            ? result.AmlWeight.Value.ToString("0.##") + "%"
+                                            : "—")
+                                    </td>
+                                    <td>
+                                        @(result.AmlContribution?.ToString("0.##") ?? "—")
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Occupation</th>
+                                    <td>
+                                        @(result.OccupationRuleScore?.ToString("0.##") ?? "—")
+                                    </td>
+                                    <td>
+                                        @(result.OccupationWeight.HasValue
+                                            ? result.OccupationWeight.Value.ToString("0.##") + "%"
+                                            : "—")
+                                    </td>
+                                    <td>
+                                        @(result.OccupationContribution?.ToString("0.##") ?? "—")
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Source of funds</th>
+                                    <td>
+                                        @(result.SourceOfFundsRuleScore?.ToString("0.##") ?? "—")
+                                    </td>
+                                    <td>
+                                        @(result.SourceOfFundsWeight.HasValue
+                                            ? result.SourceOfFundsWeight.Value.ToString("0.##") + "%"
+                                            : "—")
+                                    </td>
+                                    <td>
+                                        @(result.SourceOfFundsContribution?.ToString("0.##") ?? "—")
+                                    </td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th scope="row" colspan="3">
+                                        Final risk score
+                                    </th>
+                                    <td>
+                                        @result.RiskScore.ToString("0.##")
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <p class="screening-note">
+                        Points = rule score × weight ÷ 100.
+                    </p>
+
+                    <p class="screening-note">
+                        Model version:
+                        @(result.ModelVersion ?? "Not provided")
+                    </p>
+
+                    <p class="screening-note">
+                        Customer DOB:
+                        @(Model.DateOfBirth.HasValue
+                            ? Model.DateOfBirth.Value.ToString(
+                                "dd MMM yyyy",
+                                CultureInfo.InvariantCulture)
+                            : "Not provided")
+                    </p>
+                </details>
             }
 
+            @* <p class="screening-note">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                <span>
+                    Potential matches require review.
+                    Name similarity and risk score are separate measures.
+                    Results do not confirm identity or provide clearance.
+                </span>
+            </p> *@
         </section>
 
     </div>
-
 </div>
 
-
-@section Scripts
-{
+@section Scripts {
     <partial name="_ValidationScriptsPartial" />
+
+    <script>
+        (() => {
+            const form = document.getElementById("customerScreeningForm");
+            const button = document.getElementById("screeningSubmit");
+            const buttonText = document.getElementById("screeningButtonText");
+            const resultPanel = document.getElementById("screeningResult");
+            const status = document.getElementById("screeningStatus");
+
+            form.addEventListener("submit", function (event) {
+                if (!form.checkValidity()) {
+                    return;
+                }
+
+                if (window.jQuery &&
+                    jQuery.fn.valid &&
+                    !jQuery(form).valid()) {
+                    return;
+                }
+
+                if (event.defaultPrevented) {
+                    return;
+                }
+
+                button.disabled = true;
+                button.classList.add("is-loading");
+                buttonText.textContent = "Checking...";
+                resultPanel.setAttribute("aria-busy", "true");
+
+                const title = document.getElementById("screeningEmptyTitle");
+                const message = document.getElementById("screeningEmptyMessage");
+
+                if (title && message) {
+                    title.textContent = "Screening in progress";
+                    message.textContent =
+                        "Checking AML records and calculating the result.";
+                } else {
+                    status.textContent = "Screening in progress...";
+                }
+            });
+
+            window.addEventListener("pageshow", function () {
+                button.disabled = false;
+                button.classList.remove("is-loading");
+                buttonText.textContent = "Check PEP/Sanction";
+                resultPanel.removeAttribute("aria-busy");
+            });
+        })();
+    </script>
 }

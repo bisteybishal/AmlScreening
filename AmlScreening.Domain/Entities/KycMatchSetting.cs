@@ -17,6 +17,7 @@ public class KycMatchSetting
     public decimal ReviewThreshold { get; set; }
 
     public decimal StrongMatchThreshold { get; set; }
+    public decimal NameMatchPercent { get; set; }
 
 
     public bool IsActive { get; set; }
