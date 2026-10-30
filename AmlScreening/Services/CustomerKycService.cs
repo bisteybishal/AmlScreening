@@ -14,17 +14,10 @@ namespace AmlScreening.Portal.Services;
 
 public class CustomerKycService
 {
-    private readonly IAmlRecordRepository
-        _amlRepository;
-
-    private readonly AmlScreeningDbContext
-        _dbContext;
-
-    private readonly ICurrentUserContext
-        _userContext;
-
-    private readonly DropdownHelper
-        _dropdownHelper;
+    private readonly IAmlRecordRepository _amlRepository;
+    private readonly AmlScreeningDbContext _dbContext;
+    private readonly ICurrentUserContext _userContext;
+    private readonly DropdownHelper _dropdownHelper;
 
 
     public CustomerKycService(
@@ -33,34 +26,50 @@ public class CustomerKycService
         ICurrentUserContext userContext,
         DropdownHelper dropdownHelper)
     {
-        _amlRepository =
-            amlRepository;
-
-        _dbContext =
-            dbContext;
-
-        _userContext =
-            userContext;
-
-        _dropdownHelper =
-            dropdownHelper;
+        _amlRepository = amlRepository;
+        _dbContext = dbContext;
+        _userContext = userContext;
+        _dropdownHelper = dropdownHelper;
     }
 
+
+    // =========================================================
+    // CUSTOMER KYC CHECK
+    // =========================================================
 
     public async Task<CustomerKycResult> CheckAsync(
         CustomerKycViewModel model,
         CancellationToken cancellationToken)
     {
+        // =====================================================
+        // 1. VALIDATE CURRENT USER
+        // =====================================================
+
         if (!_userContext.IsAuthenticated ||
-            _userContext.PartnerId <= 0)
+            _userContext.PartnerId <= 0 ||
+            _userContext.UserId <= 0)
         {
             throw new ArgumentException(
-                "Invalid partner.");
+                "Invalid authenticated user.");
+        }
+
+
+        if (string.IsNullOrWhiteSpace(model.FullName))
+        {
+            throw new ArgumentException(
+                "Customer name is required.");
+        }
+
+
+        if (string.IsNullOrWhiteSpace(model.ScreeningType))
+        {
+            throw new ArgumentException(
+                "Screening type is required.");
         }
 
 
         // =====================================================
-        // 1. LOAD MATCH CONFIGURATION
+        // 2. LOAD MATCH CONFIGURATION
         // =====================================================
 
         var settings =
@@ -69,7 +78,9 @@ public class CustomerKycService
 
 
         // =====================================================
-        // 2. CREATE ONE LOG ROW FOR THIS KYC HIT
+        // 3. CREATE SCREENING LOG
+        //
+        // One KYC request = one row.
         // =====================================================
 
         var log =
@@ -87,11 +98,37 @@ public class CustomerKycService
                 Username =
                     _userContext.Username,
 
+
                 ScreeningType =
                     model.ScreeningType.Trim(),
 
+
+                // Customer snapshot
+
+                FullName =
+                    model.FullName.Trim(),
+
+                DateOfBirth =
+                    model.DateOfBirth,
+
+                Country =
+                    model.Country?.Trim(),
+
+                Gender =
+                    model.Gender?.Trim(),
+
+                Occupation =
+                    model.Occupation?.Trim(),
+
+                SourceOfFunds =
+                    model.SourceOfFunds?.Trim(),
+
+
                 Status =
                     "PROCESSING",
+
+                CreatedBy =
+                    _userContext.Username,
 
                 CreatedDate =
                     DateTime.UtcNow
@@ -110,72 +147,196 @@ public class CustomerKycService
         try
         {
             // =================================================
-            // 3. FIND AML CANDIDATES
+            // 4. FIND POSSIBLE AML CANDIDATES
             // =================================================
 
             var candidates =
                 await _amlRepository
                     .FindKycCandidatesAsync(
                         model.FullName.Trim(),
-                        model.ScreeningType,
+                        model.ScreeningType.Trim(),
                         cancellationToken);
 
 
-            if (candidates.Count > 50)
+            if (candidates.Count > 250)
             {
                 throw new ArgumentException(
-                    "Too many matches. Enter a more complete name.");
+                    "Too many AML candidates. Enter a more complete name.");
             }
 
+
             // =================================================
-            // 4. FIRST CHECK NAME SIMILARITY
+            // 5. CALCULATE NAME SIMILARITY
             // =================================================
 
-            var nameCandidates = candidates.Select(candidate =>
-            new
-            {
-                candidate = candidate,
-                NamePercent = GetNamePercent(model.FullName, candidate)
-            }).ToList();
+            var nameCandidates =
+                candidates
+                    .Select(candidate => new
+                    {
+                        Candidate =
+                            candidate,
 
-            // =====================================================
-            // 5. NAME MUST PASS CONFIGURED THRESHOLD
-            // =====================================================
+                        NamePercent =
+                            GetNamePercent(
+                                model.FullName,
+                                candidate)
+                    })
+                    .OrderByDescending(x =>
+                        x.NamePercent)
+                    .ToList();
 
-            var passedNameCandidates = nameCandidates.Where(x => x.NamePercent >= settings.NameMatchPercent).ToList();
-            if (passedNameCandidates.Count == 0)
+
+            var bestCandidate =
+                nameCandidates
+                    .FirstOrDefault();
+
+
+            var highestNamePercent =
+                bestCandidate?.NamePercent ?? 0;
+
+
+            // =================================================
+            // 6. SAVE CLOSEST AML RECORD
+            //
+            // Even NO_MATCH keeps closest record for audit.
+            // =================================================
+
+            if (bestCandidate != null)
             {
-                log.MatchCount =
+                log.AmlRecordId =
+                    bestCandidate.Candidate.Id;
+
+                log.MatchedName =
+                    bestCandidate.Candidate.FullName;
+
+                log.NameMatchPercent =
+                    bestCandidate.NamePercent;
+
+                log.HighestMatchPercent =
+                    bestCandidate.NamePercent;
+            }
+            else
+            {
+                log.NameMatchPercent =
                     0;
 
                 log.HighestMatchPercent =
-                    nameCandidates.Count == 0
-                        ? 0
-                        : nameCandidates.Max(
-                            x => x.NamePercent);
-
-                log.Status =
-                    "COMPLETED_NO_NAME";
-
-                log.CompletedDate =
-                    DateTime.UtcNow;
-
-
-                await _dbContext.SaveChangesAsync(
-                    cancellationToken);
-
-
-                throw new ArgumentException(
-                    $"No AML name matched the minimum " +
-                    $"{settings.NameMatchPercent:0.##}% " +
-                    "name similarity. " +
-                    "Risk score was not calculated.");
+                    0;
             }
 
 
+            // =================================================
+            // 7. NO MATCH
+            //
+            // <= configured NameMatchPercent
+            //
+            // Example:
+            //
+            // configured = 80
+            //
+            // 60 -> NO_MATCH
+            // 80 -> NO_MATCH
+            //
+            // No risk calculation.
+            // =================================================
+
+            if (bestCandidate == null ||
+                highestNamePercent <
+                settings.NameMatchPercent)
+            {
+                log.MatchCount = 0;
+                log.RiskScore = null;
+                log.RiskLevel = null;
+                log.Status = "NO_MATCH";
+                log.CompletedDate = DateTime.UtcNow;
+
+                await _dbContext.SaveChangesAsync(
+                    cancellationToken);
+                string message;
+
+                if (bestCandidate == null)
+                {
+                    message =
+                        $"No AML candidate was found for " +
+                        $"\"{model.FullName}\". " +
+                        "Risk score was not calculated.";
+                }
+                else
+                {
+                    message =
+                        $"No AML name met the required " +
+                        $"{settings.NameMatchPercent:0.##}% threshold. " +
+                        $"Closest AML name: " +
+                        $"\"{bestCandidate.Candidate.FullName}\". " +
+                        $"Name similarity: " +
+                        $"{highestNamePercent:0.##}%. " +
+                        "Risk score was not calculated.";
+                }
+
+
+                return new CustomerKycResult
+                {
+                    RiskCalculated =
+                        false,
+
+                    RequiresApproval =
+                        false,
+
+                    ScreeningStatus =
+                        "NO_MATCH",
+
+                    ScreeningMessage = message,
+
+                    Matches =
+                        [],
+
+                    MatchEvidence =
+                        [],
+
+                    Sources =
+                        []
+                };
+            }
+
 
             // =================================================
-            // 6. NAME PASSED - CALCULATE OTHER FIELDS
+            // 8. DETERMINE EXACT OR FUZZY
+            //
+            // > threshold && < 100
+            //     = requires checker
+            //
+            // 100
+            //     = exact
+            // =================================================
+
+            var requiresApproval = highestNamePercent < 100;
+
+
+            // =================================================
+            // 9. SELECT PASSED NAME CANDIDATES
+            // =================================================
+
+            var passedNameCandidates =
+                highestNamePercent == 100
+
+                    // Exact name exists.
+                    // Only use exact name candidates.
+                    ? nameCandidates
+                        .Where(x =>
+                            x.NamePercent == 100)
+                        .ToList()
+
+                    // Fuzzy name.
+                    // Use candidates above configured threshold.
+                    : nameCandidates
+                        .Where(x =>
+                            x.NamePercent >=
+                            settings.NameMatchPercent)
+                        .ToList();
+
+
+            // =================================================
+            // 10. CALCULATE DOB / COUNTRY / GENDER MATCH
             // =================================================
 
             var matchedEvidence =
@@ -183,14 +344,22 @@ public class CustomerKycService
                     .Select(x =>
                         CalculateMatch(
                             model,
-                            x.candidate,
+                            x.Candidate,
                             settings,
                             x.NamePercent))
                     .ToList();
 
 
+            if (matchedEvidence.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "Qualified AML match evidence could not be created.");
+            }
 
 
+            // =================================================
+            // 11. GET MATCHED AML RECORDS
+            // =================================================
 
             var matchedIds =
                 matchedEvidence
@@ -207,9 +376,8 @@ public class CustomerKycService
                     .ToList();
 
 
-
             // =================================================
-            // 6. GET AML SOURCES
+            // 12. GET AML SOURCES
             // =================================================
 
             var sources =
@@ -224,6 +392,13 @@ public class CustomerKycService
                     .ToList();
 
 
+            if (sources.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "Matched AML record has no AML source.");
+            }
+
+
             if (sources.Any(
                     x => x.Contains(',')))
             {
@@ -233,15 +408,35 @@ public class CustomerKycService
 
 
             var matchedSources =
-                sources.Count == 0
-                    ? null
-                    : string.Join(
-                        ",",
-                        sources);
+                string.Join(
+                    ",",
+                    sources);
 
 
             // =================================================
-            // 7. CALL EXISTING RISK SCORE SP
+            // 13. OPTIONAL OCCUPATION / SOURCE OF FUNDS
+            // =================================================
+
+            var occupation =
+                string.IsNullOrWhiteSpace(
+                    model.Occupation)
+
+                    ? "NOT_PROVIDED"
+
+                    : model.Occupation.Trim();
+
+
+            var sourceOfFunds =
+                string.IsNullOrWhiteSpace(
+                    model.SourceOfFunds)
+
+                    ? "NOT_PROVIDED"
+
+                    : model.SourceOfFunds.Trim();
+
+
+            // =================================================
+            // 14. CALCULATE RISK
             // =================================================
 
             var command =
@@ -250,14 +445,20 @@ public class CustomerKycService
 
                     new
                     {
+                        // Add this only when your SP
+                        // has @PartnerId parameter.
+                        //
+                        // PartnerId =
+                        //     _userContext.PartnerId,
+
                         MatchedSources =
                             matchedSources,
 
                         Occupation =
-                            model.Occupation.Trim(),
+                            occupation,
 
                         SourceOfFunds =
-                            model.SourceOfFunds.Trim()
+                            sourceOfFunds
                     },
 
                     commandType:
@@ -282,7 +483,7 @@ public class CustomerKycService
 
 
             // =================================================
-            // 8. VALIDATE RISK RESULT
+            // 15. VALIDATE RISK RESULT
             // =================================================
 
             if (risk.IsPartial ||
@@ -323,7 +524,8 @@ public class CustomerKycService
             }
 
 
-            if (risk.Score < 0)
+            if (risk.Score < 0 ||
+                risk.Score > 100)
             {
                 throw new InvalidOperationException(
                     "Risk calculation returned an invalid score.");
@@ -331,7 +533,13 @@ public class CustomerKycService
 
 
             // =================================================
-            // 9. UPDATE USAGE LOG
+            // 16. UPDATE LOG
+            //
+            // Fuzzy
+            //     -> PENDING_REVIEW
+            //
+            // Exact
+            //     -> COMPLETED
             // =================================================
 
             log.MatchCount =
@@ -339,10 +547,11 @@ public class CustomerKycService
 
 
             log.HighestMatchPercent =
-                matchedEvidence.Count == 0
-                    ? 0
-                    : matchedEvidence.Max(
-                        x => x.MatchPercent);
+                highestNamePercent;
+
+
+            log.NameMatchPercent =
+                highestNamePercent;
 
 
             log.RiskScore =
@@ -354,7 +563,9 @@ public class CustomerKycService
 
 
             log.Status =
-                "COMPLETED";
+                requiresApproval
+                    ? "PENDING_REVIEW"
+                    : "COMPLETED";
 
 
             log.CompletedDate =
@@ -366,76 +577,102 @@ public class CustomerKycService
 
 
             // =================================================
-            // 10. RETURN RESULT
+            // 17. RETURN RESULT
             // =================================================
 
             return new CustomerKycResult
             {
-                Matches =
-                    matches,
+                ScreeningStatus =
+         requiresApproval
+             ? "PENDING_REVIEW"
+             : "COMPLETED",
 
-                // Only show meaningful matches in UI.
+                RequiresApproval =
+         requiresApproval,
+
+                RiskCalculated =
+         true,
+
+                ScreeningMessage =
+         requiresApproval
+             ? "Potential AML match found. " +
+               "Risk score was calculated. " +
+               "Compliance approval is required."
+             : "Exact AML name match found. " +
+               "Screening completed. " +
+               "Compliance approval is not required.",
+
+                Matches =
+         matches,
+
                 MatchEvidence =
-                    matchedEvidence,
+         matchedEvidence,
 
                 Sources =
-                    sources,
+         sources,
 
                 RiskScore =
-                    risk.Score,
+         risk.Score,
 
                 RiskLevel =
-                    risk.Level,
+         risk.Level,
 
                 ModelVersion =
-                    risk.ModelVersion,
-
+         risk.ModelVersion,
 
                 AmlRuleScore =
-                    risk.AmlRuleScore,
+         risk.AmlRuleScore,
 
                 AmlWeight =
-                    risk.AmlWeight,
+         risk.AmlWeight,
 
                 AmlContribution =
-                    risk.AmlContribution,
-
+         risk.AmlContribution,
 
                 OccupationRuleScore =
-                    risk.OccupationRuleScore,
+         risk.OccupationRuleScore,
 
                 OccupationWeight =
-                    risk.OccupationWeight,
+         risk.OccupationWeight,
 
                 OccupationContribution =
-                    risk.OccupationContribution,
-
+         risk.OccupationContribution,
 
                 SourceOfFundsRuleScore =
-                    risk.SourceOfFundsRuleScore,
+         risk.SourceOfFundsRuleScore,
 
                 SourceOfFundsWeight =
-                    risk.SourceOfFundsWeight,
+         risk.SourceOfFundsWeight,
 
                 SourceOfFundsContribution =
-                    risk.SourceOfFundsContribution
+         risk.SourceOfFundsContribution
             };
         }
         catch
         {
+            // =================================================
+            // ONLY TECHNICAL FAILURE SHOULD BECOME FAILED
+            //
+            // NO_MATCH returns normally before this point.
+            // =================================================
+
             if (log.Status == "PROCESSING")
             {
-                log.Status = "FAILED";
-                log.CompletedDate = DateTime.UtcNow;
+                log.Status =
+                    "FAILED";
+
+                log.CompletedDate =
+                    DateTime.UtcNow;
 
 
                 try
                 {
-                    await _dbContext.SaveChangesAsync(CancellationToken.None);
+                    await _dbContext.SaveChangesAsync(
+                        CancellationToken.None);
                 }
                 catch
                 {
-                    // Keep original exception.
+                    // Never hide the original exception.
                 }
             }
 
@@ -454,34 +691,37 @@ public class CustomerKycService
         CancellationToken cancellationToken = default)
     {
         model.CountryOptions =
-            await _dropdownHelper.GetCountryListAsync(cancellationToken);
+            await _dropdownHelper
+                .GetCountryListAsync(
+                    cancellationToken);
 
 
-
-        model.GenderOptions = [
+        model.GenderOptions =
+        [
             new SelectListItem
-    {
-        Value = "MALE",
-        Text = "Male"
-    },
+            {
+                Value = "MALE",
+                Text = "Male"
+            },
 
-    new SelectListItem
-    {
-        Value = "FEMALE",
-        Text = "Female"
-    },
+            new SelectListItem
+            {
+                Value = "FEMALE",
+                Text = "Female"
+            },
 
-    new SelectListItem
-    {
-        Value = "OTHER",
-        Text = "Other"
-    }
-            ];
-
+            new SelectListItem
+            {
+                Value = "OTHER",
+                Text = "Other"
+            }
+        ];
 
 
         model.ScreeningTypeOptions =
-            await _dropdownHelper.GetAmlSourceNameAsync(cancellationToken);
+            await _dropdownHelper
+                .GetAmlSourceNameAsync(
+                    cancellationToken);
 
 
         model.OccupationOptions =
@@ -500,7 +740,7 @@ public class CustomerKycService
 
 
     // =========================================================
-    // MATCH CONFIGURATION
+    // MATCH SETTINGS
     // =========================================================
 
     private async Task<KycMatchSetting>
@@ -540,11 +780,22 @@ public class CustomerKycService
         }
 
 
+        // NameMatchPercent must remain below 100
+        // because 100 is reserved for exact matching.
+
         if (settings.NameMatchPercent < 0 ||
-            settings.NameMatchPercent > 100)
+            settings.NameMatchPercent >= 100)
         {
             throw new InvalidOperationException(
-               "Name match threshold must be between 0 and 100.");
+                "Name match threshold must be between 0 and less than 100.");
+        }
+
+
+        if (settings.ReviewThreshold < 0 ||
+            settings.ReviewThreshold > 100)
+        {
+            throw new InvalidOperationException(
+                "KYC review threshold is invalid.");
         }
 
 
@@ -569,7 +820,7 @@ public class CustomerKycService
 
 
     // =========================================================
-    // CALCULATE MATCH
+    // CALCULATE CUSTOMER MATCH
     // =========================================================
 
     private static KycMatchEvidence CalculateMatch(
@@ -579,13 +830,13 @@ public class CustomerKycService
         decimal namePercent)
     {
         var dobMatched =
-      customer.DateOfBirth.HasValue
-      &&
-      aml.DateOfBirth.HasValue
-      &&
-      customer.DateOfBirth.Value.Date
-      ==
-      aml.DateOfBirth.Value.Date;
+            customer.DateOfBirth.HasValue
+            &&
+            aml.DateOfBirth.HasValue
+            &&
+            customer.DateOfBirth.Value.Date
+            ==
+            aml.DateOfBirth.Value.Date;
 
 
         var countryMatched =
@@ -599,16 +850,6 @@ public class CustomerKycService
                 customer.Gender,
                 aml.Gender);
 
-
-        // Example with configuration:
-        //
-        // Name match = 100%
-        // Name weight = 50
-        // Contribution = 50
-        //
-        // DOB matched = 25
-        // Country matched = 15
-        // Gender matched = 10
 
         var matchPercent =
             (
@@ -675,6 +916,11 @@ public class CustomerKycService
             NameMatchPercent =
                 namePercent,
 
+            NameMatchStatus =
+                namePercent == 100
+                    ? "EXACT_NAME"
+                    : "FUZZY_NAME",
+
             DateOfBirthMatched =
                 dobMatched,
 
@@ -687,12 +933,8 @@ public class CustomerKycService
             MatchPercent =
                 matchPercent,
 
-            MatchStatus = matchStatus,
-            NameMatchStatus =
-        namePercent >= 100
-            ? "EXACT_NAME"
-            : "FUZZY_NAME"
-
+            MatchStatus =
+                matchStatus
         };
     }
 
@@ -705,32 +947,95 @@ public class CustomerKycService
         string customerName,
         AmlRecord aml)
     {
-        string customer = AmlNameNormalizer.Normalize(customerName);
-        string amlName = AmlNameNormalizer.Normalize(aml.FullName);
+        var customer =
+            AmlNameNormalizer.Normalize(
+                customerName);
 
-        if (customer.Length == 0 || amlName.Length == 0)
+
+        var amlName =
+            !string.IsNullOrWhiteSpace(
+                aml.NormalizedName)
+
+                ? aml.NormalizedName
+
+                : AmlNameNormalizer.Normalize(
+                    aml.FullName);
+
+
+        if (string.IsNullOrWhiteSpace(customer) ||
+            string.IsNullOrWhiteSpace(amlName))
         {
             return 0;
         }
-        // Exact
-        if (customer == amlName)
-        {
-            return 100;
-        }
-        // Fuzzy
-        var distance = GetLevenshteinDistance(customer, amlName);
-        var totalLength = customer.Length + amlName.Length;
 
-        decimal percentage = ((decimal)(totalLength - distance) / totalLength) * 100;
-        return Math.Round(percentage, 2);
+
+        return CalculateNameSimilarity(
+            customer,
+            amlName);
     }
 
 
     // =========================================================
-    // TEXT COMPARISON
+    // LEVENSHTEIN NAME %
     // =========================================================
 
-    private static bool Same(string? first, string? second)
+    private static decimal CalculateNameSimilarity(
+        string first,
+        string second)
+    {
+        if (string.IsNullOrWhiteSpace(first) ||
+            string.IsNullOrWhiteSpace(second))
+        {
+            return 0;
+        }
+
+
+        if (string.Equals(
+                first,
+                second,
+                StringComparison.Ordinal))
+        {
+            return 100;
+        }
+
+
+        var distance =
+            GetLevenshteinDistance(
+                first,
+                second);
+
+
+        var totalLength =
+            first.Length +
+            second.Length;
+
+
+        if (totalLength == 0)
+        {
+            return 0;
+        }
+
+
+        var percentage =
+            ((decimal)
+                (totalLength - distance)
+                / totalLength)
+            * 100m;
+
+
+        return Math.Round(
+            percentage,
+            2);
+    }
+
+
+    // =========================================================
+    // OTHER TEXT MATCH
+    // =========================================================
+
+    private static bool Same(
+        string? first,
+        string? second)
     {
         if (string.IsNullOrWhiteSpace(first) ||
             string.IsNullOrWhiteSpace(second))
@@ -744,6 +1049,11 @@ public class CustomerKycService
             second.Trim(),
             StringComparison.OrdinalIgnoreCase);
     }
+
+
+    // =========================================================
+    // LEVENSHTEIN DISTANCE
+    // =========================================================
 
     private static int GetLevenshteinDistance(
         string first,
@@ -759,7 +1069,8 @@ public class CustomerKycService
              i <= first.Length;
              i++)
         {
-            matrix[i, 0] = i;
+            matrix[i, 0] =
+                i;
         }
 
 
@@ -767,7 +1078,8 @@ public class CustomerKycService
              j <= second.Length;
              j++)
         {
-            matrix[0, j] = j;
+            matrix[0, j] =
+                j;
         }
 
 
@@ -782,7 +1094,9 @@ public class CustomerKycService
                 var cost =
                     first[i - 1] ==
                     second[j - 1]
+
                         ? 0
+
                         : 1;
 
 
@@ -791,7 +1105,9 @@ public class CustomerKycService
                         Math.Min(
                             matrix[i - 1, j] + 1,
                             matrix[i, j - 1] + 1),
-                        matrix[i - 1, j - 1] + cost);
+
+                        matrix[i - 1, j - 1] +
+                        cost);
             }
         }
 
@@ -801,8 +1117,10 @@ public class CustomerKycService
             second.Length];
     }
 }
+
+
 // =============================================================
-// RISK SP RESULT
+// RISK STORED PROCEDURE RESULT
 // =============================================================
 
 public class KycRiskResult

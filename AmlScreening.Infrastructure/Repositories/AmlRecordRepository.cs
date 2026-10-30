@@ -399,45 +399,31 @@ public sealed class AmlRecordRepository : IAmlRecordRepository
         {
             return [];
         }
-        var normalizeName = AmlNameNormalizer.Normalize(name);
-        if (string.IsNullOrWhiteSpace(
-        normalizeName))
-        {
-            return [];
-        }
-
-        if (normalizeName.Length > 250)
-        {
-            throw new ArgumentException(
-                "Search name is too long.");
-        }
+       const int maxsafeCandidates = 10000;
         var source = screeningType.Trim();
-        var originalName = name.Trim();
-        return await PartnerQuery(false)
-            // ScreeningType is only for filtering.
-            .Where(x => x.IsActive && x.SourceName == source)
-              // Find possible name candidates.
-              .Where(x => (x.NormalizedName != null && x.NormalizedName.Contains(normalizeName)) ||(x.FullName !=null && x.FullName.Contains(name)))
-
+        var query = PartnerQuery(false)
+            .Where(x => x.IsActive
+                && x.SourceName == source);
+        var count = await query.CountAsync(cancellationToken);
+        if (count > maxsafeCandidates)
+        {
+            throw new InvalidOperationException(
+                $"AML source '{source}' contains too many records " +
+                "for safe screening.");
+        }
+        return await query
             .OrderBy(x => x.FullName)
             .ThenBy(x => x.Id)
-            .Take(51)
             .Select(x => new AmlRecord
             {
                 Id = x.Id,
-
                 FullName = x.FullName,
-
-                Aliases = x.Aliases,
-
+                NormalizedName = x.NormalizedName,
+                NamePrefix = x.NamePrefix,
                 DateOfBirth = x.DateOfBirth,
-
                 Country = x.Country,
-
                 Gender = x.Gender,
-
                 SourceName = x.SourceName,
-
                 ReferenceNo = x.ReferenceNo
             }).ToListAsync(cancellationToken);
     }

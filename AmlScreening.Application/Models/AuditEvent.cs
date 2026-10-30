@@ -9,7 +9,7 @@ public sealed record AuditEvent(
 public sealed class AuditLogItem
 {
     public long AuditLogId { get; init; }
-    public int ClientId { get; init; }
+    public int PartnerId { get; init; }
     public long UserId { get; init; }
     public string Username { get; init; } = string.Empty;
     public string Action { get; init; } = string.Empty;

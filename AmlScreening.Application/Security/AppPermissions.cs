@@ -119,6 +119,10 @@ public static class AppPermissions
     {
         public const string View =
             "CustomerKyc.View";
+        public const string Approve =
+            "CustomerKyc.Approve";
+        public const string Review =
+            "CustomerKyc.Review";
     }
 
     public static class Api
@@ -146,6 +150,10 @@ public static class AppPermissions
         Compliance.Manage,
         Compliance.Approve,
 
+          CustomerKyc.View,
+        CustomerKyc.Review,
+        CustomerKyc.Approve,
+
         RiskScore.View,
         RiskScore.Manage,
         RiskScore.Approve,
@@ -168,7 +176,7 @@ public static class AppPermissions
         Audit.View,
         Screening.View,
         Roles.View,
-        CustomerKyc.View,
+
         Api.Access
      ];
 
@@ -191,6 +199,10 @@ public static class AppPermissions
     Compliance.View,
     Compliance.Manage,
     Compliance.Approve,
+
+          CustomerKyc.View,
+        CustomerKyc.Review,
+CustomerKyc.Approve,
 
         RiskScore.View,
         RiskScore.Manage,

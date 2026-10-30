@@ -1,0 +1,349 @@
+﻿@model IReadOnlyList<CustomerKycScreeningLog>
+
+@{
+    ViewData["Title"] = "KYC Review";
+
+    var pendingCount =
+        Model?.Count ?? 0;
+}
+
+@section Styles
+{
+    <link rel="stylesheet"
+          href="~/css/workflow.css"
+          asp-append-version="true" />
+
+    <link rel="stylesheet"
+          href="~/css/customer-kyc-review.css"
+          asp-append-version="true" />
+}
+
+
+<section class="kyc-review-heading">
+
+    <div>
+      @*   <span class="kyc-review-eyebrow">
+            MAKER-CHECKER
+        </span> *@
+
+        <h1>
+            Customer KYC Review
+        </h1>
+
+        <p>
+            Review fuzzy AML name matches
+            submitted for checker approval.
+        </p>
+    </div>
+
+
+    <div class="kyc-review-count">
+
+        <span>
+            Pending
+        </span>
+
+        <strong>
+            @pendingCount
+        </strong>
+
+    </div>
+
+</section>
+
+
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="workflow-message success">
+
+        <i class="bi bi-check-circle"></i>
+
+        <span>
+            @successMessage
+        </span>
+
+    </div>
+}
+
+
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="workflow-message error">
+
+        <i class="bi bi-exclamation-circle"></i>
+
+        <span>
+            @errorMessage
+        </span>
+
+    </div>
+}
+
+
+<section class="workflow-panel">
+
+    <div class="workflow-panel-title">
+
+        <div>
+            <h2>
+                Pending Reviews
+            </h2>
+
+            <span>
+                Fuzzy name matches waiting for checker action.
+            </span>
+        </div>
+
+    </div>
+
+
+    <div class="table-responsive">
+
+        <table class="workflow-table kyc-review-table">
+
+            <thead>
+
+                <tr>
+
+                    <th>
+                        Ref
+                    </th>
+
+                    <th>
+                        Customer
+                    </th>
+
+                    <th>
+                        AML Match
+                    </th>
+
+                    <th>
+                        Name %
+                    </th>
+
+                    <th>
+                        Risk
+                    </th>
+
+                    <th>
+                        Screening
+                    </th>
+
+                    <th>
+                        Maker
+                    </th>
+
+                    <th>
+                        Created
+                    </th>
+
+                    <th>
+                        Action
+                    </th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+                @if (Model == null ||
+                     Model.Count == 0)
+                {
+                    <tr>
+
+                        <td colspan="9"
+                            class="workflow-empty">
+
+                            <div class="kyc-review-empty">
+
+                                <i class="bi bi-shield-check"></i>
+
+                                <strong>
+                                    No pending KYC reviews
+                                </strong>
+
+                                <span>
+                                    All fuzzy screening results
+                                    have been reviewed.
+                                </span>
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var item in Model)
+                    {
+                        var riskClass =
+                            item.RiskLevel?
+                                .Trim()
+                                .ToUpperInvariant()
+                            switch
+                            {
+                                "LOW" =>
+                                    "low",
+
+                                "MEDIUM" =>
+                                    "medium",
+
+                                "HIGH" =>
+                                    "high",
+
+                                "CRITICAL" =>
+                                    "critical",
+
+                                _ =>
+                                    ""
+                            };
+
+
+                        <tr>
+
+                            <td>
+
+                                <strong>
+                                    #@item.Id
+                                </strong>
+
+                            </td>
+
+
+                            <td>
+
+                                <strong class="kyc-customer-name">
+                                    @item.FullName
+                                </strong>
+
+
+                                @if (item.DateOfBirth.HasValue)
+                                {
+                                    <small>
+                                        DOB:
+                                        @item.DateOfBirth.Value.ToString("dd MMM yyyy")
+                                    </small>
+                                }
+                                else
+                                {
+                                    <small>
+                                        DOB not provided
+                                    </small>
+                                }
+
+                            </td>
+
+
+                            <td>
+
+                                <strong>
+                                    @(string.IsNullOrWhiteSpace(
+                                        item.MatchedName)
+                                        ? "-"
+                                        : item.MatchedName)
+                                </strong>
+
+                            </td>
+
+
+                            <td>
+
+                                <span class="kyc-match-pill">
+
+                                    @(item.NameMatchPercent?
+                                        .ToString("0.##")
+                                        ?? "0")%
+
+                                </span>
+
+                            </td>
+
+
+                            <td>
+
+                                @if (!string.IsNullOrWhiteSpace(
+                                        item.RiskLevel))
+                                {
+                                    <span class="risk-pill @riskClass">
+
+                                        @item.RiskLevel
+
+                                    </span>
+
+                                    <small>
+                                        Score:
+                                        @(item.RiskScore?
+                                            .ToString("0.##")
+                                            ?? "-")
+                                    </small>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">
+                                        -
+                                    </span>
+                                }
+
+                            </td>
+
+
+                            <td>
+
+                                <span class="kyc-screening-badge">
+
+                                    @item.ScreeningType
+
+                                </span>
+
+                            </td>
+
+
+                            <td>
+
+                                <strong>
+                                    @item.Username
+                                </strong>
+
+                            </td>
+
+
+                            <td>
+
+                                @item.CreatedDate.ToString("dd MMM yyyy")
+
+                                <small>
+                                    @item.CreatedDate.ToString("hh:mm tt")
+                                </small>
+
+                            </td>
+
+
+                            <td>
+
+                                <a asp-controller="CustomerKycReview"
+                                   asp-action="Details"
+                                   asp-route-id="@item.Id"
+                                   class="kyc-review-button">
+
+                                    <i class="bi bi-eye"></i>
+
+                                    Review
+
+                                </a>
+
+                            </td>
+
+                        </tr>
+                    }
+                }
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>

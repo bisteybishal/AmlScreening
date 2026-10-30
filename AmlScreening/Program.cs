@@ -27,6 +27,7 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CustomerKycService>();
+builder.Services.AddScoped<CustomerKycReviewService>();
 builder.Services.AddScoped<DropdownHelper>();
 builder.Services.AddScoped<PortalCookieEvents>();
 

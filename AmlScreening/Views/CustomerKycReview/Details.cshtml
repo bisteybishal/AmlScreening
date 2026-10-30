@@ -1,0 +1,926 @@
+﻿@using System.Security.Claims
+
+@model CustomerKycScreeningLog
+
+@{
+    ViewData["Title"] =
+        "Review Customer KYC";
+
+
+    var currentUserIdValue =
+        User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
+
+
+    long.TryParse(
+        currentUserIdValue,
+        out var currentUserId);
+
+
+    var isMaker =
+        currentUserId ==
+        Model.UserId;
+
+
+    var isPending =
+        string.Equals(
+            Model.Status,
+            "PENDING_REVIEW",
+            StringComparison.OrdinalIgnoreCase);
+
+
+    var hasApprovePermission =
+        User.HasClaim(
+            AppPermissions.ClaimType,
+            AppPermissions.CustomerKyc.Approve);
+
+
+    var canApprove =
+        isPending
+        &&
+        hasApprovePermission
+        &&
+        !isMaker;
+
+
+    var riskClass =
+        Model.RiskLevel?
+            .Trim()
+            .ToUpperInvariant()
+        switch
+        {
+            "LOW" =>
+                "low",
+
+            "MEDIUM" =>
+                "medium",
+
+            "HIGH" =>
+                "high",
+
+            "CRITICAL" =>
+                "critical",
+
+            _ =>
+                ""
+        };
+
+
+    var statusClass =
+        Model.Status?
+            .Trim()
+            .ToUpperInvariant()
+        switch
+        {
+            "PENDING_REVIEW" =>
+                "pending",
+
+            "APPROVED" =>
+                "approved",
+
+            "REJECTED" =>
+                "rejected",
+
+            "COMPLETED" =>
+                "completed",
+
+            _ =>
+                ""
+        };
+}
+
+
+@section Styles
+{
+    <link rel="stylesheet"
+          href="~/css/workflow.css"
+          asp-append-version="true" />
+
+    <link rel="stylesheet"
+          href="~/css/customer-kyc-review.css"
+          asp-append-version="true" />
+}
+
+
+<section class="kyc-review-heading">
+
+    <div>
+
+        <span class="kyc-review-eyebrow">
+            KYC CHECKER REVIEW
+        </span>
+
+        <h1>
+            Review Screening #@Model.Id
+        </h1>
+
+        <p>
+            Review the customer information,
+            AML match and calculated risk
+            before taking action.
+        </p>
+
+    </div>
+
+
+    <span class="kyc-status-pill @statusClass">
+
+        @Model.Status.Replace("_", " ")
+
+    </span>
+
+</section>
+
+
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="workflow-message error">
+
+        <i class="bi bi-exclamation-circle"></i>
+
+        @errorMessage
+
+    </div>
+}
+
+
+@if (isMaker)
+{
+    <div class="kyc-review-notice">
+
+        <i class="bi bi-info-circle"></i>
+
+        <div>
+
+            <strong>
+                Maker-checker restriction
+            </strong>
+
+            <p>
+                You created this KYC screening.
+                A different authorized user must
+                approve or reject it.
+            </p>
+
+        </div>
+
+    </div>
+}
+
+
+<div class="kyc-review-grid">
+
+
+    <!-- =====================================================
+         CUSTOMER DETAILS
+         ===================================================== -->
+
+    <section class="workflow-panel">
+
+        <div class="kyc-panel-heading">
+
+            <span class="kyc-panel-icon">
+                <i class="bi bi-person-vcard"></i>
+            </span>
+
+            <div>
+
+                <h2>
+                    Customer Details
+                </h2>
+
+                <p>
+                    Information submitted by the maker.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <dl class="kyc-detail-list">
+
+
+            <div>
+
+                <dt>
+                    Full name
+                </dt>
+
+                <dd>
+                    @Model.FullName
+                </dd>
+
+            </div>
+
+
+            <div>
+
+                <dt>
+                    Date of birth
+                </dt>
+
+                <dd>
+
+                    @(Model.DateOfBirth.HasValue
+                        ? Model.DateOfBirth.Value
+                            .ToString("dd MMM yyyy")
+                        : "Not provided")
+
+                </dd>
+
+            </div>
+
+
+            <div>
+
+                <dt>
+                    Country
+                </dt>
+
+                <dd>
+                    @(string.IsNullOrWhiteSpace(
+                        Model.Country)
+                        ? "Not provided"
+                        : Model.Country)
+                </dd>
+
+            </div>
+
+
+            <div>
+
+                <dt>
+                    Gender
+                </dt>
+
+                <dd>
+                    @(string.IsNullOrWhiteSpace(
+                        Model.Gender)
+                        ? "Not provided"
+                        : Model.Gender)
+                </dd>
+
+            </div>
+
+
+            <div>
+
+                <dt>
+                    Occupation
+                </dt>
+
+                <dd>
+                    @(string.IsNullOrWhiteSpace(
+                        Model.Occupation)
+                        ? "Not provided"
+                        : Model.Occupation)
+                </dd>
+
+            </div>
+
+
+            <div>
+
+                <dt>
+                    Source of funds
+                </dt>
+
+                <dd>
+                    @(string.IsNullOrWhiteSpace(
+                        Model.SourceOfFunds)
+                        ? "Not provided"
+                        : Model.SourceOfFunds)
+                </dd>
+
+            </div>
+
+
+            <div>
+
+                <dt>
+                    Screening type
+                </dt>
+
+                <dd>
+
+                    <span class="kyc-screening-badge">
+
+                        @Model.ScreeningType
+
+                    </span>
+
+                </dd>
+
+            </div>
+
+
+        </dl>
+
+    </section>
+
+
+    <!-- =====================================================
+         AML MATCH
+         ===================================================== -->
+
+    <section class="workflow-panel">
+
+        <div class="kyc-panel-heading">
+
+            <span class="kyc-panel-icon warning">
+                <i class="bi bi-shield-exclamation"></i>
+            </span>
+
+            <div>
+
+                <h2>
+                    AML Name Match
+                </h2>
+
+                <p>
+                    Closest AML record found
+                    during screening.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="kyc-name-comparison">
+
+
+            <div>
+
+                <span>
+                    Customer entered
+                </span>
+
+                <strong>
+                    @Model.FullName
+                </strong>
+
+            </div>
+
+
+            <span class="kyc-name-arrow">
+
+                <i class="bi bi-arrow-right"></i>
+
+            </span>
+
+
+            <div>
+
+                <span>
+                    AML record
+                </span>
+
+                <strong>
+
+                    @(string.IsNullOrWhiteSpace(
+                        Model.MatchedName)
+                        ? "Not available"
+                        : Model.MatchedName)
+
+                </strong>
+
+            </div>
+
+
+        </div>
+
+
+        <div class="kyc-match-score">
+
+            <div>
+
+                <small>
+                    Name similarity
+                </small>
+
+                <strong>
+
+                    @(Model.NameMatchPercent?
+                        .ToString("0.##")
+                        ?? "0")%
+
+                </strong>
+
+            </div>
+
+
+            <div>
+
+                <small>
+                    AML Record ID
+                </small>
+
+                <strong>
+
+                    @(Model.AmlRecordId?
+                        .ToString()
+                        ?? "-")
+
+                </strong>
+
+            </div>
+
+
+            <div>
+
+                <small>
+                    Match count
+                </small>
+
+                <strong>
+                    @Model.MatchCount
+                </strong>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         RISK
+         ===================================================== -->
+
+    <section class="workflow-panel">
+
+        <div class="kyc-panel-heading">
+
+            <span class="kyc-panel-icon">
+                <i class="bi bi-speedometer2"></i>
+            </span>
+
+            <div>
+
+                <h2>
+                    Risk Assessment
+                </h2>
+
+                <p>
+                    Risk calculated during
+                    the original screening.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="kyc-risk-box">
+
+            <div>
+
+                <span>
+                    Risk score
+                </span>
+
+                <strong>
+
+                    @(Model.RiskScore?
+                        .ToString("0.##")
+                        ?? "-")
+
+                </strong>
+
+            </div>
+
+
+            <div>
+
+                <span>
+                    Risk level
+                </span>
+
+
+                @if (!string.IsNullOrWhiteSpace(
+                        Model.RiskLevel))
+                {
+                    <span class="risk-pill @riskClass">
+
+                        @Model.RiskLevel
+
+                    </span>
+                }
+                else
+                {
+                    <strong>
+                        -
+                    </strong>
+                }
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         WORKFLOW
+         ===================================================== -->
+
+    <section class="workflow-panel">
+
+        <div class="kyc-panel-heading">
+
+            <span class="kyc-panel-icon">
+                <i class="bi bi-person-check"></i>
+            </span>
+
+            <div>
+
+                <h2>
+                    Workflow
+                </h2>
+
+                <p>
+                    Maker and checker information.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <dl class="kyc-detail-list">
+
+
+            <div>
+
+                <dt>
+                    Maker
+                </dt>
+
+                <dd>
+                    @Model.Username
+                </dd>
+
+            </div>
+
+
+            <div>
+
+                <dt>
+                    Screening date
+                </dt>
+
+                <dd>
+
+                    @Model.CreatedDate
+                    .ToString(
+                    "dd MMM yyyy hh:mm tt")
+
+                </dd>
+
+            </div>
+
+
+            <div>
+
+                <dt>
+                    Current status
+                </dt>
+
+                <dd>
+
+                    <span class="kyc-status-pill @statusClass">
+
+                        @Model.Status.Replace(
+                            "_",
+                            " ")
+
+                    </span>
+
+                </dd>
+
+            </div>
+
+
+            @if (Model.ApprovedDate.HasValue)
+            {
+                <div>
+
+                    <dt>
+                        Approved by
+                    </dt>
+
+                    <dd>
+                        @Model.ApprovedBy
+                    </dd>
+
+                </div>
+
+
+                <div>
+
+                    <dt>
+                        Approved date
+                    </dt>
+
+                    <dd>
+
+                        @Model.ApprovedDate.Value
+                        .ToString(
+                        "dd MMM yyyy hh:mm tt")
+
+                    </dd>
+
+                </div>
+            }
+
+
+            @if (Model.RejectedDate.HasValue)
+            {
+                <div>
+
+                    <dt>
+                        Rejected by
+                    </dt>
+
+                    <dd>
+                        @Model.RejectedBy
+                    </dd>
+
+                </div>
+
+
+                <div>
+
+                    <dt>
+                        Rejected date
+                    </dt>
+
+                    <dd>
+
+                        @Model.RejectedDate.Value
+                        .ToString(
+                        "dd MMM yyyy hh:mm tt")
+
+                    </dd>
+
+                </div>
+            }
+
+
+            @if (!string.IsNullOrWhiteSpace(
+                    Model.ApprovalRemarks))
+            {
+                <div class="full">
+
+                    <dt>
+                        Remarks
+                    </dt>
+
+                    <dd>
+                        @Model.ApprovalRemarks
+                    </dd>
+
+                </div>
+            }
+
+
+        </dl>
+
+    </section>
+
+</div>
+
+
+<!-- =========================================================
+     CHECKER ACTION
+     ========================================================= -->
+@if (canApprove)
+{
+    <section class="workflow-panel kyc-action-panel">
+
+        <div class="kyc-panel-heading">
+
+            <span class="kyc-panel-icon">
+                <i class="bi bi-check2-square"></i>
+            </span>
+
+            <div>
+
+                <h2>
+                    Checker Decision
+                </h2>
+
+                <p>
+                    Confirm the screening result
+                    or reject it with a reason.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="kyc-decision-grid">
+
+
+            <!-- APPROVE -->
+
+            <form asp-controller="CustomerKycReview"
+                  asp-action="Approve"
+                  method="post"
+                  class="kyc-decision-card approve"
+                  onsubmit="return confirm('Approve this KYC screening?');">
+
+                @Html.AntiForgeryToken()
+
+
+                <input type="hidden"
+                       name="id"
+                       value="@Model.Id" />
+
+
+                <input type="hidden"
+                       name="rowVersion"
+                       value="@Convert.ToBase64String(
+                                                  Model.RowVersion)" />
+
+
+                <div class="kyc-decision-title">
+
+                    <i class="bi bi-check-circle"></i>
+
+                    <div>
+
+                        <strong>
+                            Approve
+                        </strong>
+
+                        <span>
+                            Confirm this fuzzy AML match.
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <label for="approveRemarks">
+                    Remarks
+                    <small>
+                        Optional
+                    </small>
+                </label>
+
+
+                <textarea id="approveRemarks"
+                          name="remarks"
+                          rows="3"
+                          maxlength="500"
+                          placeholder="Optional checker remarks"></textarea>
+
+
+                <button type="submit"
+                        class="kyc-approve-button">
+
+                    <i class="bi bi-check2"></i>
+
+                    Approve Screening
+
+                </button>
+
+            </form>
+
+
+            <!-- REJECT -->
+
+            <form asp-controller="CustomerKycReview"
+                  asp-action="Reject"
+                  method="post"
+                  class="kyc-decision-card reject"
+                  onsubmit="return confirm('Reject this KYC screening?');">
+
+                @Html.AntiForgeryToken()
+
+
+                <input type="hidden"
+                       name="id"
+                       value="@Model.Id" />
+
+
+               @*  <input type="hidden"
+                       name="rowVersion"
+                       value="@Convert.ToBase64String(
+                                                  Model.RowVersion)" /> *@
+
+
+                <div class="kyc-decision-title">
+
+                    <i class="bi bi-x-circle"></i>
+
+                    <div>
+
+                        <strong>
+                            Reject
+                        </strong>
+
+                        <span>
+                            Reject this potential AML match.
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <label for="rejectRemarks">
+                    Rejection reason
+                    <span class="text-danger">
+                        *
+                    </span>
+                </label>
+
+
+                <textarea id="rejectRemarks"
+                          name="remarks"
+                          rows="3"
+                          maxlength="500"
+                          placeholder="Enter rejection reason"
+                          required></textarea>
+
+
+                <button type="submit"
+                        class="kyc-reject-button">
+
+                    <i class="bi bi-x-lg"></i>
+
+                    Reject Screening
+
+                </button>
+
+            </form>
+
+        </div>
+
+    </section>
+}
+else if (isMaker &&
+         isPending)
+{
+    <div class="kyc-review-notice">
+
+        <i class="bi bi-lock"></i>
+
+        <div>
+
+            <strong>
+                Waiting for another checker
+            </strong>
+
+            <p>
+                Because you created this screening,
+                you cannot approve or reject it.
+            </p>
+
+        </div>
+
+    </div>
+}
+else if (isPending &&
+         !hasApprovePermission)
+{
+    <div class="kyc-review-notice">
+
+        <i class="bi bi-lock"></i>
+
+        <div>
+
+            <strong>
+                View only
+            </strong>
+
+            <p>
+                You can review this screening,
+                but you do not have approval permission.
+            </p>
+
+        </div>
+
+    </div>
+}
+
+
+<div class="kyc-review-footer">
+
+    <a asp-controller="CustomerKycReview"
+       asp-action="Index"
+       class="workflow-secondary">
+
+        <i class="bi bi-arrow-left"></i>
+
+        Back to Reviews
+
+    </a>
+
+</div>

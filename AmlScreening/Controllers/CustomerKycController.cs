@@ -4,6 +4,7 @@ using AmlScreening.Portal.Services;
 using AmlScreening.Portal.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 
 namespace AmlScreening.Portal.Controllers
@@ -61,131 +62,67 @@ namespace AmlScreening.Portal.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Screen(
-    [Bind(
-        "FullName,DateOfBirth,Country,Gender," +
-        "ScreeningType,Occupation,SourceOfFunds")]
-    CustomerKycViewModel model,
-    CancellationToken cancellationToken)
+        public async Task<IActionResult> Screen(CustomerKycViewModel model, CancellationToken cancellationToken)
         {
+
+            // Load options first.
+            await _service.LoadDropdownsAsync(
+                model,
+                cancellationToken);
+
+
+            // Validate occupation only when supplied.
+            if (!string.IsNullOrWhiteSpace(
+                    model.Occupation)
+                &&
+                !model.OccupationOptions.Any(
+                    x => string.Equals(
+                        x.Value,
+                        model.Occupation,
+                        StringComparison.OrdinalIgnoreCase)))
+            {
+                ModelState.AddModelError(
+                    nameof(model.Occupation),
+                    "Select a valid occupation.");
+            }
+
+
+            // Validate source only when supplied.
+            if (!string.IsNullOrWhiteSpace(
+                    model.SourceOfFunds)
+                &&
+                !model.SourceOfFundsOptions.Any(
+                    x => string.Equals(
+                        x.Value,
+                        model.SourceOfFunds,
+                        StringComparison.OrdinalIgnoreCase)))
+            {
+                ModelState.AddModelError(
+                    nameof(model.SourceOfFunds),
+                    "Select a valid source of funds.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return View(
+                    "Index",
+                    model);
+            }
             try
             {
-                // Always reload dropdowns after POST.
-                await _service.LoadDropdownsAsync(
-                    model,
-                    cancellationToken);
-
-
-                // ==========================================
-                // VALIDATE COUNTRY
-                // ==========================================
-
-                if (!model.CountryOptions.Any(
-                        x =>
-                            string.Equals(
-                                x.Value,
-                                model.Country,
-                                StringComparison.OrdinalIgnoreCase)))
-                {
-                    ModelState.AddModelError(
-                        nameof(model.Country),
-                        "Select a valid country.");
-                }
-
-
-                // ==========================================
-                // VALIDATE GENDER
-                // ==========================================
-
-                if (!model.GenderOptions.Any(
-                        x =>
-                            string.Equals(
-                                x.Value,
-                                model.Gender,
-                                StringComparison.OrdinalIgnoreCase)))
-                {
-                    ModelState.AddModelError(
-                        nameof(model.Gender),
-                        "Select a valid gender.");
-                }
-
-
-                // ==========================================
-                // VALIDATE SCREENING TYPE
-                // ==========================================
-
-                if (!model.ScreeningTypeOptions.Any(
-                        x =>
-                            string.Equals(
-                                x.Value,
-                                model.ScreeningType,
-                                StringComparison.OrdinalIgnoreCase)))
-                {
-                    ModelState.AddModelError(
-                        nameof(model.ScreeningType),
-                        "Select a valid screening type.");
-                }
-
-
-                // ==========================================
-                // VALIDATE OCCUPATION
-                // ==========================================
-
-                        //if (!model.OccupationOptions.Any(
-                        //        x =>
-                        //            string.Equals(
-                        //                x.Value,
-                        //                model.Occupation,
-                        //                StringComparison.OrdinalIgnoreCase)))
-                        //{
-                        //    ModelState.AddModelError(
-                        //        nameof(model.Occupation),
-                        //        "Select a valid occupation.");
-                        //}
-
-
-                // ==========================================
-                // VALIDATE SOURCE OF FUNDS
-                // ==========================================
-
-                            //if (!model.SourceOfFundsOptions.Any(
-                            //        x =>
-                            //            string.Equals(
-                            //                x.Value,
-                            //                model.SourceOfFunds,
-                            //                StringComparison.OrdinalIgnoreCase)))
-                            //{
-                            //    ModelState.AddModelError(
-                            //        nameof(model.SourceOfFunds),
-                            //        "Select a valid source of funds.");
-                            //}
-
-
-                if (!ModelState.IsValid)
-                {
-                    return View(
-                        "Index",
-                        model);
-                }
-
-
+               
                 model.Result =
                     await _service.CheckAsync(
                         model,
                         cancellationToken);
             }
+            catch (InvalidOperationException ex)
+            {
+                TempData["ErrorMessage"] =
+                    ex.Message;
+            }
 
-            catch (ArgumentException ex)
-            {
-                model.Result = null;
-                model.ScreeningMessage = ex.Message;
-            }
-            catch (OperationCanceledException)
-                when (cancellationToken.IsCancellationRequested)
-            {
-                return new EmptyResult();
-            }
-          
+
             catch (Exception ex)
             {
                 model.Result =
@@ -193,7 +130,7 @@ namespace AmlScreening.Portal.Controllers
 
 
                 await _errorLogService.LogAsync(
-                    ex,
+                    ex.GetBaseException(),
                     nameof(CustomerKycController),
                     nameof(Screen),
                     User.FindFirstValue(

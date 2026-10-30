@@ -58,11 +58,7 @@ namespace AmlScreening.Portal.Services
                         .RemoteIpAddress?
                         .ToString();
 
-                var requestPath =
-       context == null
-           ? null
-           : $"{context.Request.Path}" +
-             $"{context.Request.QueryString}";
+                var requestPath=context?.Request.Path.Value;
 
                 string errorNumber;
 

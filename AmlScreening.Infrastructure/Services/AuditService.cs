@@ -1,8 +1,9 @@
 using AmlScreening.Application.Interface;
 using AmlScreening.Application.Models;
+using AmlScreening.Application.Security;
 using AmlScreening.Infrastructure.Persistence;
 using Dapper;
-using AmlScreening.Application.Security;
+using System.Data;
 
 namespace AmlScreening.Infrastructure.Services;
 
@@ -23,51 +24,41 @@ public sealed class AuditService : IAuditService
         AuditEvent auditEvent,
         CancellationToken cancellationToken = default)
     {
-        const string sql = """
-            INSERT INTO dbo.AuditLogs
-                (ClientId, UserId, Username, Action, EntityType, EntityId, Details, CreatedDate)
-            VALUES
-                (@ClientId, @UserId, @Username, @Action, @EntityType, @EntityId, @Details, SYSUTCDATETIME());
-            """;
-
         using var connection = _connectionFactory.CreateConnection();
         await connection.ExecuteAsync(new CommandDefinition(
-            sql,
-            new
-            {
-                PartnerId = _currentUser.PartnerId,
-                UserId = _currentUser.UserId,
-                Username = _currentUser.Username,
-                auditEvent.Action,
-                auditEvent.EntityType,
-                auditEvent.EntityId,
-                Details = Truncate(auditEvent.Details, 2000)
-            },
-            cancellationToken: cancellationToken));
+          "dbo.usp_AuditLog",
+          new
+          {
+              _currentUser.PartnerId,
+              _currentUser.UserId,
+              _currentUser.Username,
+              auditEvent.Action,
+              auditEvent.EntityType,
+              auditEvent.EntityId,
+              Details = Truncate(auditEvent.Details, 2000)
+          },
+          commandType: CommandType.StoredProcedure,
+          cancellationToken: cancellationToken));
     }
 
     public async Task<IReadOnlyList<AuditLogItem>> GetRecentAsync(
         int maximumRecords = 200,
         CancellationToken cancellationToken = default)
     {
-        const string sql = """
-            SELECT TOP (@MaximumRecords)
-                   AuditLogId, ClientId, UserId, Username, Action,
-                   EntityType, EntityId, Details, CreatedDate
-            FROM dbo.AuditLogs
-            WHERE (@CanViewAll = 1 OR ClientId = @ClientId)
-            ORDER BY CreatedDate DESC, AuditLogId DESC;
-            """;
+        
 
         using var connection = _connectionFactory.CreateConnection();
+       
         var records = await connection.QueryAsync<AuditLogItem>(new CommandDefinition(
-            sql,
+             "dbo.usp_GetRecentAuditLogs",
             new
             {
                 MaximumRecords = Math.Clamp(maximumRecords, 1, 1000),
-                PartnerId = _currentUser.PartnerId,
-                CanViewAll = _currentUser.HasPermission(AppPermissions.Portal.Access)
+                _currentUser.PartnerId,
+                CanViewAll = _currentUser.IsAdmin
+
             },
+             commandType: CommandType.StoredProcedure,
             cancellationToken: cancellationToken));
         return records.AsList();
     }

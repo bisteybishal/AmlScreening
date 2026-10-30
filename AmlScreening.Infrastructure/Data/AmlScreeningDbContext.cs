@@ -391,6 +391,45 @@ public sealed class AmlScreeningDbContext
                     .HasMaxLength(20)
                     .IsRequired();
 
+                entity.Property(x => x.FullName)
+    .HasMaxLength(500);
+
+                entity.Property(x => x.Country)
+                    .HasMaxLength(100);
+
+                entity.Property(x => x.Gender)
+                    .HasMaxLength(20);
+
+                entity.Property(x => x.Occupation)
+                    .HasMaxLength(150);
+
+                entity.Property(x => x.SourceOfFunds)
+                    .HasMaxLength(150);
+
+                entity.Property(x => x.MatchedName)
+                    .HasMaxLength(200);
+
+                entity.Property(x => x.Status)
+                    .HasMaxLength(20)
+                    .IsRequired();
+
+                entity.Property(x => x.ApprovedBy)
+                    .HasMaxLength(100);
+
+                entity.Property(x => x.ApprovalRemarks)
+                    .HasMaxLength(500);
+                entity.Property(x => x.RejectedBy)
+                   .HasMaxLength(100);
+                entity.Property(x => x.RejectedRemarks)
+                   .HasMaxLength(500);
+                entity.Property(x => x.MatchedName)
+                                .HasMaxLength(200);
+
+                entity.Property(x => x.NameMatchPercent)
+                    .HasPrecision(5, 2);
+                entity.Property(x => x.RowVersion)
+    .IsRowVersion()
+    .IsConcurrencyToken();
 
                 entity.HasIndex(x =>
                         new

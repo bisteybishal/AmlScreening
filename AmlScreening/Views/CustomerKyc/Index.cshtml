@@ -5,43 +5,77 @@
     ViewData["Title"] = "Customer Screening";
 
     var result = Model.Result;
-    var hasErrors = !ViewData.ModelState.IsValid;
-    var hasscreeingErrors = !string.IsNullOrWhiteSpace(Model.ScreeningMessage);
 
-    var riskClass = result?.RiskLevel?.Trim().ToUpperInvariant() switch
-    {
-        "LOW" => "risk-low",
-        "MEDIUM" => "risk-medium",
-        "HIGH" => "risk-high",
-        "CRITICAL" => "risk-critical",
-        _ => ""
-    };
+    var hasErrors =
+        !ViewData.ModelState.IsValid;
+
+    var riskClass =
+        result?.RiskLevel?
+            .Trim()
+            .ToUpperInvariant()
+        switch
+        {
+            "LOW" => "risk-low",
+            "MEDIUM" => "risk-medium",
+            "HIGH" => "risk-high",
+            "CRITICAL" => "risk-critical",
+            _ => ""
+        };
 }
 
 
-        
-        <link rel="stylesheet" href="~/css/customer-kyc.css" asp-append-version="true" / >
+@section Styles
+{
+    <link rel="stylesheet"
+          href="~/css/customer-kyc.css"
+          asp-append-version="true" />
+}
 
 
 <div class="screening-page">
 
+    <!-- ======================================================
+         PAGE HEADER
+         ====================================================== -->
+
     <header class="screening-header">
-        <span class="screening-eyebrow">Customer Screening</span>
-       
+
+        <span class="screening-eyebrow">
+            Customer Screening
+        </span>
+
     </header>
+
 
     <div class="screening-layout">
 
-        <!-- CUSTOMER FORM -->
+
+        <!-- ==================================================
+             LEFT SIDE - CUSTOMER FORM
+             ================================================== -->
+
         <section class="screening-card">
+
             <div class="screening-card-heading">
-                <span class="screening-icon" aria-hidden="true">
+
+                <span class="screening-icon"
+                      aria-hidden="true">
+
                     <i class="bi bi-person-vcard"></i>
+
                 </span>
+
+
                 <div>
-                    <h2>Customer Details</h2>
+
+                    <h2>
+                        Customer Details
+                    </h2>
+
                 </div>
+
             </div>
+
 
             <form id="customerScreeningForm"
                   asp-controller="CustomerKyc"
@@ -49,176 +83,345 @@
                   method="post"
                   asp-antiforgery="true">
 
+
+                <!-- GENERAL VALIDATION -->
+
                 <div asp-validation-summary="ModelOnly"
                      class="screening-errors"
-                     role="alert"></div>
+                     role="alert">
+                </div>
+
 
                 <div class="screening-fields">
 
+
+                    <!-- FULL NAME -->
+
                     <div class="screening-field">
+
                         <label asp-for="FullName"
                                class="screening-label">
+
                             <span>
                                 Full name
-                                <span class="screening-required">*</span>
+                                <span class="screening-required">
+                                    *
+                                </span>
                             </span>
+
                         </label>
+
+
                         <input asp-for="FullName"
                                class="screening-input"
                                placeholder="Enter full name"
                                autocomplete="name"
                                required />
-                        <span asp-validation-for="FullName"></span>
+
+
+                        <span asp-validation-for="FullName">
+                        </span>
+
                     </div>
 
+
+                    <!-- DATE OF BIRTH -->
+
                     <div class="screening-field">
+
                         <label asp-for="DateOfBirth"
                                class="screening-label">
-                            <span>Date of birth</span>
-                            <span class="screening-optional">Optional</span>
+
+                            <span>
+                                Date of birth
+                            </span>
+
+                            <span class="screening-optional">
+                                Optional
+                            </span>
+
                         </label>
+
+
                         <input asp-for="DateOfBirth"
                                type="date"
                                class="screening-input" />
-                        <span asp-validation-for="DateOfBirth"></span>
+
+
+                        <span asp-validation-for="DateOfBirth">
+                        </span>
+
                     </div>
 
+
+                    <!-- COUNTRY -->
+
                     <div class="screening-field">
+
                         <label asp-for="Country"
                                class="screening-label">
+
                             <span>
                                 Country
-                                <span class="screening-required">*</span>
+                                <span class="screening-required">
+                                    *
+                                </span>
                             </span>
+
                         </label>
+
+
                         <select asp-for="Country"
                                 asp-items="Model.CountryOptions"
                                 class="screening-input"
                                 required>
-                            <option value="">Select country</option>
+
+                            <option value="">
+                                Select country
+                            </option>
+
                         </select>
-                        <span asp-validation-for="Country"></span>
+
+
+                        <span asp-validation-for="Country">
+                        </span>
+
                     </div>
 
+
+                    <!-- GENDER -->
+
                     <div class="screening-field">
+
                         <label asp-for="Gender"
                                class="screening-label">
+
                             <span>
                                 Gender
-                                <span class="screening-required">*</span>
+                                <span class="screening-required">
+                                    *
+                                </span>
                             </span>
+
                         </label>
+
+
                         <select asp-for="Gender"
                                 asp-items="Model.GenderOptions"
                                 class="screening-input"
                                 required>
-                            <option value="">Select gender</option>
+
+                            <option value="">
+                                Select gender
+                            </option>
+
                         </select>
-                        <span asp-validation-for="Gender"></span>
+
+
+                        <span asp-validation-for="Gender">
+                        </span>
+
                     </div>
 
+
+                    <!-- SCREENING TYPE -->
+
                     <div class="screening-field">
+
                         <label asp-for="ScreeningType"
                                class="screening-label">
+
                             <span>
                                 Screening type
-                                <span class="screening-required">*</span>
+                                <span class="screening-required">
+                                    *
+                                </span>
                             </span>
+
                         </label>
+
+
                         <select asp-for="ScreeningType"
                                 asp-items="Model.ScreeningTypeOptions"
                                 class="screening-input"
                                 required>
-                            <option value="">Select screening type</option>
+
+                            <option value="">
+                                Select screening type
+                            </option>
+
                         </select>
-                        <span asp-validation-for="ScreeningType"></span>
+
+
+                        <span asp-validation-for="ScreeningType">
+                        </span>
+
                     </div>
 
+
+                    <!-- OCCUPATION -->
+
                     <div class="screening-field">
+
                         <label asp-for="Occupation"
                                class="screening-label">
+
                             <span>
                                 Occupation
-                                <span class="screening-required"></span>
                             </span>
+
+                            <span class="screening-optional">
+                                Optional
+                            </span>
+
                         </label>
+
+
                         <select asp-for="Occupation"
                                 asp-items="Model.OccupationOptions"
-                                class="screening-input"
-                                >
-                            <option value="">Select occupation</option>
+                                class="screening-input">
+
+                            <option value="">
+                                Select occupation
+                            </option>
+
                         </select>
-                        <span asp-validation-for="Occupation"></span>
+
+
+                        <span asp-validation-for="Occupation">
+                        </span>
+
                     </div>
 
+
+                    <!-- SOURCE OF FUNDS -->
+
                     <div class="screening-field">
+
                         <label asp-for="SourceOfFunds"
                                class="screening-label">
+
                             <span>
                                 Source of funds
-                                <span class="screening-required"></span>
                             </span>
+
+                            <span class="screening-optional">
+                                Optional
+                            </span>
+
                         </label>
+
+
                         <select asp-for="SourceOfFunds"
                                 asp-items="Model.SourceOfFundsOptions"
-                                class="screening-input"
-                                >
-                            <option value="">Select source of funds</option>
+                                class="screening-input">
+
+                            <option value="">
+                                Select source of funds
+                            </option>
+
                         </select>
-                        <span asp-validation-for="SourceOfFunds"></span>
+
+
+                        <span asp-validation-for="SourceOfFunds">
+                        </span>
+
                     </div>
 
                 </div>
 
+
+                <!-- FORM ACTIONS -->
+
                 <div class="screening-actions">
+
                     <button id="screeningSubmit"
                             type="submit"
                             class="screening-submit">
+
                         <i class="bi bi-search screening-search-icon"
-                           aria-hidden="true"></i>
+                           aria-hidden="true">
+                        </i>
+
+
                         <span class="screening-busy-icon"
-                              aria-hidden="true"></span>
+                              aria-hidden="true">
+                        </span>
+
+
                         <span id="screeningButtonText">
                             Check PEP/Sanction
                         </span>
+
                     </button>
+
 
                     <a asp-controller="CustomerKyc"
                        asp-action="Index"
                        class="screening-clear">
+
                         Clear
+
                     </a>
+
                 </div>
 
-                @* <p class="screening-note">
-                    <i class="bi bi-info-circle" aria-hidden="true"></i>
-                    <span>
-                        Screening activity is recorded for audit  and usage tracking.
-                    </span>
-                </p> *@
             </form>
+
         </section>
 
-        <!-- SCREENING RESULT -->
+
+        <!-- ==================================================
+             RIGHT SIDE - SCREENING RESULT
+             ================================================== -->
+
         <section class="screening-card"
                  id="screeningResult"
                  aria-labelledby="screeningResultTitle">
 
+
+            <!-- RESULT HEADER -->
+
             <div class="screening-card-heading">
-                <span class="screening-icon" aria-hidden="true">
+
+                <span class="screening-icon"
+                      aria-hidden="true">
+
                     <i class="bi bi-shield-check"></i>
+
                 </span>
+
+
                 <div>
-                    <h2 id="screeningResultTitle">Screening Result</h2>
+
+                    <h2 id="screeningResultTitle">
+                        Screening Result
+                    </h2>
+
+
                     <p>
+
                         @(result == null
                             ? "Your result will appear here."
                             : Model.FullName)
+
                     </p>
+
                 </div>
+
             </div>
 
-            <div id="screeningStatus" role="status" aria-live="polite">
+
+            <div id="screeningStatus"
+                 role="status"
+                 aria-live="polite">
+
+
+                @* =================================================
+                   CASE 1:
+                   NO RESULT YET
+                   ================================================= *@
+
                 @if (result == null)
                 {
                     <div class="screening-empty">
@@ -226,324 +429,772 @@
                         <span class="screening-empty-icon"
                               aria-hidden="true">
 
-                            @if (hasscreeingErrors)
+                            @if (hasErrors)
                             {
-                                <i class="bi bi-exclamation-circle"></i>
-                            }
-                            else if (hasErrors)
-                            {
-                                <i class="bi bi-exclamation-circle"></i>
+                                <i class="bi bi-exclamation-circle">
+                                </i>
                             }
                             else
                             {
-                                <i class="bi bi-shield-check"></i>
+                                <i class="bi bi-shield-check">
+                                </i>
                             }
 
                         </span>
 
 
-                        @if (hasscreeingErrors)
-                        {
-                            <h3 id="screeningEmptyTitle">
-                                No AML name match
-                            </h3>
-
-                            <p id="screeningEmptyMessage">
-                                @Model.ScreeningMessage
-                            </p>
-                        }
-                        else if (hasErrors)
+                        @if (hasErrors)
                         {
                             <h3 id="screeningEmptyTitle">
                                 Check not completed
                             </h3>
 
+
                             <p id="screeningEmptyMessage">
-                                Complete the required customer details
-                                and submit again.
+
+                                Review the customer details
+                                and try again.
+
                             </p>
                         }
                         else
                         {
                             <h3 id="screeningEmptyTitle">
-                                Ready when you are
+                                Ready for screening
                             </h3>
 
+
                             <p id="screeningEmptyMessage">
-                                Enter customer details and select
-                                Check PEP/Sanction to start screening.
+
+                                Enter customer details and click
+                                Check PEP/Sanction.
+
                             </p>
                         }
 
                     </div>
                 }
-            </div>
 
-            @if (result != null)
-            {
-                <div class="screening-risk">
-                    <div>
-                        <p class="screening-risk-label">
-                            Calculated risk score
-                        </p>
-                        <div class="screening-risk-score">
-                            @result.RiskScore.ToString("0.##")
-                        </div>
-                        <p class="screening-risk-caption">
-                            Based on the configured risk model
-                        </p>
-                    </div>
 
-                    <span class="screening-badge @riskClass">
-                        @result.RiskLevel
-                    </span>
-                </div>
+                @* =================================================
+                   CASE 2:
+                   NAME BELOW THRESHOLD
 
-                <h3 class="screening-section-title">
-                    @(result.Matches.Count > 0
-                        ? "Potential AML matches"
-                        : "No AML match found")
-                </h3>
+                   Example:
+                   threshold = 80
+                   name = 75
 
-                <p class="screening-description">
-                    @if (result.Matches.Count > 0)
-                    {
-                        <text>
-                            @result.Matches.Count potential
-                            @(result.Matches.Count == 1 ? "match" : "matches")
-                            found. Review the details below.
-                        </text>
-                    }
-                    else
-                    {
-                        <text>
-                            No AML record met the configured
-                            match threshold for this screening.
-                        </text>
-                    }
-                </p>
+                   Result:
+                   NO_MATCH
+                   NO RISK
+                   ================================================= *@
 
-                @foreach (var evidence in result.MatchEvidence)
+                else if (result.ScreeningStatus == "NO_MATCH")
                 {
-                    <article class="screening-match">
-                        <div class="screening-match-heading">
-                            <h4>@evidence.MatchedName</h4>
-                            <span class="screening-badge">
-                                @evidence.SourceName
-                            </span>
-                        </div>
+                    <div class="screening-empty">
 
-                        <div class="screening-match-percent">
-                            <span>Name similarity</span>
-                            <strong>
-                                @evidence.NameMatchPercent.ToString("0.##")%
-                            </strong>
-                        </div>
+                        <span class="screening-empty-icon"
+                              aria-hidden="true">
 
-                        <dl class="screening-evidence">
-                            <div>
-                                <dt>Match status</dt>
-                                <dd>@evidence.MatchStatus</dd>
-                            </div>
+                            <i class="bi bi-search"></i>
 
-                            <div>
-                                <dt>Overall match</dt>
-                                <dd>
-                                    @evidence.MatchPercent.ToString("0.##")%
-                                </dd>
-                            </div>
+                        </span>
 
-                            <div>
-                                <dt>Reference</dt>
-                                <dd>
-                                    @(string.IsNullOrWhiteSpace(evidence.ReferenceNo)
-                                        ? "Not provided"
-                                        : evidence.ReferenceNo)
-                                </dd>
-                            </div>
 
-                            <div>
-                                <dt>Date of birth</dt>
-                                <dd>
-                                    @(evidence.DateOfBirthMatched
-                                        ? "Matched"
-                                        : "Not matched or unavailable")
-                                </dd>
-                            </div>
+                        <h3>
+                            No AML Name Match
+                        </h3>
 
-                            <div>
-                                <dt>Country</dt>
-                                <dd>
-                                    @(evidence.CountryMatched
-                                        ? "Matched"
-                                        : "Not matched or unavailable")
-                                </dd>
-                            </div>
 
-                            <div>
-                                <dt>Gender</dt>
-                                <dd>
-                                    @(evidence.GenderMatched
-                                        ? "Matched"
-                                        : "Not matched or unavailable")
-                                </dd>
-                            </div>
-                        </dl>
-                    </article>
+                        <p>
+                            @result.ScreeningMessage
+                        </p>
+
+
+                        <p class="screening-note">
+
+                            <i class="bi bi-info-circle">
+                            </i>
+
+                            Risk score was not calculated.
+
+                        </p>
+
+                    </div>
                 }
 
-                <details class="screening-details">
-                    <summary>Risk calculation details</summary>
 
-                    <div class="screening-table-wrap">
-                        <table class="screening-table">
-                            <thead>
-                                <tr>
-                                    <th scope="col">Factor</th>
-                                    <th scope="col">Rule score</th>
-                                    <th scope="col">Weight</th>
-                                    <th scope="col">Points</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <th scope="row">AML source</th>
-                                    <td>
-                                        @(result.AmlRuleScore?.ToString("0.##") ?? "—")
-                                    </td>
-                                    <td>
-                                        @(result.AmlWeight.HasValue
-                                            ? result.AmlWeight.Value.ToString("0.##") + "%"
-                                            : "—")
-                                    </td>
-                                    <td>
-                                        @(result.AmlContribution?.ToString("0.##") ?? "—")
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">Occupation</th>
-                                    <td>
-                                        @(result.OccupationRuleScore?.ToString("0.##") ?? "—")
-                                    </td>
-                                    <td>
-                                        @(result.OccupationWeight.HasValue
-                                            ? result.OccupationWeight.Value.ToString("0.##") + "%"
-                                            : "—")
-                                    </td>
-                                    <td>
-                                        @(result.OccupationContribution?.ToString("0.##") ?? "—")
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">Source of funds</th>
-                                    <td>
-                                        @(result.SourceOfFundsRuleScore?.ToString("0.##") ?? "—")
-                                    </td>
-                                    <td>
-                                        @(result.SourceOfFundsWeight.HasValue
-                                            ? result.SourceOfFundsWeight.Value.ToString("0.##") + "%"
-                                            : "—")
-                                    </td>
-                                    <td>
-                                        @(result.SourceOfFundsContribution?.ToString("0.##") ?? "—")
-                                    </td>
-                                </tr>
-                            </tbody>
-                            <tfoot>
-                                <tr>
-                                    <th scope="row" colspan="3">
-                                        Final risk score
-                                    </th>
-                                    <td>
-                                        @result.RiskScore.ToString("0.##")
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
+                @* =================================================
+                   CASE 3 / CASE 4
 
-                    <p class="screening-note">
-                        Points = rule score × weight ÷ 100.
+                   PENDING_REVIEW
+                   OR
+                   COMPLETED
+                   ================================================= *@
+
+                else
+                {
+
+                    <!-- ==========================================
+                         WORKFLOW STATUS
+                         ========================================== -->
+                    @if (result.ScreeningStatus ==
+                                             "PENDING_REVIEW")
+                    {
+                        <div class="screening-review-alert">
+
+                            <span class="screening-review-alert-icon">
+
+                                <i class="bi bi-shield-exclamation">
+                                </i>
+
+                            </span>
+
+
+                            <div>
+
+                                <strong>
+                                    Pending Compliance Review
+                                </strong>
+
+
+                                <p>
+                                    Potential AML match found.
+                                    Risk score has been calculated.
+                                    Compliance approval is required
+                                    before this screening is final.
+                                </p>
+
+                            </div>
+
+                        </div>
+                    }
+                    else if (result.ScreeningStatus ==
+                             "COMPLETED")
+                    {
+                        <div class="screening-completed-alert">
+
+                            <span>
+
+                                <i class="bi bi-check-circle">
+                                </i>
+
+                            </span>
+
+
+                            <div>
+
+                                <strong>
+                                    Screening Completed
+                                </strong>
+
+
+                                <p>
+                                    Exact AML name match found.
+                                    Risk calculation completed.
+                                    Compliance approval is not required.
+                                </p>
+
+                            </div>
+
+                        </div>
+                    }
+
+
+                    <!-- ==========================================
+                         AML MATCH FIRST
+                         ========================================== -->
+
+                    <h3 class="screening-section-title">
+                        AML Match
+                    </h3>
+
+
+                    <p class="screening-description">
+
+                        @result.Matches.Count potential
+
+                        @(result.Matches.Count == 1
+                            ? "match"
+                            : "matches")
+
+                        found.
+
                     </p>
 
-                    <p class="screening-note">
-                        Model version:
-                        @(result.ModelVersion ?? "Not provided")
-                    </p>
 
-                    <p class="screening-note">
-                        Customer DOB:
-                        @(Model.DateOfBirth.HasValue
-                            ? Model.DateOfBirth.Value.ToString(
-                                "dd MMM yyyy",
-                                CultureInfo.InvariantCulture)
-                            : "Not provided")
-                    </p>
-                </details>
-            }
+                    @foreach (var evidence in result.MatchEvidence)
+                    {
+                        <article class="screening-match">
 
-            @* <p class="screening-note">
-                <i class="bi bi-info-circle" aria-hidden="true"></i>
-                <span>
-                    Potential matches require review.
-                    Name similarity and risk score are separate measures.
-                    Results do not confirm identity or provide clearance.
-                </span>
-            </p> *@
+
+                            <!-- AML NAME -->
+
+                            <div class="screening-match-heading">
+
+                                <h4>
+                                    @evidence.MatchedName
+                                </h4>
+
+
+                                <span class="screening-badge">
+
+                                    @evidence.SourceName
+
+                                </span>
+
+                            </div>
+
+
+                            <!-- NAME % -->
+
+                            <div class="screening-match-percent">
+
+                                <span>
+                                    Name similarity
+                                </span>
+
+
+                                <strong>
+
+                                    @evidence.NameMatchPercent.ToString("0.##")%
+
+                                </strong>
+
+                            </div>
+
+
+                            <!-- MATCH DETAILS -->
+
+                            <dl class="screening-evidence">
+
+
+                                <!-- NAME STATUS -->
+
+                                <div>
+
+                                    <dt>
+                                        Name match
+                                    </dt>
+
+
+                                    <dd>
+                                        @evidence.NameMatchStatus
+                                    </dd>
+
+                                </div>
+
+
+                                <!-- OVERALL -->
+
+                                <div>
+
+                                    <dt>
+                                        Overall match
+                                    </dt>
+
+
+                                    <dd>
+
+                                        @evidence.MatchPercent.ToString("0.##")%
+
+                                    </dd>
+
+                                </div>
+
+
+                                <!-- REFERENCE -->
+
+                                <div>
+
+                                    <dt>
+                                        Reference
+                                    </dt>
+
+
+                                    <dd>
+
+                                        @(string.IsNullOrWhiteSpace(
+                                            evidence.ReferenceNo)
+
+                                            ? "Not provided"
+
+                                            : evidence.ReferenceNo)
+
+                                    </dd>
+
+                                </div>
+
+
+                                <!-- DOB -->
+
+                                <div>
+
+                                    <dt>
+                                        Date of birth
+                                    </dt>
+
+
+                                    <dd>
+
+                                        @(evidence.DateOfBirthMatched
+                                            ? "Matched"
+                                            : "Not matched")
+
+                                    </dd>
+
+                                </div>
+
+
+                                <!-- COUNTRY -->
+
+                                <div>
+
+                                    <dt>
+                                        Country
+                                    </dt>
+
+
+                                    <dd>
+
+                                        @(evidence.CountryMatched
+                                            ? "Matched"
+                                            : "Not matched")
+
+                                    </dd>
+
+                                </div>
+
+
+                                <!-- GENDER -->
+
+                                <div>
+
+                                    <dt>
+                                        Gender
+                                    </dt>
+
+
+                                    <dd>
+
+                                        @(evidence.GenderMatched
+                                            ? "Matched"
+                                            : "Not matched")
+
+                                    </dd>
+
+                                </div>
+
+                            </dl>
+
+                        </article>
+                    }
+
+
+                    <!-- ==========================================
+                         RISK SECOND
+                         ========================================== -->
+                    @if (result.RiskCalculated)
+                    {
+                        <h3 class="screening-section-title">
+                            Risk Assessment
+                        </h3>
+
+
+                        <div class="screening-risk">
+
+                            <div>
+
+                                <p class="screening-risk-label">
+                                    Calculated risk score
+                                </p>
+
+
+                                <div class="screening-risk-score">
+
+                                    @result.RiskScore.ToString("0.##")
+
+                                </div>
+
+
+                                <p class="screening-risk-caption">
+
+                                    Based on the configured
+                                    risk model
+
+                                </p>
+
+                            </div>
+
+
+                            <span class="screening-badge @riskClass">
+
+                                @result.RiskLevel
+
+                            </span>
+
+                        </div>
+
+
+                        <!-- ======================================
+                             RISK CALCULATION DETAILS
+                             ====================================== -->
+
+                        <details class="screening-details">
+
+
+                            <summary>
+                                Risk calculation details
+                            </summary>
+
+
+                            <div class="screening-table-wrap">
+
+
+                                <table class="screening-table">
+
+
+                                    <thead>
+
+                                        <tr>
+
+                                            <th scope="col">
+                                                Factor
+                                            </th>
+
+                                            <th scope="col">
+                                                Rule score
+                                            </th>
+
+                                            <th scope="col">
+                                                Weight
+                                            </th>
+
+                                            <th scope="col">
+                                                Points
+                                            </th>
+
+                                        </tr>
+
+                                    </thead>
+
+
+                                    <tbody>
+
+
+                                        <!-- AML SOURCE -->
+
+                                        <tr>
+
+                                            <th scope="row">
+                                                AML source
+                                            </th>
+
+
+                                            <td>
+
+                                                @(result.AmlRuleScore?
+                                                    .ToString("0.##")
+                                                    ?? "—")
+
+                                            </td>
+
+
+                                            <td>
+
+                                                @(result.AmlWeight.HasValue
+                                                    ? result.AmlWeight.Value
+                                                        .ToString("0.##") + "%"
+                                                    : "—")
+
+                                            </td>
+
+
+                                            <td>
+
+                                                @(result.AmlContribution?
+                                                    .ToString("0.##")
+                                                    ?? "—")
+
+                                            </td>
+
+                                        </tr>
+
+
+                                        <!-- OCCUPATION -->
+
+                                        <tr>
+
+                                            <th scope="row">
+                                                Occupation
+                                            </th>
+
+
+                                            <td>
+
+                                                @(result.OccupationRuleScore?
+                                                    .ToString("0.##")
+                                                    ?? "—")
+
+                                            </td>
+
+
+                                            <td>
+
+                                                @(result.OccupationWeight.HasValue
+                                                    ? result.OccupationWeight.Value
+                                                        .ToString("0.##") + "%"
+                                                    : "—")
+
+                                            </td>
+
+
+                                            <td>
+
+                                                @(result.OccupationContribution?
+                                                    .ToString("0.##")
+                                                    ?? "—")
+
+                                            </td>
+
+                                        </tr>
+
+
+                                        <!-- SOURCE OF FUNDS -->
+
+                                        <tr>
+
+                                            <th scope="row">
+                                                Source of funds
+                                            </th>
+
+
+                                            <td>
+
+                                                @(result.SourceOfFundsRuleScore?
+                                                    .ToString("0.##")
+                                                    ?? "—")
+
+                                            </td>
+
+
+                                            <td>
+
+                                                @(result.SourceOfFundsWeight.HasValue
+                                                    ? result.SourceOfFundsWeight.Value
+                                                        .ToString("0.##") + "%"
+                                                    : "—")
+
+                                            </td>
+
+
+                                            <td>
+
+                                                @(result.SourceOfFundsContribution?
+                                                    .ToString("0.##")
+                                                    ?? "—")
+
+                                            </td>
+
+                                        </tr>
+
+                                    </tbody>
+
+
+                                    <tfoot>
+
+                                        <tr>
+
+                                            <th scope="row"
+                                                colspan="3">
+
+                                                Final risk score
+
+                                            </th>
+
+
+                                            <td>
+
+                                                @result.RiskScore.ToString("0.##")
+
+                                            </td>
+
+                                        </tr>
+
+                                    </tfoot>
+
+
+                                </table>
+
+                            </div>
+
+
+                            <p class="screening-note">
+
+                                Points =
+                                rule score × weight ÷ 100.
+
+                            </p>
+
+
+                            <p class="screening-note">
+
+                                Model version:
+
+                                @(result.ModelVersion
+                                    ?? "Not provided")
+
+                            </p>
+
+
+                            <p class="screening-note">
+
+                                Customer DOB:
+
+                                @(Model.DateOfBirth.HasValue
+
+                                    ? Model.DateOfBirth.Value.ToString("dd MMM yyyy",CultureInfo.InvariantCulture): "Not provided")
+
+                            </p>
+
+                        </details>
+                    }
+
+                }
+
+            </div>
+
         </section>
 
     </div>
+
 </div>
 
-@section Scripts {
+
+@section Scripts
+{
     <partial name="_ValidationScriptsPartial" />
 
+
     <script>
+
         (() => {
-            const form = document.getElementById("customerScreeningForm");
-            const button = document.getElementById("screeningSubmit");
-            const buttonText = document.getElementById("screeningButtonText");
-            const resultPanel = document.getElementById("screeningResult");
-            const status = document.getElementById("screeningStatus");
 
-            form.addEventListener("submit", function (event) {
-                if (!form.checkValidity()) {
-                    return;
-                }
+            const form =
+                document.getElementById(
+                    "customerScreeningForm");
 
-                if (window.jQuery &&
-                    jQuery.fn.valid &&
-                    !jQuery(form).valid()) {
-                    return;
-                }
+            const button =
+                document.getElementById(
+                    "screeningSubmit");
 
-                if (event.defaultPrevented) {
-                    return;
-                }
+            const buttonText =
+                document.getElementById(
+                    "screeningButtonText");
 
-                button.disabled = true;
-                button.classList.add("is-loading");
-                buttonText.textContent = "Checking...";
-                resultPanel.setAttribute("aria-busy", "true");
+            const resultPanel =
+                document.getElementById(
+                    "screeningResult");
 
-                const title = document.getElementById("screeningEmptyTitle");
-                const message = document.getElementById("screeningEmptyMessage");
+            const status =
+                document.getElementById(
+                    "screeningStatus");
 
-                if (title && message) {
-                    title.textContent = "Screening in progress";
-                    message.textContent =
-                        "Checking AML records and calculating the result.";
-                } else {
-                    status.textContent = "Screening in progress...";
-                }
-            });
 
-            window.addEventListener("pageshow", function () {
-                button.disabled = false;
-                button.classList.remove("is-loading");
-                buttonText.textContent = "Check PEP/Sanction";
-                resultPanel.removeAttribute("aria-busy");
-            });
+            if (!form ||
+                !button ||
+                !buttonText ||
+                !resultPanel)
+            {
+                return;
+            }
+
+
+            form.addEventListener(
+                "submit",
+                function (event) {
+
+                    // Browser validation.
+                    if (!form.checkValidity()) {
+                        return;
+                    }
+
+
+                    // jQuery validation.
+                    if (window.jQuery &&
+                        jQuery.fn.valid &&
+                        !jQuery(form).valid()) {
+
+                        return;
+                    }
+
+
+                    if (event.defaultPrevented) {
+                        return;
+                    }
+
+
+                    // Disable button while request runs.
+                    button.disabled = true;
+
+                    button.classList.add(
+                        "is-loading");
+
+                    buttonText.textContent =
+                        "Checking...";
+
+
+                    resultPanel.setAttribute(
+                        "aria-busy",
+                        "true");
+
+
+                    const title =
+                        document.getElementById(
+                            "screeningEmptyTitle");
+
+                    const message =
+                        document.getElementById(
+                            "screeningEmptyMessage");
+
+
+                    if (title && message)
+                    {
+                        title.textContent =
+                            "Screening in progress";
+
+                        message.textContent =
+                            "Checking AML records and calculating the result.";
+                    }
+                    else if (status)
+                    {
+                        status.textContent =
+                            "Screening in progress...";
+                    }
+
+                });
+
+
+            // Fix browser back/forward button state.
+            window.addEventListener(
+                "pageshow",
+                function () {
+
+                    button.disabled =
+                        false;
+
+                    button.classList.remove(
+                        "is-loading");
+
+                    buttonText.textContent =
+                        "Check PEP/Sanction";
+
+                    resultPanel.removeAttribute(
+                        "aria-busy");
+
+                });
+
         })();
+
     </script>
 }

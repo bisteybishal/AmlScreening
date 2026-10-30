@@ -203,9 +203,6 @@ public class AccountController : Controller
 
                     AllowRefresh = true,
 
-                    ExpiresUtc =
-                        DateTimeOffset.UtcNow
-                            .AddHours(8)
                 });
 
 

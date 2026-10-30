@@ -35,13 +35,13 @@ public class CustomerKycViewModel : IValidatableObject
 
     //[Required]
     [StringLength(150)]
-    public string Occupation { get; set; } = string.Empty;
+    public string? Occupation { get; set; }
 
 
     //[Required]
     [StringLength(150)]
-    [Display(Name = "Source of funds")]
-    public string SourceOfFunds { get; set; } = string.Empty;
+    [Display(Name = "Source of Funds")]
+    public string? SourceOfFunds { get; set; } 
 
 
     public List<SelectListItem> CountryOptions { get; set; } = [];
@@ -88,15 +88,18 @@ public class CustomerKycResult
 
     public string? ModelVersion { get; set; }
 
+    public bool RiskCalculated { get; set; }
+
+    public bool RequiresApproval { get; set; }
+
+    public string ScreeningStatus { get; set; }
+        = string.Empty;
+
+    public string? ScreeningMessage { get; set; }
 
     public bool IsProvisional =>
         Matches.Count > 0;
 
-
-    public string ScreeningStatus =>
-        IsProvisional
-            ? "REVIEW_REQUIRED"
-            : "NO_CANDIDATE_FOUND";
 
 
     public decimal? AmlRuleScore { get; set; }
