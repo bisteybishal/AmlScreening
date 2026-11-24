@@ -41,7 +41,7 @@
         <aside id="sidebar" class="sidebar" aria-label="Main navigation">
             <a class="sidebar-brand" asp-controller="Dashboard" asp-action="Index">
                 <span class="brand-shield"><i class="bi bi-shield-check"></i></span>
-                <span class="brand-copy"><strong>AML</strong><small>SCREENING</small></span>
+                <span class="brand-copy">PEP/Sanction<small>SCREENING</small></span>
             </a>
             <nav class="sidebar-nav">
                 @foreach (var section in navigationItems.GroupBy(item => item.SectionName))
@@ -90,17 +90,7 @@
                     }
                 }
             </nav>
-            <div class="sidebar-footer">
-                <div class="sidebar-user">
-                    <span class="avatar">@initials</span>
-                    <span class="sidebar-user-copy"><strong>@fullName</strong><small>@role</small></span>
-                    <i class="bi bi-chevron-right ms-auto"></i>
-                </div>
-                <form asp-controller="Account" asp-action="Logout" method="post">
-                    @Html.AntiForgeryToken()
-                    <button class="logout-button" type="submit"><i class="bi bi-box-arrow-right"></i><span>Logout</span></button>
-                </form>
-            </div>
+        
         </aside>
         <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
         <div class="portal-main">
@@ -110,13 +100,71 @@
                     <strong class="page-name">@ViewData["Title"]</strong>
                 </div>
                 <div class="topbar-right">
-                    <button class="notification-button" type="button" aria-label="Notifications"><i class="bi bi-bell"></i></button>
+                    <!--notification-->
+                    @* <button class="notification-button" type="button" aria-label="Notifications"><i class="bi bi-bell"></i></button> *@
                     <div class="topbar-separator"></div>
-                    <div class="profile-summary">
-                        <span class="avatar">@initials</span>
-                        <span class="profile-copy"><strong>@fullName</strong><small>@role</small></span>
-                        <i class="bi bi-chevron-down"></i>
+                 
+                    <!-- PROFILE DROPDOWN -->
+                    <div class="dropdown profile-dropdown">
+
+                        <button class="profile-summary profile-button"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false">
+
+                            <span class="avatar">
+                                @initials
+                            </span>
+
+                            <span class="profile-copy">
+                                <strong>@fullName</strong>
+                                <small>@role</small>
+                            </span>
+
+                            <i class="bi bi-chevron-down profile-arrow"></i>
+
+                        </button>
+
+
+                        <div class="dropdown-menu dropdown-menu-end profile-menu">
+
+                            <div class="profile-menu-header">
+
+                                <span class="avatar">
+                                    @initials
+                                </span>
+
+                                <div>
+                                    <strong>@fullName</strong>
+                                    <small>@role</small>
+                                </div>
+
+                            </div>
+
+                            <div class="dropdown-divider"></div>
+
+
+                            <form asp-controller="Account"
+                                  asp-action="Logout"
+                                  method="post">
+
+                                @Html.AntiForgeryToken()
+
+                                <button type="submit"
+                                        class="dropdown-item profile-logout">
+
+                                    <i class="bi bi-box-arrow-right"></i>
+
+                                    <span>Logout</span>
+
+                                </button>
+
+                            </form>
+
+                        </div>
+
                     </div>
+
                 </div>
             </header>
             <nav id="workspaceTabs"

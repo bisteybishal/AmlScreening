@@ -17,4 +17,8 @@
     <Folder Include="Security\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="wwwroot\Images\pep-sanction-login.png" />
+  </ItemGroup>
+
 </Project>
